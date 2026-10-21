@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* Brand: warm teak accent instead of the default blue. */
+:root,
+.light,
+[data-theme="light"] {
+  --accent: oklch(0.52 0.12 52);
+  --accent-foreground: oklch(0.99 0.01 80);
+  --focus: oklch(0.52 0.12 52);
+  --background: oklch(0.975 0.004 80);
+}
+
+.dark,
+[data-theme="dark"] {
+  --accent: oklch(0.72 0.12 60);
+  --accent-foreground: oklch(0.2 0.02 60);
+  --focus: oklch(0.72 0.12 60);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-feature-settings: "cv11", "ss01";
+  background: var(--background);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+}
