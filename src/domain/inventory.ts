@@ -105,3 +105,52 @@ export function transferLot(db: Db, lotId: ID, qty: number, toLocation: string, 
   recordMove(db, { lot: moved, qty: 0, type: "transfer", ref, note: note || `Pindah ke ${toLocation}` });
   return moved;
 }
+
+/**
+ * Merges several lots of the same item into one, e.g. offcuts of one size bundled together, or
+ * stock tidied after transfers. Cost is the weighted average; the merged lot keeps the oldest
+ * receipt date so it stays first in line under FIFO.
+ */
+export function mergeLots(db: Db, lotIds: ID[], opts: { location?: string; dimensions?: Dimensions; note?: string } = {}) {
+  const ids = [...new Set(lotIds)];
+  assert(ids.length >= 2, "Pilih minimal dua lot untuk digabung.");
+  const lots = ids.map((id) => getLot(db, id));
+  const first = lots[0]!;
+  const item = getItem(db, first.itemId);
+  for (const l of lots) {
+    assert(l.itemId === first.itemId, "Hanya lot dari barang yang sama yang bisa digabung.");
+    assert(l.status === "tersedia", `Lot ${l.code} berstatus ${l.status} dan tidak bisa digabung.`);
+    assert(l.qty > EPS, `Lot ${l.code} sudah kosong.`);
+    assert(l.isRemnant === first.isRemnant, "Sisa material tidak bisa digabung dengan stok biasa.");
+    assert((l.reservedForWo ?? null) === (first.reservedForWo ?? null), "Lot yang dicadangkan untuk pekerjaan berbeda tidak bisa digabung.");
+  }
+  const location = opts.location || first.location;
+  assertLocation(db, location);
+  assertDimensions(opts.dimensions);
+  const ref = adjustmentRef(db);
+  const at = new Date().toISOString();
+  const qty = roundQty(lots.reduce((a, l) => a + l.qty, 0));
+  const value = lots.reduce((a, l) => a + l.qty * l.unitCost, 0);
+  const oldest = lots.map((l) => l.createdAt).sort()[0]!;
+  const codes = lots.map((l) => l.code).join(", ");
+  for (const l of lots) {
+    takeFromLot(db, l.id, l.qty, "gabung", ref, { at, note: "Digabung", allowStatus: ["tersedia"] });
+  }
+  const merged = createLot(db, {
+    itemId: item.id,
+    qty,
+    unitCost: value / qty,
+    origin: "gabung",
+    originRef: ref,
+    isRemnant: first.isRemnant,
+    reservedForWo: first.reservedForWo,
+    dimensions: opts.dimensions,
+    location,
+    status: "tersedia",
+    createdAt: oldest,
+    mergedFrom: lots.map((l) => l.id),
+    note: opts.note || `Gabungan ${codes}`,
+  });
+  recordMove(db, { lot: merged, qty, type: "gabung", ref, at, note: `Dari ${codes}` });
+  return merged;
+}

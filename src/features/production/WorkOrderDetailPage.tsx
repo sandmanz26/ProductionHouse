@@ -13,12 +13,14 @@ import {
   sum,
   unissue,
   updateWorkOrder,
+  workOrderFlow,
   type ExtraCost,
   type Issue,
   type Lot,
   type WorkOrder,
 } from "@/domain";
 import { NumberInput, TextInput } from "@/components/fields";
+import { FlowDiagram } from "@/components/FlowDiagram";
 import { RecordNotFound } from "@/components/NotFound";
 import { Code, ConfirmButton, DataTable, EmptyBlock, KeyValue, PageHeader, Row, Section, StatusChip, Tag, type Column } from "@/components/ui";
 import { formatDate, formatDateTime, formatDims, formatIDR, formatPct, formatQty } from "@/lib/format";
@@ -44,6 +46,7 @@ export default function WorkOrderDetailPage() {
 
   const reqs = useMemo(() => (wo ? requirements(db, wo) : []), [db, wo]);
   const lotsById = useMemo(() => new Map(db.lots.map((l) => [l.id, l])), [db.lots]);
+  const flow = useMemo(() => (wo ? workOrderFlow(db, wo) : { nodes: [], links: [] }), [db, wo]);
 
   if (!wo) return <RecordNotFound what="Perintah kerja" back="/produksi" />;
 
@@ -101,6 +104,7 @@ export default function WorkOrderDetailPage() {
   ];
 
   const createdLots = (wo.createdLotIds ?? []).map((lid) => lotsById.get(lid)).filter((l): l is Lot => !!l);
+  const recipe = wo.recipeId ? db.recipes.find((r) => r.id === wo.recipeId) : undefined;
 
   return (
     <>
@@ -148,12 +152,27 @@ export default function WorkOrderDetailPage() {
         }
       />
 
+      <Section
+        title="Peta proses"
+        description={
+          wo.cost
+            ? "Ke mana setiap rupiah pekerjaan ini mengalir: bahan dan tenaga kerja masuk, hasil, sisa, dan limbah keluar — lalu ke mana hasilnya pergi."
+            : wo.issues.length
+              ? "Yang sudah masuk ke pekerjaan ini sejauh ini. Peta lengkap terkunci saat pekerjaan selesai."
+              : "Rencana pada harga standar. Berubah menjadi angka nyata begitu bahan diambil."
+        }
+        className="mb-6"
+        bodyClassName="p-0"
+      >
+        <FlowDiagram graph={flow} label={`Peta proses ${wo.code}`} />
+      </Section>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
           {open && (
             <Section
               title="Kebutuhan bahan"
-              description="Dari BOM produk dan bahan tambahan. Klik Ambil untuk mengeluarkan bahan dari gudang."
+              description={`${recipe ? `Dari resep ${recipe.name}` : "Dari BOM produk dan bahan tambahan"}. Klik Ambil untuk mengeluarkan bahan dari gudang.`}
               actions={
                 <>
                   {componentShort.length > 0 && (
@@ -332,6 +351,7 @@ export default function WorkOrderDetailPage() {
                     "—"
                   ),
                 ],
+                ["Resep", recipe ? <Link href={`/resep/${recipe.id}`}>{recipe.name}{wo.batches && wo.batches !== 1 ? ` × ${wo.batches} batch` : ""}</Link> : "—"],
                 ["Catatan", wo.note],
               ]}
             />

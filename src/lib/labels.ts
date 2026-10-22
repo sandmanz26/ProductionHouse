@@ -1,4 +1,5 @@
 import type {
+  FlowKind,
   CostingMethod,
   LotOrigin,
   OutputGrade,
@@ -32,6 +33,12 @@ export const WO_TYPE: Record<WorkOrderType, { label: string; short: string; desc
     short: "Konversi",
     description: "Produk yang ada diubah menjadi produk lain (mis. meja makan → meja kerja).",
     tone: "warning",
+  },
+  gabung: {
+    label: "Gabung",
+    short: "Gabung",
+    description: "Beberapa barang → satu barang: set meja + kursi, atau potongan sisa dilem jadi panel.",
+    tone: "default",
   },
   dekonstruksi: {
     label: "Dekonstruksi",
@@ -93,6 +100,7 @@ export const LOT_ORIGIN: Record<LotOrigin, string> = {
   retur_sewa: "Retur sewa",
   retur_penjualan: "Retur penjualan",
   penyesuaian: "Penyesuaian",
+  gabung: "Gabungan lot",
 };
 
 export const RETURN_KIND: Record<ReturnKind, { label: string; description: string; tone: Tone }> = {
@@ -124,6 +132,7 @@ export const MOVE_TYPE: Record<MoveType, string> = {
   transfer: "Pindah lokasi",
   retur_penjualan: "Masuk · retur penjualan",
   revaluasi: "Revaluasi HPP",
+  gabung: "Gabung lot",
 };
 
 export const MATERIAL_CATEGORY: Record<MaterialCategory, string> = {
@@ -175,4 +184,15 @@ export const COSTING_HINT: Record<CostingMethod, string> = {
   rata_rata: "Setiap barang keluar dengan harga rata-rata semua stok saat itu; dihitung ulang tiap barang masuk.",
   identifikasi: "Harga lot yang benar-benar diambil. Cocok untuk barang unik atau pesanan proyek.",
   lifo: "Stok yang masuk terakhir keluar lebih dulu. Hanya untuk analisa internal.",
+};
+
+/** Legend wording for process-map node kinds. */
+export const FLOW_KIND: Record<FlowKind, string> = {
+  bahan: "Bahan",
+  produk: "Produk",
+  sisa: "Sisa material",
+  biaya: "Tenaga kerja & overhead",
+  proses: "Proses",
+  stok: "Stok / dalam proses",
+  rugi: "Limbah & rugi",
 };

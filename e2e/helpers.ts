@@ -28,8 +28,8 @@ export async function readDb(page: Page) {
  * Types into a combobox and picks an option, retrying until the field shows the choice. Under
  * load the list re-renders while it filters, and a click on a detached option selects nothing.
  */
-export async function pickOption(page: Page, combobox: string, text: string, option: RegExp) {
-  const box = page.getByRole("combobox", { name: combobox }).first();
+export async function pickOption(page: Page, combobox: string, text: string, option: RegExp, nth = 0) {
+  const box = page.getByRole("combobox", { name: combobox }).nth(nth);
   await expect(async () => {
     await box.fill(text);
     await page.getByRole("option", { name: option }).first().click({ timeout: 3_000 });

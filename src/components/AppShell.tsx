@@ -2,6 +2,7 @@ import { Button, Drawer, Dropdown, type Key } from "@heroui/react";
 import {
   ArrowLeftRight,
   Armchair,
+  BookOpen,
   Calculator,
   CalendarClock,
   Hammer,
@@ -16,6 +17,7 @@ import {
   Settings,
   SquareKanban,
   Wallet,
+  Workflow,
   Ship,
   ShoppingCart,
   Sun,
@@ -54,6 +56,7 @@ const NAV: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: "/produksi", label: "Perintah kerja", icon: Hammer, end: true, badge: (c) => (c.woOpen ? { value: c.woOpen, tone: "accent" } : undefined) },
       { to: "/produksi/papan", label: "Papan produksi", icon: SquareKanban },
+      { to: "/resep", label: "Resep proses", icon: BookOpen },
       {
         to: "/pembelian",
         label: "Pembelian",
@@ -74,7 +77,13 @@ const NAV: { title?: string; items: NavItem[] }[] = [
       { to: "/stok/mutasi", label: "Mutasi Stok", icon: ArrowLeftRight },
     ],
   },
-  { title: "Analisa", items: [{ to: "/laporan", label: "Laporan HPP", icon: Calculator }] },
+  {
+    title: "Analisa",
+    items: [
+      { to: "/peta", label: "Peta alur", icon: Workflow },
+      { to: "/laporan", label: "Laporan HPP", icon: Calculator },
+    ],
+  },
   {
     title: "Data Master",
     items: [

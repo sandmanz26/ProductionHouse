@@ -115,7 +115,8 @@ export type LotOrigin =
   | "dekonstruksi"
   | "retur_sewa"
   | "retur_penjualan"
-  | "penyesuaian";
+  | "penyesuaian"
+  | "gabung";
 
 export type DocType = "opening" | "purchase" | "workOrder" | "sale" | "rental" | "adjustment";
 
@@ -143,6 +144,10 @@ export interface Lot {
   /** Soft reservation: lot was bought for a specific work order. */
   reservedForWo?: ID;
   /** Set on lots received as partial output (provisional cost, revalued when the order closes). */
+  /** Lots this one was merged from (traceability). */
+  mergedFrom?: ID[];
+  /** Lot this one was split off (transfer, rental hand-over) — same layer, same origin. */
+  splitFrom?: ID;
   receiptId?: ID;
   createdAt: ISODateTime;
   note?: string;
@@ -164,7 +169,8 @@ export type MoveType =
   | "limbah"
   | "transfer"
   | "retur_penjualan"
-  | "revaluasi";
+  | "revaluasi"
+  | "gabung";
 
 export interface StockMove {
   id: ID;
@@ -230,7 +236,12 @@ export interface Purchase {
 
 // ------------------------------------------------------------------ Production
 
-export type WorkOrderType = "produksi" | "konversi" | "dekonstruksi" | "perbaikan";
+/**
+ * produksi: materials → new product (BOM or recipe) · konversi: product → other product ·
+ * gabung: several items → one item (a set, or offcuts laminated into a panel) ·
+ * dekonstruksi: product → reusable materials · perbaikan: damaged unit → usable again.
+ */
+export type WorkOrderType = "produksi" | "konversi" | "gabung" | "dekonstruksi" | "perbaikan";
 export type WorkOrderStatus = "rencana" | "berjalan" | "selesai" | "batal";
 export type StageStatus = "menunggu" | "proses" | "selesai";
 export type OutputGrade = "baik" | "reject";
@@ -395,6 +406,55 @@ export interface WorkOrder {
   cost?: CostSummary;
   createdLotIds?: ID[];
   note?: string;
+  /** Created from a recipe: inputs come from the recipe instead of the products' BOM. */
+  recipeId?: ID;
+  /** Recipe multiplier (number of batches). */
+  batches?: number;
+}
+
+// ------------------------------------------------------------------ Recipes
+
+export type RecipeType = Exclude<WorkOrderType, "perbaikan">;
+
+export interface RecipeLine {
+  id: ID;
+  itemId: ID;
+  /** Per batch. */
+  qty: number;
+  note?: string;
+}
+
+export interface RecipeOutput {
+  id: ID;
+  itemId: ID;
+  /** Per batch. */
+  qty: number;
+  /** Fixed cost share in percent; when one output has it, all must. */
+  sharePct?: number;
+}
+
+/**
+ * A reusable process: what goes in, what comes out, how long it takes and what usually falls off.
+ * Unlike a BOM (one product, one way to make it) a recipe may have several outputs, several routes
+ * to the same product, and covers conversions, merges and dismantling too.
+ */
+export interface Recipe {
+  id: ID;
+  code: string;
+  name: string;
+  type: RecipeType;
+  inputs: RecipeLine[];
+  outputs: RecipeOutput[];
+  /** Expected usable offcut, % of input material value (credited back to stock). */
+  expectedRemnantPct: number;
+  /** Expected waste, % of input material quantity (planning only; cost stays in the product). */
+  expectedWastePct: number;
+  /** Labour hours per batch. */
+  laborHours: number;
+  stages: string[];
+  note?: string;
+  archived?: boolean;
+  createdAt: ISODateTime;
 }
 
 // ------------------------------------------------------------------ Sales
@@ -580,7 +640,7 @@ export interface Settings {
   costingHistory: CostingChange[];
 }
 
-export type CounterKey = "lot" | "purchase" | "workOrder" | "sale" | "rental" | "adjustment" | "item" | "partner";
+export type CounterKey = "lot" | "purchase" | "workOrder" | "sale" | "rental" | "adjustment" | "item" | "partner" | "recipe";
 
 export interface Db {
   schemaVersion: number;
@@ -593,5 +653,6 @@ export interface Db {
   workOrders: WorkOrder[];
   sales: SalesOrder[];
   rentals: Rental[];
+  recipes: Recipe[];
   counters: Record<CounterKey, number>;
 }

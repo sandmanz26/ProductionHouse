@@ -44,6 +44,7 @@ export const CODE_PREFIX: Record<CounterKey, string> = {
   adjustment: "ADJ",
   item: "ITM",
   partner: "REL",
+  recipe: "RSP",
 };
 
 export function nextCode(db: Db, key: CounterKey): string {
@@ -150,7 +151,7 @@ export function splitLot(db: Db, lotId: ID, qty: number, type: MoveType, ref: Do
   if (Math.abs(qty - lot.qty) < EPS) return lot;
   lot.qty = roundQty(lot.qty - qty);
   const { id: _id, code: _code, createdAt: _c, ...rest } = lot;
-  const part = createLot(db, { ...rest, qty, createdAt: lot.createdAt });
+  const part = createLot(db, { ...rest, qty, createdAt: lot.createdAt, splitFrom: lot.id });
   recordMove(db, { lot, qty: -qty, type, ref, at, note: `Dipecah ke ${part.code}` });
   recordMove(db, { lot: part, qty, type, ref, at, note: `Dipecah dari ${lot.code}` });
   return part;

@@ -44,6 +44,17 @@ Ditambahkan setelah *roast* terhadap v1 ([`docs/ROAST.md`](docs/ROAST.md)):
   layar sambutan (bengkel contoh vs bengkel sendiri), langkah pertama untuk bengkel baru, dan
   suara yang konsisten di keadaan kosong & halaman buntu. Lihat `docs/BRAND.md`.
 
+## Baru di v3.2 — peta proses, resep, gabung
+
+- **Peta proses** (diagram Sankey, lebar = rupiah): per perintah kerja, per resep, telusur lot
+  (asal-usul → tujuan, untuk SVLK/EUDR), dan **Peta alur** seluruh bengkel per periode.
+- **Resep proses**: banyak hasil, banyak cara membuat barang yang sama, batch, perkiraan sisa &
+  limbah, riwayat pemakaian (hasil & bahan vs resep).
+- **Gabung**: jenis perintah kerja baru (set meja-kursi, panel dari potongan sisa) dan **gabung lot**
+  di gudang.
+
+Detail: [`docs/PROCESS.md`](docs/PROCESS.md).
+
 ## Baru di v3.1 — metode biaya persediaan
 
 FIFO (default), rata-rata bergerak, identifikasi khusus, dan LIFO (khusus analisa internal), dengan

@@ -1,12 +1,14 @@
 import { Button, Card } from "@heroui/react";
-import { Check, Hammer, Plus, Recycle, Trash2, Wrench, Shuffle, Scissors, type LucideIcon } from "lucide-react";
+import { Check, Combine, Hammer, Plus, Recycle, Trash2, Wrench, Shuffle, Scissors, X, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import {
   createWorkOrder,
+  createWorkOrderFromRecipe,
   EPS,
   getLot,
-  isProducible,
+  isProducibleIn,
+  recipeFlow,
   requirements,
   sum,
   transact,
@@ -17,6 +19,7 @@ import {
 } from "@/domain";
 import { DateInput, NumberInput, SelectInput, TextAreaInput, TextInput } from "@/components/fields";
 import { ItemPicker } from "@/components/pickers";
+import { FlowDiagram } from "@/components/FlowDiagram";
 import { PageHeader, Row, Section } from "@/components/ui";
 import { formatIDR, formatQty, UOM_LABEL } from "@/lib/format";
 import { WO_TYPE } from "@/lib/labels";
@@ -27,6 +30,7 @@ import { RequirementsTable } from "./shared";
 const TYPE_ICON: Record<WorkOrderType, LucideIcon> = {
   produksi: Hammer,
   konversi: Shuffle,
+  gabung: Combine,
   dekonstruksi: Scissors,
   perbaikan: Wrench,
 };
@@ -59,8 +63,14 @@ export default function WorkOrderNewPage() {
   const [extras, setExtras] = useState<LineState[]>([]);
   const [sourceLotId, setSourceLotId] = useState<ID | null>(initialLot);
   const [sourceQty, setSourceQty] = useState(1);
+  const [recipeId, setRecipeId] = useState<ID | null>(params.get("resep"));
+  const [batches, setBatches] = useState(1);
+  const recipe = recipeId ? db.recipes.find((r) => r.id === recipeId && !r.archived) : undefined;
+  const recipeOptions = db.recipes
+    .filter((r) => !r.archived)
+    .map((r) => ({ id: r.id, label: r.name, description: `${r.code} · ${WO_TYPE[r.type].short} · ${r.outputs.map((o) => item(o.itemId)?.name).join(", ")}` }));
 
-  const needsSource = type !== "produksi";
+  const needsSource = type === "konversi" || type === "dekonstruksi" || type === "perbaikan";
   const sourceLot = sourceLotId ? db.lots.find((l) => l.id === sourceLotId) : undefined;
   const sourceItem = item(sourceLot?.itemId);
 
@@ -84,6 +94,8 @@ export default function WorkOrderNewPage() {
           return first ? `Produksi ${first}${outs.length > 1 ? ` +${outs.length - 1}` : ""}` : "";
         case "konversi":
           return sourceItem && first ? `Konversi ${sourceItem.name} → ${first}` : "";
+        case "gabung":
+          return first ? `Gabung → ${first}` : "";
         case "dekonstruksi":
           return sourceItem ? `Bongkar ${sourceItem.name}` : "";
         case "perbaikan":
@@ -91,19 +103,26 @@ export default function WorkOrderNewPage() {
       }
     })();
     const base = { type, title: title.trim() || autoTitle, dueDate: dueDate || undefined, note: note || undefined, salesOrderId };
-    if (type === "produksi") return { ...base, plannedOutputs: outs, plannedInputs: ext };
+    if (type === "produksi" || type === "gabung") return { ...base, plannedOutputs: outs, plannedInputs: ext };
     if (type === "perbaikan")
       return { ...base, plannedOutputs: sourceLot ? [{ itemId: sourceLot.itemId, qty: sourceQty }] : [], plannedInputs: [...source, ...ext] };
     if (type === "konversi") return { ...base, plannedOutputs: outs, plannedInputs: [...source, ...ext] };
     return { ...base, plannedOutputs: outs, plannedInputs: source };
   }, [type, title, dueDate, note, outputs, extras, sourceLot, sourceQty, sourceItem, item, salesOrderId]);
 
-  const ready = needsSource ? !!sourceLot : !!input?.plannedOutputs.length;
+  const ready = recipe ? batches > 0 : needsSource ? !!sourceLot : !!input?.plannedOutputs.length;
+  const create = useMemo(
+    () => (d: typeof db) =>
+      recipe
+        ? createWorkOrderFromRecipe(d, recipe.id, { batches, title: title.trim() || undefined, dueDate: dueDate || undefined, salesOrderId, note: note || undefined })
+        : createWorkOrder(d, input!),
+    [recipe, batches, title, dueDate, salesOrderId, note, input],
+  );
   const preview = useMemo(() => {
-    if (!input || !ready) return null;
+    if ((!input && !recipe) || !ready) return null;
     try {
       return transact(db, (d) => {
-        const wo = createWorkOrder(d, input);
+        const wo = create(d);
         const reqs = requirements(d, wo);
         const material = sum(
           reqs.map((r) => {
@@ -116,24 +135,50 @@ export default function WorkOrderNewPage() {
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) };
     }
-  }, [db, input, item, ready]);
+  }, [db, input, recipe, create, item, ready]);
+  const recipeMap = useMemo(() => (recipe ? recipeFlow(db, recipe, batches || 1) : null), [db, recipe, batches]);
 
-  const outputUnits = sum(input?.plannedOutputs.map((o) => o.qty) ?? []);
+  const outputUnits = recipe ? sum(recipe.outputs.map((o) => o.qty * batches)) : sum(input?.plannedOutputs.map((o) => o.qty) ?? []);
   const canSave = !!preview && !("error" in preview);
 
   const save = () => {
-    if (!input) return;
-    const wo = run((d) => createWorkOrder(d, input), (w) => `Perintah kerja ${w.code} dibuat`);
+    if (!input && !recipe) return;
+    const wo = run(create, (w) => `Perintah kerja ${w.code} dibuat`);
     if (wo) navigate(`/produksi/${wo.id}`, { replace: true });
   };
 
 
   return (
     <>
-      <PageHeader title="Perintah kerja baru" description="Tiga langkah: pilih jenis pekerjaan, tentukan barang, cek kebutuhan bahan." back="/produksi" />
+      <PageHeader title="Perintah kerja baru" description="Mulai dari resep yang sudah teruji, atau susun sendiri: jenis pekerjaan, barang, lalu cek kebutuhan bahan." back="/produksi" />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
+          <Section title="Mulai dari resep" description="Resep membawa bahan, hasil, jam kerja, dan tahapannya sendiri — dikalikan jumlah batch.">
+            <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_8rem_auto]">
+              <SelectInput
+                label="Resep"
+                value={recipeId}
+                onChange={setRecipeId}
+                options={recipeOptions}
+                placeholder={recipeOptions.length ? "Tanpa resep — susun sendiri" : "Belum ada resep"}
+                isDisabled={!recipeOptions.length}
+              />
+              <NumberInput label="Batch" value={batches} onChange={setBatches} isDisabled={!recipe} maximumFractionDigits={2} />
+              {recipe && (
+                <Button variant="ghost" onPress={() => setRecipeId(null)}>
+                  <X className="size-4" /> Lepas resep
+                </Button>
+              )}
+            </div>
+            {recipeMap && (
+              <div className="-mx-4 mt-3 border-t border-[var(--rule)]">
+                <FlowDiagram graph={recipeMap} label={`Peta resep ${recipe?.name}`} />
+              </div>
+            )}
+          </Section>
+
+          {!recipe && (
           <Section title="1 · Jenis pekerjaan">
             <div role="radiogroup" aria-label="Jenis pekerjaan" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(Object.keys(WO_TYPE) as WorkOrderType[]).map((t) => {
@@ -149,6 +194,8 @@ export default function WorkOrderNewPage() {
                       setType(t);
                       if (t !== type) setSourceLotId(null);
                       setOutputs([newLine()]);
+                      // A merge needs at least two things to join; start with two empty rows.
+                      if (t === "gabung" && extras.length < 2) setExtras([newLine(), newLine()]);
                     }}
                     className={`flex items-start gap-3 rounded-md border p-4 text-left transition focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none ${
                       active ? "border-accent bg-accent-soft/50" : "border-[var(--rule)] hover:border-accent/60"
@@ -168,9 +215,11 @@ export default function WorkOrderNewPage() {
             </div>
           </Section>
 
-          <Section title="2 · Barang">
+          )}
+
+          <Section title={recipe ? "Detail" : "2 · Barang"}>
             <div className="flex flex-col gap-5">
-              {needsSource && (
+              {!recipe && needsSource && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_10rem]">
                   <SelectInput
                     label={type === "perbaikan" ? "Unit rusak yang diperbaiki" : "Produk asal (diambil dari stok)"}
@@ -194,21 +243,34 @@ export default function WorkOrderNewPage() {
                 </div>
               )}
 
-              {type !== "perbaikan" && (
+              {!recipe && type !== "perbaikan" && (
                 <LineEditor
-                  title={type === "dekonstruksi" ? "Perkiraan bahan yang didapat (bisa diubah saat selesai)" : "Yang dihasilkan — produk, komponen, atau bahan olahan"}
+                  title={
+                    type === "dekonstruksi"
+                      ? "Perkiraan bahan yang didapat (bisa diubah saat selesai)"
+                      : type === "gabung"
+                        ? "Hasil gabungan — satu jenis barang (mis. Set Makan, panel laminasi)"
+                        : "Yang dihasilkan — produk, komponen, atau bahan olahan"
+                  }
                   kind={type === "dekonstruksi" ? "material" : undefined}
-                  filter={type === "dekonstruksi" ? undefined : isProducible}
+                  filter={type === "dekonstruksi" || type === "gabung" ? undefined : (i) => isProducibleIn(db, i)}
                   lines={outputs}
                   onChange={setOutputs}
                   addLabel={type === "dekonstruksi" ? "Tambah bahan" : "Tambah produk"}
+                  single={type === "gabung"}
                 />
               )}
 
-              {type !== "dekonstruksi" && (
+              {!recipe && type !== "dekonstruksi" && (
                 <LineEditor
-                  title={type === "produksi" ? "Bahan tambahan di luar BOM (opsional)" : "Bahan tambahan yang dibutuhkan"}
-                  kind="material"
+                  title={
+                    type === "produksi"
+                      ? "Bahan tambahan di luar BOM (opsional)"
+                      : type === "gabung"
+                        ? "Barang yang digabung — dari stok (produk, komponen, sisa, bahan)"
+                        : "Bahan tambahan yang dibutuhkan"
+                  }
+                  kind={type === "gabung" ? undefined : "material"}
                   lines={extras}
                   onChange={setExtras}
                   addLabel="Tambah bahan"
@@ -217,7 +279,12 @@ export default function WorkOrderNewPage() {
               )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TextInput label="Judul" value={title} onChange={setTitle} placeholder={input?.title || "Otomatis dari produk"} />
+                <TextInput
+                  label="Judul"
+                  value={title}
+                  onChange={setTitle}
+                  placeholder={recipe ? `${recipe.name}${batches !== 1 ? ` ×${batches}` : ""}` : input?.title || "Otomatis dari produk"}
+                />
                 <DateInput label="Target selesai" value={dueDate} onChange={setDueDate} />
               </div>
               <TextAreaInput label="Catatan" value={note} onChange={setNote} placeholder="Instruksi untuk tukang, spesifikasi finishing, dll." rows={2} />
@@ -225,7 +292,7 @@ export default function WorkOrderNewPage() {
           </Section>
 
           <Section
-            title="3 · Cek kebutuhan bahan"
+            title={recipe ? "Cek kebutuhan bahan" : "3 · Cek kebutuhan bahan"}
             description="Sistem memakai sisa material lebih dulu, lalu stok terlama. Kekurangan bisa langsung dibuatkan pembelian setelah disimpan."
             bodyClassName="p-0"
           >
@@ -243,7 +310,7 @@ export default function WorkOrderNewPage() {
           <Card>
             <Card.Header>
               <Card.Title className="text-base">Estimasi biaya standar</Card.Title>
-              <Card.Description>Perkiraan dari BOM & tarif. HPP sebenarnya dihitung saat selesai.</Card.Description>
+              <Card.Description>Perkiraan dari {recipe ? "resep" : "BOM"} & tarif. HPP sebenarnya dihitung saat selesai.</Card.Description>
             </Card.Header>
             <Card.Content>
               {preview && "material" in preview ? (
@@ -288,6 +355,7 @@ function LineEditor({
   onChange,
   addLabel,
   allowEmpty,
+  single,
 }: {
   title: string;
   kind?: "material" | "product";
@@ -296,6 +364,8 @@ function LineEditor({
   onChange: (lines: LineState[]) => void;
   addLabel: string;
   allowEmpty?: boolean;
+  /** Exactly one line (a merge has one output). */
+  single?: boolean;
 }) {
   const { item } = useLookups();
   const update = (key: string, patch: Partial<LineState>) => onChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -318,11 +388,13 @@ function LineEditor({
             </Button>
           </div>
         ))}
-        <div>
-          <Button size="sm" variant="tertiary" onPress={() => onChange([...lines, newLine()])}>
-            <Plus className="size-4" /> {addLabel}
-          </Button>
-        </div>
+        {!single && (
+          <div>
+            <Button size="sm" variant="tertiary" onPress={() => onChange([...lines, newLine()])}>
+              <Plus className="size-4" /> {addLabel}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

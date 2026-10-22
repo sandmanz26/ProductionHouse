@@ -22,6 +22,7 @@ import {
   type LotSuggestion,
 } from "./core";
 import { assertCostOrder, orderPicks } from "./costing";
+import { createWorkOrderFromRecipe, recipesFor } from "./recipes";
 import type {
   CostLine,
   CostSummary,
@@ -53,6 +54,16 @@ export const isOpenWo = (wo: WorkOrder) => wo.status === "rencana" || wo.status 
 /** Items that can be the output of a production order: products, and materials with a BOM. */
 export const isProducible = (item: Item) => item.kind === "product" || (item.bom?.length ?? 0) > 0;
 
+/**
+ * Like isProducible, but also counts materials an active recipe makes (e.g. a laminated panel).
+ * Dismantling recipes don't count: recovered timber is a by-product, never something to plan for.
+ */
+export const isProducibleIn = (db: Pick<Db, "recipes">, item: Item) =>
+  isProducible(item) || db.recipes.some((r) => !r.archived && r.type !== "dekonstruksi" && r.outputs.some((o) => o.itemId === item.id));
+
+/** Merges and dismantling may output anything (a set, a laminated panel, recovered timber). */
+const outputsUnrestricted = (type: WorkOrderType) => type === "dekonstruksi" || type === "gabung";
+
 export function getWorkOrder(db: Db, id: ID): WorkOrder {
   const wo = db.workOrders.find((w) => w.id === id);
   assert(wo, "Perintah kerja tidak ditemukan.");
@@ -74,6 +85,9 @@ export interface WorkOrderInput {
   /** Stage names; defaults to the first output's route or the company default. */
   stages?: string[];
   note?: string;
+  /** Set by createWorkOrderFromRecipe: the recipe's inputs replace the outputs' BOM. */
+  recipeId?: ID;
+  batches?: number;
 }
 
 /** Standard labour hours for the planned outputs (from item master data). */
@@ -98,9 +112,9 @@ function validatePlan(db: Db, input: WorkOrderInput, keep?: ReadonlySet<ID>) {
   for (const o of input.plannedOutputs) {
     const item = getUsableItem(db, o.itemId, keep);
     assert(Number.isFinite(o.qty) && o.qty > EPS, `Qty output ${item.name} harus lebih dari 0.`);
-    if (input.type !== "dekonstruksi") {
+    if (!outputsUnrestricted(input.type)) {
       assert(
-        isProducible(item),
+        isProducibleIn(db, item),
         `${item.name} tidak bisa diproduksi: hanya produk, atau material yang punya resep (komponen / bahan olahan).`,
       );
     }
@@ -114,8 +128,19 @@ function validatePlan(db: Db, input: WorkOrderInput, keep?: ReadonlySet<ID>) {
   if (input.type === "produksi") {
     assert(input.plannedOutputs.length > 0, "Tentukan barang yang akan dibuat.");
   }
-  if (input.type === "konversi" || input.type === "dekonstruksi" || input.type === "perbaikan") {
+  if (input.type === "konversi" || input.type === "gabung" || input.type === "dekonstruksi" || input.type === "perbaikan") {
     assert((input.plannedInputs ?? []).length > 0, "Tentukan barang asal yang akan diproses.");
+  }
+  if (input.type === "gabung") {
+    const outputItems = new Set(input.plannedOutputs.map((o) => o.itemId));
+    assert(outputItems.size === 1, "Gabung menghasilkan tepat satu jenis barang.");
+    const inputs = input.plannedInputs ?? [];
+    // Two different things (meja + kursi, kayu + lem), or two units of one (dua papan dilem).
+    assert(
+      new Set(inputs.map((i) => i.itemId)).size >= 2 || sum(inputs.map((i) => i.qty)) >= 2 - EPS,
+      "Gabung butuh minimal dua barang (atau dua unit) yang disatukan.",
+    );
+    assert(!inputs.some((i) => outputItems.has(i.itemId)), "Barang hasil gabung tidak boleh menjadi bahannya sendiri.");
   }
 }
 
@@ -123,6 +148,7 @@ function defaultStageNames(db: Db, input: WorkOrderInput): string[] {
   if (input.stages) return input.stages;
   if (input.type === "perbaikan") return ["Perbaikan", "QC"];
   if (input.type === "dekonstruksi") return ["Bongkar", "Sortir bahan"];
+  if (input.type === "gabung") return ["Siapkan bagian", "Gabung", "QC"];
   const route = input.plannedOutputs.map((o) => findItem(db, o.itemId)?.stages).find((s) => s?.length);
   return route ?? db.settings.defaultStages ?? [];
 }
@@ -159,6 +185,8 @@ export function createWorkOrder(db: Db, input: WorkOrderInput): WorkOrder {
     laborLogs: [],
     receipts: [],
     note: input.note,
+    recipeId: input.recipeId,
+    batches: input.batches,
   };
   db.workOrders.push(wo);
   return wo;
@@ -233,13 +261,14 @@ export interface Requirement {
 }
 
 /** Standard material requirement derived from the plan (one BOM level). */
-export function plannedRequirement(db: Db, wo: Pick<WorkOrder, "type" | "plannedOutputs" | "plannedInputs">) {
+export function plannedRequirement(db: Db, wo: Pick<WorkOrder, "type" | "plannedOutputs" | "plannedInputs" | "recipeId">) {
   const req = new Map<ID, { qty: number; lotId?: ID }>();
   const add = (itemId: ID, qty: number, lotId?: ID) => {
     const cur = req.get(itemId);
     req.set(itemId, { qty: (cur?.qty ?? 0) + qty, lotId: cur?.lotId ?? lotId });
   };
-  if (wo.type === "produksi") {
+  // A recipe lists its inputs explicitly; the products' BOM would count them twice.
+  if (wo.type === "produksi" && !wo.recipeId) {
     for (const o of wo.plannedOutputs) {
       for (const b of findItem(db, o.itemId)?.bom ?? []) add(b.materialId, b.qty * o.qty);
     }
@@ -283,7 +312,7 @@ export function requirements(db: Db, wo: WorkOrder): Requirement[] {
       reservedForThis: roundQty(sum(lots.filter((l) => l.reservedForWo === wo.id).map((l) => l.qty))),
       shortage: Math.max(0, roundQty(remaining - free)),
       lotId: p?.lotId,
-      producible: !!item && item.kind === "material" && (item.bom?.length ?? 0) > 0,
+      producible: !!item && item.kind === "material" && isProducibleIn(db, item),
       inComponentOrders: Math.max(0, inComponentOrders),
     };
   });
@@ -298,16 +327,31 @@ export function createComponentOrders(db: Db, woId: ID): WorkOrder[] {
   assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
   const todo = requirements(db, wo).filter((r) => r.producible && r.shortage - r.inComponentOrders > EPS);
   assert(todo.length > 0, "Tidak ada komponen yang perlu diproduksi.");
-  return todo.map((r) =>
-    createWorkOrder(db, {
+  return todo.map((r) => {
+    const item = getItem(db, r.itemId);
+    const qty = roundQty(r.shortage - r.inComponentOrders);
+    const title = `${item.name} untuk ${wo.code}`;
+    // No BOM of its own: follow the item's recipe, in whole batches.
+    const recipe = item.bom?.length ? undefined : recipesFor(db, item.id)[0];
+    const perBatch = recipe?.outputs.find((o) => o.itemId === item.id)?.qty ?? 0;
+    if (recipe && perBatch > EPS) {
+      return createWorkOrderFromRecipe(db, recipe.id, {
+        batches: Math.ceil(qty / perBatch - EPS),
+        title,
+        parentWoId: wo.id,
+        salesOrderId: wo.salesOrderId,
+        dueDate: wo.dueDate,
+      });
+    }
+    return createWorkOrder(db, {
       type: "produksi",
-      title: `${getItem(db, r.itemId).name} untuk ${wo.code}`,
-      plannedOutputs: [{ itemId: r.itemId, qty: roundQty(r.shortage - r.inComponentOrders) }],
+      title,
+      plannedOutputs: [{ itemId: r.itemId, qty }],
       parentWoId: wo.id,
       salesOrderId: wo.salesOrderId,
       dueDate: wo.dueDate,
-    }),
-  );
+    });
+  });
 }
 
 // ------------------------------------------------------------------ Execution
@@ -588,8 +632,8 @@ export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): Cost
     assert(Number.isFinite(o.qty) && o.qty >= 0, `Qty hasil ${item.name} tidak valid.`);
     if (o.sharePct !== undefined) assertAmount(o.sharePct, `Porsi biaya ${item.name}`);
     assertDimensions(o.dimensions);
-    if (wo.type !== "dekonstruksi" && o.qty > EPS) {
-      assert(isProducible(item), `${item.name} tidak bisa diproduksi: pilih produk, atau material yang punya resep.`);
+    if (!outputsUnrestricted(wo.type) && o.qty > EPS) {
+      assert(isProducibleIn(db, item), `${item.name} tidak bisa diproduksi: pilih produk, atau material yang punya resep.`);
     }
   }
   for (const r of input.returns) {
@@ -835,9 +879,13 @@ function allocate(
  */
 export function defaultCompletion(db: Db, wo: WorkOrder): CompletionInput {
   const issuedItems = [...new Set(wo.issues.map((i) => i.itemId))];
+  // Fixed cost shares from the recipe carry over, unless partial receipts already exist.
+  const recipe = wo.recipeId ? db.recipes.find((r) => r.id === wo.recipeId) : undefined;
+  const shareOf = (itemId: ID) =>
+    wo.receipts.length ? undefined : recipe?.outputs.find((o) => o.itemId === itemId)?.sharePct;
   return {
     outputs: wo.plannedOutputs
-      .map((o) => ({ itemId: o.itemId, qty: Math.max(0, roundQty(o.qty - receivedQty(wo, o.itemId))) }))
+      .map((o) => ({ itemId: o.itemId, qty: Math.max(0, roundQty(o.qty - receivedQty(wo, o.itemId))), sharePct: shareOf(o.itemId) }))
       .filter((o) => o.qty > EPS || wo.receipts.length === 0),
     returns: issuedItems
       .filter((id) => findItem(db, id)?.trackRemnant)

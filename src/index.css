@@ -31,6 +31,13 @@
   --field-border-width: 1px;
   --ink-soft: oklch(0.45 0.01 70);
   --rule: oklch(0.89 0.008 85);
+  /* Process-map palette — validated with the dataviz checker (CVD-safe, ≥3:1 on white). */
+  --flow-bahan: #a0612d;
+  --flow-produk: #2a78d6;
+  --flow-sisa: #16946a;
+  --flow-biaya: #6250d6;
+  --flow-netral: #8f8a83;
+  --flow-rugi: #6b665f;
 }
 
 /* Unlayered rules beat HeroUI's layered theme, so every token set above must be re-set here. */
@@ -45,6 +52,12 @@
   --field-border: oklch(0.34 0.005 70);
   --ink-soft: oklch(0.72 0.01 70);
   --rule: oklch(0.32 0.005 70);
+  --flow-bahan: #c27a40;
+  --flow-produk: #3987e5;
+  --flow-sisa: #199e70;
+  --flow-biaya: #9085e9;
+  --flow-netral: #77726b;
+  --flow-rugi: #9a948b;
 }
 
 html {

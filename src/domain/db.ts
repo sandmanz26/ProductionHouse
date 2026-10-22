@@ -2,7 +2,7 @@ import { DomainError } from "./core";
 import { isCostingMethod } from "./costing-rules";
 import type { CounterKey, Db, Settings } from "./types";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const defaultSettings = (): Settings => ({
   companyName: "Production House Furnitur",
@@ -23,7 +23,7 @@ export const defaultSettings = (): Settings => ({
   costingHistory: [],
 });
 
-const COUNTERS: CounterKey[] = ["lot", "purchase", "workOrder", "sale", "rental", "adjustment", "item", "partner"];
+const COUNTERS: CounterKey[] = ["lot", "purchase", "workOrder", "sale", "rental", "adjustment", "item", "partner", "recipe"];
 
 export function emptyDb(): Db {
   return {
@@ -37,11 +37,12 @@ export function emptyDb(): Db {
     workOrders: [],
     sales: [],
     rentals: [],
+    recipes: [],
     counters: Object.fromEntries(COUNTERS.map((k) => [k, 0])) as Db["counters"],
   };
 }
 
-const COLLECTIONS = ["items", "partners", "lots", "moves", "purchases", "workOrders", "sales", "rentals"] as const;
+const COLLECTIONS = ["items", "partners", "lots", "moves", "purchases", "workOrders", "sales", "rentals", "recipes"] as const;
 
 /**
  * Validates and upgrades persisted/imported data to the current schema. Unknown future
@@ -124,6 +125,10 @@ function checkIntegrity(db: Db) {
       for (const l of d.lines) if (!itemIds.has(l.itemId as string) || !isNum(l.qty)) fail(`${key}[${i}] baris rusak`);
     });
   }
+  db.recipes.forEach((r, i) => {
+    if (!isStr(r.name) || !Array.isArray(r.inputs) || !Array.isArray(r.outputs)) return fail(`recipes[${i}] tidak lengkap`);
+    for (const l of [...r.inputs, ...r.outputs]) if (!itemIds.has(l.itemId) || !isNum(l.qty)) fail(`recipes[${i}] baris rusak`);
+  });
   db.workOrders.forEach((w, i) => {
     if (!Array.isArray(w.plannedOutputs) || !Array.isArray(w.issues)) return fail(`workOrders[${i}] tidak lengkap`);
     for (const o of w.plannedOutputs) if (!itemIds.has(o.itemId)) fail(`workOrders[${i}] hasil merujuk item yang tidak ada`);
@@ -134,7 +139,7 @@ function checkIntegrity(db: Db) {
   }
 }
 
-/** Fills fields added in later schema versions so older data keeps working (v1 → v2 → v3). */
+/** Fills fields added in later schema versions so older data keeps working (v1 → … → v4). */
 function normalizeRecords(db: Db) {
   db.workOrders = db.workOrders.map((w) => ({ ...w, stages: w.stages ?? [], laborLogs: w.laborLogs ?? [], receipts: w.receipts ?? [] }));
   db.sales = db.sales.map((s) => ({ ...s, payments: s.payments ?? [], returns: s.returns ?? [] }));

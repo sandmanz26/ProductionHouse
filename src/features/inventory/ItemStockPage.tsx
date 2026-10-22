@@ -1,5 +1,5 @@
 import { Button, Link } from "@heroui/react";
-import { Pencil, Plus, Recycle } from "lucide-react";
+import { Combine, Pencil, Plus, Recycle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { COSTING_LABEL, costingMethodOf, EPS, emptySummary, layerOrder, nextLayer, type Lot } from "@/domain";
@@ -10,7 +10,7 @@ import { categoryLabel, LOT_ORIGIN, LOT_STATUS } from "@/lib/labels";
 import { docRoute } from "@/lib/routes";
 import { useDb, useLookups } from "@/store/db-store";
 import { MovesTable } from "./MovesPage";
-import { LotAdjustDialog, OpeningStockDialog, TransferDialog } from "./StockDialogs";
+import { LotAdjustDialog, MergeLotsDialog, OpeningStockDialog, TransferDialog } from "./StockDialogs";
 
 export default function ItemStockPage() {
   const { id } = useParams();
@@ -20,6 +20,7 @@ export default function ItemStockPage() {
   const [adding, setAdding] = useState(false);
   const [adjusting, setAdjusting] = useState<Lot | null>(null);
   const [moving, setMoving] = useState<Lot | null>(null);
+  const [merging, setMerging] = useState(false);
   const it = db.items.find((i) => i.id === id);
   const method = costingMethodOf(db, it);
   // Lots are listed in the order the cost formula lets them leave.
@@ -38,7 +39,9 @@ export default function ItemStockPage() {
       className: "whitespace-nowrap",
       cell: (l) => (
         <span className="inline-flex items-center gap-1.5 font-medium">
-          {l.code}
+          <Link href={`/stok/lot/${l.id}`} aria-label={`Telusuri ${l.code}`}>
+            {l.code}
+          </Link>
           {l.isRemnant && <Recycle className="size-3.5 text-success" aria-label="Sisa" />}
         </span>
       ),
@@ -102,6 +105,11 @@ export default function ItemStockPage() {
             <Button variant="secondary" onPress={() => navigate(`/master/item/${it.id}`)}>
               <Pencil className="size-4" /> Data master
             </Button>
+            {lots.filter((l) => l.status === "tersedia").length >= 2 && (
+              <Button variant="secondary" onPress={() => setMerging(true)}>
+                <Combine className="size-4" /> Gabung lot
+              </Button>
+            )}
             <Button onPress={() => setAdding(true)}>
               <Plus className="size-4" /> Tambah stok
             </Button>
@@ -129,6 +137,7 @@ export default function ItemStockPage() {
       {adding && <OpeningStockDialog itemId={it.id} isOpen={adding} onOpenChange={setAdding} />}
       <LotAdjustDialog lot={adjusting} onClose={() => setAdjusting(null)} />
       <TransferDialog lot={moving} onClose={() => setMoving(null)} />
+      <MergeLotsDialog itemId={it.id} isOpen={merging} onOpenChange={setMerging} />
     </>
   );
 }

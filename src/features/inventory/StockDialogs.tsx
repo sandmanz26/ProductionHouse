@@ -1,9 +1,9 @@
 import { Button } from "@heroui/react";
 import { useState } from "react";
-import { addOpeningStock, adjustLotQty, transferLot, updateLotInfo, type ID, type Lot } from "@/domain";
+import { addOpeningStock, adjustLotQty, mergeLots, transferLot, updateLotInfo, type ID, type Lot } from "@/domain";
 import { NumberInput, SelectInput, SwitchInput, TextInput } from "@/components/fields";
 import { TaskModal } from "@/components/ui";
-import { formatQty, UOM_LABEL } from "@/lib/format";
+import { formatIDR, formatQty, UOM_LABEL } from "@/lib/format";
 import { useDb, useLookups, useRun } from "@/store/db-store";
 
 /** Record stock that physically exists but is not in the system (initial balance, found stock). */
@@ -157,6 +157,97 @@ function TransferForm({ lot, onDone }: { lot: Lot; onDone: () => void }) {
           }}
         >
           Pindahkan
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Merge several lots of one item (e.g. offcuts of one size) into a single lot at weighted cost. */
+export function MergeLotsDialog({ itemId, isOpen, onOpenChange }: { itemId: ID; isOpen: boolean; onOpenChange: (o: boolean) => void }) {
+  return (
+    <TaskModal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      size="md"
+      title="Gabung lot"
+      description="Satukan beberapa lot barang yang sama — mis. potongan sisa berukuran sama diikat jadi satu. Harga pokok menjadi rata-rata tertimbang; jejak asal tetap tersimpan."
+    >
+      {isOpen && <MergeForm itemId={itemId} onDone={() => onOpenChange(false)} />}
+    </TaskModal>
+  );
+}
+
+function MergeForm({ itemId, onDone }: { itemId: ID; onDone: () => void }) {
+  const db = useDb();
+  const run = useRun();
+  const { item } = useLookups();
+  const it = item(itemId);
+  const lots = db.lots.filter((l) => l.itemId === itemId && l.status === "tersedia" && l.qty > 1e-6);
+  const [picked, setPicked] = useState<ID[]>([]);
+  const [location, setLocation] = useState(db.settings.defaultLocation);
+  const [dims, setDims] = useState({ length: 0, width: 0, thickness: 0 });
+  const chosen = lots.filter((l) => picked.includes(l.id));
+  const qty = chosen.reduce((a, l) => a + l.qty, 0);
+  const value = chosen.reduce((a, l) => a + l.qty * l.unitCost, 0);
+  const mixed = new Set(chosen.map((l) => `${l.isRemnant}|${l.reservedForWo ?? ""}`)).size > 1;
+  const toggle = (id: ID) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  return (
+    <div className="flex flex-col gap-4">
+      <fieldset className="rounded-md border border-[var(--rule)]">
+        <legend className="sr-only">Lot yang digabung</legend>
+        <ul className="max-h-64 divide-y divide-[var(--rule)] overflow-y-auto">
+          {lots.map((l) => (
+            <li key={l.id}>
+              <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-[13px] hover:bg-default/40">
+                <input type="checkbox" checked={picked.includes(l.id)} onChange={() => toggle(l.id)} className="accent-[var(--accent)]" />
+                <span className="flex-1">
+                  <b className="font-medium">{l.code}</b>
+                  {l.isRemnant && <span className="text-success"> · sisa</span>}
+                  <span className="text-muted">
+                    {" "}
+                    · {l.location}
+                    {l.dimensions ? ` · ${l.dimensions.length}×${l.dimensions.width}${l.dimensions.thickness ? `×${l.dimensions.thickness}` : ""} mm` : ""}
+                  </span>
+                </span>
+                <span className="num">{formatQty(l.qty, it?.uom)}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </fieldset>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SelectInput label="Lokasi lot gabungan" value={location} onChange={setLocation} options={db.settings.locations.map((l) => ({ id: l, label: l }))} />
+        <div className="grid grid-cols-3 gap-2">
+          <NumberInput label="P (mm)" value={dims.length} onChange={(v) => setDims({ ...dims, length: v })} />
+          <NumberInput label="L (mm)" value={dims.width} onChange={(v) => setDims({ ...dims, width: v })} />
+          <NumberInput label="T (mm)" value={dims.thickness} onChange={(v) => setDims({ ...dims, thickness: v })} />
+        </div>
+      </div>
+      <div className="rounded-md bg-default/60 p-3 text-sm">
+        <div className="flex justify-between">
+          <span>Hasil gabungan</span>
+          <b className="num">
+            {formatQty(qty, it?.uom)} · {qty ? formatIDR(value / qty) : "—"}/{it ? UOM_LABEL[it.uom] : ""}
+          </b>
+        </div>
+        {mixed && <p className="mt-1 text-danger">Sisa material tidak bisa digabung dengan stok biasa atau stok yang dicadangkan.</p>}
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="tertiary" onPress={onDone}>
+          Batal
+        </Button>
+        <Button
+          isDisabled={chosen.length < 2 || mixed}
+          onPress={() => {
+            const ok = run(
+              (d) => mergeLots(d, picked, { location, dimensions: dims.length && dims.width ? { length: dims.length, width: dims.width, thickness: dims.thickness || undefined } : undefined }),
+              (l) => `${chosen.length} lot digabung menjadi ${l.code}`,
+            );
+            if (ok) onDone();
+          }}
+        >
+          Gabung {chosen.length >= 2 ? `${chosen.length} lot` : ""}
         </Button>
       </div>
     </div>

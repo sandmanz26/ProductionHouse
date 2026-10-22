@@ -86,3 +86,12 @@ Setiap penolakan adalah `DomainError` berbahasa Indonesia dan **tidak mengubah d
 | Penjualan | konfirmasi tanpa pelanggan; mengubah total di bawah yang sudah dibayar; ganti mata uang setelah ada pembayaran |
 | Sewa | mengubah booking di bawah yang sudah dibayar; kembali sebelum serah; serah ganda |
 | Cadangan | file dengan id ganda, rujukan ke item/lot yang tidak ada, qty bukan angka, record tanpa nama — ditolak utuh dengan pesan "rusak" |
+
+## v3.2 — resep, gabung, peta proses
+
+Lihat [`PROCESS.md`](PROCESS.md). Ringkasnya:
+- Perintah kerja dari resep: bahan & hasil = resep × batch; BOM produk tidak dipakai.
+- Jenis **gabung**: satu jenis hasil, minimal dua barang atau dua unit masuk, hasil boleh material.
+- **Gabung lot**: barang sama, status tersedia, jenis sama (sisa/biasa), cadangan sama; biaya rata-rata
+  tertimbang; tanggal = lot tertua.
+- Peta proses menjaga nilai di setiap simpul proses; selisih tampil sebagai "Dalam proses".
