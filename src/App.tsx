@@ -1,20 +1,28 @@
-import { Button, I18nProvider, RouterProvider as AriaRouterProvider, Spinner, Toast } from "@heroui/react";
+import { I18nProvider, RouterProvider as AriaRouterProvider, Spinner, Toast } from "@heroui/react";
 import { Suspense, type ComponentType } from "react";
 import { createHashRouter, isRouteErrorResponse, Outlet, RouterProvider, useHref, useNavigate, useRouteError } from "react-router";
 import { AppShell } from "./components/AppShell";
+import { BrandedState } from "./components/BrandedState";
+import { WelcomePage } from "./features/welcome/WelcomePage";
+import { useDbStore } from "./store/db-store";
 
 type PageModule = { default: ComponentType };
 const page = (load: () => Promise<PageModule>) => async () => ({ Component: (await load()).default });
 
 function Root() {
   const navigate = useNavigate();
+  const onboarded = useDbStore((s) => s.onboarded);
   return (
     <AriaRouterProvider navigate={navigate} useHref={useHref}>
-      <AppShell>
-        <Suspense fallback={<PageLoading />}>
-          <Outlet />
-        </Suspense>
-      </AppShell>
+      {!onboarded ? (
+        <WelcomePage />
+      ) : (
+        <AppShell>
+          <Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </Suspense>
+        </AppShell>
+      )}
     </AriaRouterProvider>
   );
 }
@@ -29,18 +37,14 @@ function PageLoading() {
 
 function RouteError() {
   const error = useRouteError();
-  const navigate = useNavigate();
   const notFound = isRouteErrorResponse(error) && error.status === 404;
   return (
     <AppShell>
-      <div className="mx-auto max-w-md py-16 text-center">
-        <p className="text-5xl font-semibold text-muted">{notFound ? "404" : "Ups"}</p>
-        <h1 className="mt-3 text-lg font-semibold">{notFound ? "Halaman tidak ditemukan" : "Terjadi kesalahan saat menampilkan halaman"}</h1>
-        {!notFound && <p className="mt-2 text-sm break-words text-muted">{error instanceof Error ? error.message : String(error)}</p>}
-        <Button className="mt-6" onPress={() => navigate("/")}>
-          Kembali ke beranda
-        </Button>
-      </div>
+      <BrandedState
+        code={notFound ? "404" : "Galat"}
+        title={notFound ? "Halaman ini tidak ada di buku kerja." : "Ada yang patah saat halaman ini dibuka."}
+        body={notFound ? "Tautannya mungkin salah ketik, atau datanya sudah dihapus." : error instanceof Error ? error.message : String(error)}
+      />
     </AppShell>
   );
 }

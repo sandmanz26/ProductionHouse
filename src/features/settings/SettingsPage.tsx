@@ -51,7 +51,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `mebelos-cadangan-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `serat-cadangan-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Cadangan diunduh");

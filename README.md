@@ -1,14 +1,16 @@
-# MebelOS — ERP Production House Furnitur
+# Serat — buku kerja produksi untuk bengkel mebel
 
-ERP **frontend-only** (React 19 + HeroUI v3 + Tailwind v4) untuk production house furnitur yang
+> *Setiap potongan punya harga.*
+
+Serat (dulu "MebelOS") adalah ERP **frontend-only** (React 19 + HeroUI v3 + Tailwind v4) untuk production house furnitur yang
 memproduksi, mengekspor, men-supply, dan menyewakan/meminjamkan furnitur. Tanpa backend: semua data
 tersimpan di browser (localStorage) dengan cadangan/pulihkan JSON.
 
-> Riset lapangan & persona: [`docs/RESEARCH.md`](docs/RESEARCH.md) · Spesifikasi & metode HPP: [`docs/PRODUCT.md`](docs/PRODUCT.md)
+> Riset lapangan & persona: [`docs/RESEARCH.md`](docs/RESEARCH.md) · Spesifikasi & metode HPP: [`docs/PRODUCT.md`](docs/PRODUCT.md) · Identitas merek: [`docs/BRAND.md`](docs/BRAND.md)
 
 ## Yang membuatnya "cerdas"
 
-| Masalah di lapangan | Cara MebelOS menyelesaikannya |
+| Masalah di lapangan | Cara Serat menyelesaikannya |
 |---|---|
 | Barang mentah → produk, produk → produk lain, produk → bahan, unit rusak → layak | Satu konsep **Perintah Kerja** dengan 4 jenis: Produksi, Konversi, Dekonstruksi, Perbaikan |
 | Sisa potongan dibuang karena tidak tercatat | Sisa layak pakai jadi **lot sisa** (dengan ukuran P×L×T & nilai), otomatis **disarankan lebih dulu** saat ambil bahan, plus saran "cukup untuk N× produk X" |
@@ -32,6 +34,15 @@ Ditambahkan setelah *roast* terhadap v1 ([`docs/ROAST.md`](docs/ROAST.md)):
 - **Pembayaran** — DP %, pelunasan, refund deposit; piutang & utang dengan umur (aging); order tidak bisa ditutup bila belum lunas.
 - **Retur penjualan**, **transfer antar lokasi**, **kubikasi kayu** (T × L × P), **satuan beli** (roll, dus), **spesifikasi custom** per baris order, **jual material/sisa**, **biaya antar/setting sewa**, **utilisasi unit sewa**.
 - **UI** — tanpa pola generik: IBM Plex, garis tipis alih-alih bayangan, strip metrik, tabel otomatis jadi kartu di HP, command palette `Ctrl/⌘ K`.
+
+## Baru di v3 — kasus negatif & identitas
+
+- **Audit kasus negatif**: aturan penolakan baru (angka tidak valid, resep melingkar, item
+  diarsipkan, peran relasi salah, unit sewa yang mau di-opname, file cadangan rusak, …). Semuanya
+  atomik — data tidak berubah sedikit pun saat ditolak. Daftar lengkap di `docs/PRODUCT.md`.
+- **Serat**: nama, tanda sambungan ekor burung, IBM Plex Serif untuk judul, palet jati/arang/kertas,
+  layar sambutan (bengkel contoh vs bengkel sendiri), langkah pertama untuk bengkel baru, dan
+  suara yang konsisten di keadaan kosong & halaman buntu. Lihat `docs/BRAND.md`.
 
 ## Menjalankan
 

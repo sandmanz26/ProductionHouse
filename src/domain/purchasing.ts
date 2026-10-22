@@ -1,4 +1,4 @@
-import { assert, createLot, EPS, getItem, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, sum } from "./core";
+import { assert, assertAmount, assertDate, assertDimensions, assertPartnerRole, createLot, EPS, getItem, getUsableItem, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, sum } from "./core";
 import type { Db, Dimensions, DocRef, ExtraCost, ID, ISODate, Item, Purchase, PurchaseLine } from "./types";
 
 export interface PurchaseInput {
@@ -56,12 +56,13 @@ export function landedUnitCosts(p: Pick<Purchase, "lines" | "extraCosts">): numb
   });
 }
 
-function normalizeLines(db: Db, lines: PurchaseInput["lines"]): PurchaseLine[] {
+function normalizeLines(db: Db, lines: PurchaseInput["lines"], keep?: ReadonlySet<ID>): PurchaseLine[] {
   assert(lines.length > 0, "Tambahkan minimal satu barang.");
   return lines.map((l) => {
-    const item = getItem(db, l.itemId);
-    assert(l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
-    assert(l.unitPrice >= 0, `Harga ${item.name} tidak boleh negatif.`);
+    const item = getUsableItem(db, l.itemId, keep);
+    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
+    assertAmount(l.unitPrice, `Harga ${item.name}`);
+    assertDimensions(l.dimensions);
     return { id: newId(), itemId: l.itemId, qty: l.qty, unitPrice: l.unitPrice, dimensions: l.dimensions };
   });
 }
@@ -70,9 +71,16 @@ function normalizeExtra(extra: PurchaseInput["extraCosts"]): ExtraCost[] {
   return (extra ?? [])
     .filter((c) => c.label.trim() || c.amount)
     .map((c) => {
-      assert(c.amount >= 0, "Biaya tambahan tidak boleh negatif.");
+      assertAmount(c.amount, "Biaya tambahan");
       return { id: newId(), label: c.label.trim() || "Biaya lain", amount: c.amount };
     });
+}
+
+function validateHeader(db: Db, input: PurchaseInput) {
+  assertDate(input.date, "Tanggal pembelian");
+  if (input.dueDate) assert(input.dueDate >= input.date, "Tanggal jatuh tempo tidak boleh sebelum tanggal pembelian.");
+  assertPartnerRole(db, input.supplierId, "supplier");
+  validateWo(db, input.workOrderId);
 }
 
 function validateWo(db: Db, workOrderId?: ID) {
@@ -83,7 +91,7 @@ function validateWo(db: Db, workOrderId?: ID) {
 }
 
 export function createPurchase(db: Db, input: PurchaseInput): Purchase {
-  validateWo(db, input.workOrderId);
+  validateHeader(db, input);
   const p: Purchase = {
     id: newId(),
     code: nextCode(db, "purchase"),
@@ -105,11 +113,15 @@ export function createPurchase(db: Db, input: PurchaseInput): Purchase {
 export function updatePurchase(db: Db, id: ID, input: PurchaseInput): Purchase {
   const p = getPurchase(db, id);
   assert(p.status === "draft", "Hanya pembelian draft yang bisa diubah.");
-  validateWo(db, input.workOrderId);
+  validateHeader(db, input);
+  const lines = normalizeLines(db, input.lines, new Set(p.lines.map((l) => l.itemId)));
+  const total = purchaseTotals({ lines, extraCosts: normalizeExtra(input.extraCosts) }).total;
+  const paidSoFar = sum(p.payments.map((x) => x.amount));
+  assert(total + 0.01 >= paidSoFar, "Total baru lebih kecil dari yang sudah dibayar — catat refund dulu.");
   Object.assign(p, {
     supplierId: input.supplierId,
     date: input.date,
-    lines: normalizeLines(db, input.lines),
+    lines,
     extraCosts: normalizeExtra(input.extraCosts),
     workOrderId: input.workOrderId,
     invoiceNo: input.invoiceNo,

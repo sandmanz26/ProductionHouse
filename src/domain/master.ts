@@ -1,11 +1,19 @@
-import { assert, EPS, getItem, newId, nextCode } from "./core";
+import { assert, assertAmount, DomainError, EPS, getItem, isActiveLot, newId, nextCode } from "./core";
 import type { Db, ID, Item, Partner, Settings } from "./types";
 
 export type ItemInput = Omit<Item, "id" | "sku"> & { sku?: string };
 
 function validateItem(db: Db, input: ItemInput, selfId?: ID) {
-  assert(input.name.trim(), "Nama item wajib diisi.");
-  assert(input.standardCost >= 0, "Harga standar tidak boleh negatif.");
+  assert(input.name?.trim(), "Nama item wajib diisi.");
+  assertAmount(input.standardCost, "Harga standar");
+  for (const [key, label] of [
+    ["salePrice", "Harga jual"],
+    ["rentalRatePerDay", "Tarif sewa"],
+    ["laborHours", "Jam kerja standar"],
+    ["reorderPoint", "Stok minimum"],
+  ] as const) {
+    if (input[key] !== undefined) assertAmount(input[key], label);
+  }
   if (input.sku?.trim()) {
     const sku = input.sku.trim().toUpperCase();
     assert(!db.items.some((i) => i.sku.toUpperCase() === sku && i.id !== selfId), `Kode ${sku} sudah dipakai.`);
@@ -13,11 +21,27 @@ function validateItem(db: Db, input: ItemInput, selfId?: ID) {
   for (const b of input.bom ?? []) {
     const m = getItem(db, b.materialId);
     assert(m.id !== selfId, "Produk tidak boleh menjadi bahan dirinya sendiri.");
-    assert(b.qty > EPS, `Qty BOM ${m.name} harus lebih dari 0.`);
+    assert(Number.isFinite(b.qty) && b.qty > EPS, `Qty BOM ${m.name} harus lebih dari 0.`);
   }
+  if (selfId && input.bom?.length) assertNoCycle(db, selfId, input.bom.map((b) => b.materialId));
   if (input.packing) {
     const p = input.packing;
     assert(p.length >= 0 && p.width >= 0 && p.height >= 0 && p.cartonsPerUnit > 0, "Data kemasan tidak valid.");
+  }
+}
+
+/** A recipe must never (indirectly) contain the item itself, or planning would recurse forever. */
+function assertNoCycle(db: Db, selfId: ID, materialIds: ID[]) {
+  const seen = new Set<ID>();
+  const stack = [...materialIds];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (id === selfId) {
+      throw new DomainError(`Resep melingkar: ${getItem(db, selfId).name} dipakai lagi di dalam resep komponennya sendiri.`);
+    }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const b of db.items.find((i) => i.id === id)?.bom ?? []) stack.push(b.materialId);
   }
 }
 
@@ -44,6 +68,12 @@ export function updateItem(db: Db, id: ID, input: ItemInput): Item {
   const item = getItem(db, id);
   validateItem(db, input, id);
   assert(input.kind === item.kind, "Jenis item tidak dapat diubah.");
+  if (input.uom !== item.uom) {
+    assert(
+      !db.lots.some((l) => l.itemId === id && isActiveLot(l)),
+      `Satuan ${item.name} tidak bisa diubah karena masih ada stok dalam ${item.uom}. Habiskan atau sesuaikan stok dulu.`,
+    );
+  }
   Object.assign(item, {
     ...input,
     name: input.name.trim(),
@@ -110,12 +140,23 @@ export function deletePartner(db: Db, id: ID) {
 
 export function updateSettings(db: Db, patch: Partial<Settings>): Settings {
   const next = { ...db.settings, ...patch };
-  assert(next.companyName.trim(), "Nama perusahaan wajib diisi.");
-  assert(next.laborRatePerHour >= 0 && next.overheadPerLaborHour >= 0, "Tarif tidak boleh negatif.");
-  assert(next.locations.length > 0, "Minimal satu lokasi gudang.");
-  if (!next.locations.includes(next.defaultLocation)) next.defaultLocation = next.locations[0]!;
-  for (const [cur, rate] of Object.entries(next.exchangeRates)) assert(rate > 0, `Kurs ${cur} harus lebih dari 0.`);
+  assert(next.companyName?.trim(), "Nama perusahaan wajib diisi.");
+  assertAmount(next.laborRatePerHour, "Tarif tenaga kerja");
+  assertAmount(next.overheadPerLaborHour, "Overhead per jam");
+  assert(Number.isInteger(next.remnantAgingDays) && next.remnantAgingDays >= 1, "Batas umur sisa minimal 1 hari.");
+  assert(Number.isInteger(next.rentalReminderDays) && next.rentalReminderDays >= 0, "Pengingat sewa harus 0 hari atau lebih.");
+  const locations = [...new Set(next.locations.map((l) => l.trim()).filter(Boolean))];
+  assert(locations.length > 0, "Minimal satu lokasi gudang.");
+  const orphaned = db.settings.locations.filter(
+    (loc) => !locations.includes(loc) && db.lots.some((l) => isActiveLot(l) && l.location === loc),
+  );
+  assert(orphaned.length === 0, `Lokasi ${orphaned.join(", ")} masih ada stok — pindahkan stoknya dulu.`);
+  next.locations = locations;
+  if (!locations.includes(next.defaultLocation)) next.defaultLocation = locations[0]!;
+  for (const [cur, rate] of Object.entries(next.exchangeRates)) {
+    assert(Number.isFinite(rate) && rate > 0, `Kurs ${cur} harus lebih dari 0.`);
+  }
+  next.defaultStages = (next.defaultStages ?? []).map((s) => s.trim()).filter(Boolean);
   db.settings = next;
   return next;
 }
-

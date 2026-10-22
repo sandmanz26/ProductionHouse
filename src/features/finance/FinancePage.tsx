@@ -86,7 +86,7 @@ export default function FinancePage() {
         </Tabs.ListContainer>
       </Tabs>
       <div className="rounded-md bg-surface shadow-[var(--surface-shadow)]">
-        <DataTable label="Daftar tagihan" columns={columns} rows={rows} dependencies={[view]} empty={<EmptyBlock title="Tidak ada yang terbuka" />} />
+        <DataTable label="Daftar tagihan" columns={columns} rows={rows} dependencies={[view]} empty={<EmptyBlock title="Buku bersih" description="Tidak ada tagihan yang masih terbuka di daftar ini." />} />
       </div>
       {paying && <PaymentDialog doc={paying.doc} id={paying.id} isOpen onOpenChange={(o) => !o && setPaying(null)} />}
     </>

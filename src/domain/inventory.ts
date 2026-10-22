@@ -1,4 +1,4 @@
-import { assert, createLot, EPS, getItem, getLot, nextCode, recordMove, roundQty, splitLot, takeFromLot } from "./core";
+import { assert, assertAmount, assertDimensions, assertLocation, createLot, EPS, getItem, getLot, nextCode, recordMove, roundQty, splitLot, takeFromLot } from "./core";
 import type { Db, Dimensions, DocRef, ID } from "./types";
 
 export interface OpeningStockInput {
@@ -19,6 +19,8 @@ function adjustmentRef(db: Db): DocRef {
 /** Records stock that already exists (initial balance / found stock). */
 export function addOpeningStock(db: Db, input: OpeningStockInput) {
   const item = getItem(db, input.itemId);
+  assertDimensions(input.dimensions);
+  if (input.location) assertLocation(db, input.location);
   const ref = adjustmentRef(db);
   const lot = createLot(db, {
     itemId: item.id,
@@ -39,7 +41,8 @@ export function addOpeningStock(db: Db, input: OpeningStockInput) {
 /** Stock opname: sets a lot to the physically counted quantity. */
 export function adjustLotQty(db: Db, lotId: ID, countedQty: number, note?: string) {
   const lot = getLot(db, lotId);
-  assert(countedQty >= 0, "Qty hitung fisik tidak boleh negatif.");
+  assertAmount(countedQty, "Qty hitung fisik");
+  assert(lot.status !== "disewa", `Lot ${lot.code} sedang disewa — hitung ulang setelah unit kembali.`);
   const diff = roundQty(countedQty - lot.qty);
   if (Math.abs(diff) < EPS) return lot;
   const ref = adjustmentRef(db);
@@ -51,6 +54,7 @@ export function adjustLotQty(db: Db, lotId: ID, countedQty: number, note?: strin
 /** Writes a remnant (or any available lot) off as waste. */
 export function scrapLot(db: Db, lotId: ID, note?: string) {
   const lot = getLot(db, lotId);
+  assert(lot.status !== "disewa", `Lot ${lot.code} sedang disewa dan tidak bisa dibuang.`);
   assert(lot.qty > EPS, "Lot sudah kosong.");
   const ref = adjustmentRef(db);
   return takeFromLot(db, lotId, lot.qty, "limbah", ref, {
@@ -65,6 +69,12 @@ export function updateLotInfo(
   patch: { location?: string; dimensions?: Dimensions | null; note?: string; reservedForWo?: ID | null },
 ) {
   const lot = getLot(db, lotId);
+  if (patch.location !== undefined && patch.location !== lot.location) assertLocation(db, patch.location);
+  assertDimensions(patch.dimensions);
+  if (patch.reservedForWo) {
+    const wo = db.workOrders.find((w) => w.id === patch.reservedForWo);
+    assert(wo && (wo.status === "rencana" || wo.status === "berjalan"), "Perintah kerja untuk cadangan tidak aktif.");
+  }
   if (patch.location !== undefined) lot.location = patch.location;
   if (patch.dimensions !== undefined) lot.dimensions = patch.dimensions ?? undefined;
   if (patch.note !== undefined) lot.note = patch.note;
@@ -87,7 +97,8 @@ export function transferLot(db: Db, lotId: ID, qty: number, toLocation: string, 
   assert(lot.status === "tersedia", `Lot ${lot.code} tidak bisa dipindah karena berstatus ${lot.status}.`);
   assert(toLocation.trim(), "Pilih lokasi tujuan.");
   assert(toLocation !== lot.location, "Lokasi tujuan sama dengan lokasi sekarang.");
-  assert(qty > EPS && qty <= lot.qty + EPS, `Qty pindah melebihi stok lot ${lot.code}.`);
+  assertLocation(db, toLocation);
+  assert(Number.isFinite(qty) && qty > EPS && qty <= lot.qty + EPS, `Qty pindah melebihi stok lot ${lot.code}.`);
   const ref = adjustmentRef(db);
   const moved = splitLot(db, lot.id, qty, "transfer", ref);
   moved.location = toLocation;

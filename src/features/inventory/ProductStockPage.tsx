@@ -108,7 +108,7 @@ export default function ProductStockPage() {
         columns={columns}
         rows={rows}
         onRowAction={(r) => navigate(`/stok/item/${r.id}`)}
-        empty={<EmptyBlock icon={<Armchair className="size-5" />} title="Belum ada produk" />}
+        empty={<EmptyBlock icon={<Armchair className="size-5" />} title="Belum ada produk jadi" description="Produk masuk gudang saat perintah kerja ditutup atau hasil sebagian diterima." />}
       />
     </>
   );

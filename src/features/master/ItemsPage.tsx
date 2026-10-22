@@ -104,7 +104,7 @@ export default function ItemsPage() {
         rows={rows}
         dependencies={[kind, stock]}
         onRowAction={(i) => navigate(`/master/item/${i.id}`)}
-        empty={<EmptyBlock icon={<Package className="size-5" />} title="Belum ada data" action={<Button onPress={() => navigate(`/master/item/baru?jenis=${kind}`)}>Tambah</Button>} />}
+        empty={<EmptyBlock icon={<Package className="size-5" />} title={kind === "material" ? "Belum ada material" : "Belum ada produk"} description={kind === "material" ? "Mulai dari bahan yang paling sering dibeli: kayu, papan, busa, hardware." : "Produk membawa resep bahan, jam kerja standar, harga jual, dan tarif sewa."} action={<Button onPress={() => navigate(`/master/item/baru?jenis=${kind}`)}>Tambah</Button>} />}
       />
     </>
   );

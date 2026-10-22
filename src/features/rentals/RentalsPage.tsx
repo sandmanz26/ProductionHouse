@@ -154,7 +154,7 @@ export default function RentalsPage() {
         columns={columns}
         rows={rows}
         onRowAction={(r) => navigate(`/sewa/${r.id}`)}
-        empty={<EmptyBlock icon={<CalendarClock className="size-5" />} title="Tidak ada sewa" action={<Button onPress={() => navigate("/sewa/baru")}>Booking baru</Button>} />}
+        empty={<EmptyBlock icon={<CalendarClock className="size-5" />} title="Tidak ada sewa" description="Unit untuk event, syuting, atau showroom mitra. Pinjam = sewa dengan tarif nol." action={<Button onPress={() => navigate("/sewa/baru")}>Booking baru</Button>} />}
       />
     </>
   );

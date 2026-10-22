@@ -17,6 +17,7 @@ import {
 } from "@/domain";
 import { buildDemoDb } from "@/domain/seed";
 
+/** Kept from the product's former name so existing browsers keep their data. */
 export const STORAGE_KEY = "mebelos:db";
 
 /** localStorage wrapper that never throws (private mode, quota exceeded, blocked storage). */
@@ -53,6 +54,8 @@ interface DbState {
   db: Db;
   /** True while the database still holds the bundled demo data. */
   isDemo: boolean;
+  /** False until the visitor has chosen between the sample workshop and their own. */
+  onboarded: boolean;
   /**
    * Runs a domain mutation atomically. Domain errors are shown as a toast and leave the
    * database untouched; returns the mutation result, or undefined on failure.
@@ -61,6 +64,9 @@ interface DbState {
   replace: (db: Db, opts?: { isDemo?: boolean }) => void;
   resetDemo: () => void;
   clearAll: () => void;
+  /** Welcome screen choices. */
+  startDemo: () => void;
+  startFresh: (companyName: string) => void;
 }
 
 export const useDbStore = create<DbState>()(
@@ -68,6 +74,7 @@ export const useDbStore = create<DbState>()(
     (set, get) => ({
       db: buildDemoDb(),
       isDemo: true,
+      onboarded: false,
       run: (fn, success) => {
         try {
           const { db, result } = transact(get().db, fn);
@@ -90,21 +97,28 @@ export const useDbStore = create<DbState>()(
       replace: (db, opts) => set({ db: migrate(db), isDemo: opts?.isDemo ?? false }),
       resetDemo: () => set({ db: buildDemoDb(), isDemo: true }),
       clearAll: () => set({ db: emptyDb(), isDemo: false }),
+      startDemo: () => set({ onboarded: true }),
+      startFresh: (companyName) => {
+        const db = emptyDb();
+        db.settings.companyName = companyName.trim() || db.settings.companyName;
+        set({ db, isDemo: false, onboarded: true });
+      },
     }),
     {
       name: STORAGE_KEY,
       version: SCHEMA_VERSION,
       storage: createJSONStorage(() => safeStorage),
-      partialize: (s) => ({ db: s.db, isDemo: s.isDemo }),
+      partialize: (s) => ({ db: s.db, isDemo: s.isDemo, onboarded: s.onboarded }),
       migrate: (persisted) => {
-        const p = persisted as { db?: unknown; isDemo?: boolean };
-        return { db: migrate(p.db), isDemo: !!p.isDemo };
+        const p = persisted as { db?: unknown; isDemo?: boolean; onboarded?: boolean };
+        return { db: migrate(p.db), isDemo: !!p.isDemo, onboarded: p.onboarded ?? true };
       },
       merge: (persisted, current) => {
-        const p = persisted as { db?: unknown; isDemo?: boolean } | undefined;
+        const p = persisted as { db?: unknown; isDemo?: boolean; onboarded?: boolean } | undefined;
         if (!p?.db) return current;
         try {
-          return { ...current, db: migrate(p.db), isDemo: !!p.isDemo };
+          // Data saved before the welcome screen existed belongs to someone already working.
+          return { ...current, db: migrate(p.db), isDemo: !!p.isDemo, onboarded: p.onboarded ?? true };
         } catch (err) {
           console.error("Data tersimpan tidak valid, memakai data demo.", err);
           return current;

@@ -1,4 +1,4 @@
-import type { CounterKey, Db, DocRef, ID, Item, Lot, MoveType, StockMove } from "./types";
+import type { CounterKey, Db, Dimensions, DocRef, ID, Item, Lot, MoveType, PartnerRole, StockMove } from "./types";
 
 /** Raised for rule violations; the message is user-facing (Bahasa Indonesia). */
 export class DomainError extends Error {
@@ -78,8 +78,9 @@ export function getLot(db: Db, id: ID): Lot {
 }
 
 export function createLot(db: Db, data: Omit<Lot, "id" | "code" | "createdAt"> & { createdAt?: string }): Lot {
-  assert(data.qty > EPS, "Qty lot harus lebih dari 0.");
-  assert(data.unitCost >= 0, "Harga pokok tidak boleh negatif.");
+  assert(Number.isFinite(data.qty) && data.qty > EPS, "Qty lot harus lebih dari 0.");
+  assertAmount(data.unitCost, "Harga pokok");
+  assertDimensions(data.dimensions);
   const lot: Lot = {
     ...data,
     id: newId(),
@@ -122,7 +123,7 @@ export function takeFromLot(
 ): Lot {
   const lot = getLot(db, lotId);
   const item = getItem(db, lot.itemId);
-  assert(qty > EPS, "Qty harus lebih dari 0.");
+  assert(Number.isFinite(qty) && qty > EPS, "Qty harus lebih dari 0.");
   const allowed = opts.allowStatus ?? ["tersedia"];
   assert(allowed.includes(lot.status), `Lot ${lot.code} berstatus "${lot.status}" dan tidak dapat dipakai.`);
   assert(
@@ -304,4 +305,40 @@ export function freeQtyFor(db: Pick<Db, "lots">, itemId: ID, workOrderId?: ID): 
         .map((l) => l.qty),
     ),
   );
+}
+
+/** Finite and ≥ 0; NaN/Infinity never pass (they would poison every total downstream). */
+export const isNonNegative = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0;
+
+export function assertAmount(n: unknown, label: string): asserts n is number {
+  assert(typeof n === "number" && Number.isFinite(n), `${label} harus berupa angka.`);
+  assert(n >= 0, `${label} tidak boleh negatif.`);
+}
+
+/** Item that may be used in a new document line. Lines that already held it may keep it. */
+export function getUsableItem(db: Db, id: ID, keepIds?: ReadonlySet<ID>): Item {
+  const item = getItem(db, id);
+  assert(!item.archived || keepIds?.has(id), `${item.name} sudah diarsipkan — pulihkan dulu di Master Barang.`);
+  return item;
+}
+
+export function assertPartnerRole(db: Db, id: ID | undefined, role: PartnerRole) {
+  if (!id) return;
+  const p = db.partners.find((x) => x.id === id);
+  assert(p, "Relasi tidak ditemukan.");
+  assert(p.role === role, `${p.name} terdaftar sebagai ${role === "supplier" ? "pelanggan, bukan pemasok" : "pemasok, bukan pelanggan"}.`);
+}
+
+export function assertDimensions(d: Dimensions | undefined | null) {
+  if (!d) return;
+  const ok = [d.length, d.width, d.thickness ?? 0].every((n) => isNonNegative(n));
+  assert(ok, "Ukuran (panjang/lebar/tebal) harus angka dan tidak boleh negatif.");
+}
+
+export function assertDate(date: string | undefined, label = "Tanggal"): asserts date is string {
+  assert(typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date), `${label} wajib diisi.`);
+}
+
+export function assertLocation(db: Db, location: string) {
+  assert(db.settings.locations.includes(location), `Lokasi "${location}" tidak dikenal — tambahkan dulu di Pengaturan.`);
 }

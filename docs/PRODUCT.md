@@ -1,4 +1,4 @@
-# Spesifikasi Produk — MebelOS
+# Spesifikasi Produk — Serat
 
 ## Modul & alur utama
 
@@ -65,3 +65,22 @@ Tanpa backend: `localStorage` (versi skema + migrasi), ekspor/impor cadangan JSO
 - **QC reject**: output `grade: "reject"` masuk sebagai lot `rusak` dengan HPP yang sama.
 - **Pembayaran**: tidak boleh melebihi sisa tagihan; refund maksimal yang sudah dibayar (sewa: kelebihan deposit). Piutang = order yang sudah dikirim, atau sudah lewat tanggal bayar. Order hanya bisa "selesai" bila lunas.
 - **Retur penjualan**: maksimal qty terkirim − sudah diretur; barang kembali dengan HPP kirim; kredit = qty × harga order.
+
+## v3 — kasus negatif (aturan penolakan)
+
+Setiap penolakan adalah `DomainError` berbahasa Indonesia dan **tidak mengubah data apa pun**
+(operasi berjalan di salinan; diuji di `src/domain/negative.test.ts`).
+
+| Area | Ditolak |
+|---|---|
+| Angka | NaN/Infinity/negatif untuk qty, harga, tarif, overhead, deposit, diskon, pembayaran, ukuran P×L×T |
+| Master | kode ganda, resep yang memuat dirinya sendiri atau **melingkar** lewat komponen, ganti satuan saat masih ada stok |
+| Arsip | item yang diarsipkan tidak bisa dipakai di dokumen **baru** (dokumen lama yang sudah memuatnya tetap bisa diubah) |
+| Relasi | pelanggan sebagai pemasok dan sebaliknya; relasi yang tidak ada |
+| Tanggal | tanggal kosong; jatuh tempo / target kirim / selesai sewa sebelum tanggal dokumen |
+| Pengaturan | tarif bukan angka, umur sisa < 1 hari, lokasi kosong/ganda (dibersihkan), menghapus lokasi yang masih ada stok |
+| Gudang | lokasi tak dikenal; opname, pindah, atau buang unit yang sedang **disewa** |
+| Produksi | hasil yang bukan produk/komponen; hasil bertahap melebihi rencana; membatalkan induk saat perintah komponen masih terbuka; aksi apa pun pada pekerjaan yang sudah ditutup |
+| Penjualan | konfirmasi tanpa pelanggan; mengubah total di bawah yang sudah dibayar; ganti mata uang setelah ada pembayaran |
+| Sewa | mengubah booking di bawah yang sudah dibayar; kembali sebelum serah; serah ganda |
+| Cadangan | file dengan id ganda, rujukan ke item/lot yang tidak ada, qty bukan angka, record tanpa nama — ditolak utuh dengan pesan "rusak" |

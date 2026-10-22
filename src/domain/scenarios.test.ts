@@ -54,6 +54,7 @@ import {
   toStockQty,
   transact,
   transferLot,
+  createPartner,
   type Db,
   type WorkOrder,
 } from "./index";
@@ -283,7 +284,7 @@ describe("S5 · hasil bertahap: kirim sebagian sebelum pekerjaan selesai", () =>
     expect(rec.provisionalUnitCost).toBe(900_000);
     expect(stockOf(db, chair.id).available).toBe(12);
 
-    const so = createSalesOrder(db, { channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 8, unitPrice: 2_000_000 }] });
+    const so = createSalesOrder(db, { customerId: buyerOf(db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 8, unitPrice: 2_000_000 }] });
     confirmSalesOrder(db, so.id);
     deliverSalesOrder(db, so.id, [{ itemId: chair.id, qty: 8 }]);
     expect(salesTotals(db, so).cogs).toBe(8 * 900_000);
@@ -386,7 +387,7 @@ describe("S7 · kubikasi kayu & satuan beli", () => {
 
 describe("S8 · DP, pelunasan, piutang & utang", () => {
   function orderOf(ctx: ReturnType<typeof shop>, qty: number, dpPercent?: number) {
-    const so = createSalesOrder(ctx.db, {
+    const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db),
       channel: "ekspor",
       date: "2026-09-01",
       currency: "USD",
@@ -474,7 +475,7 @@ describe("S8 · DP, pelunasan, piutang & utang", () => {
 describe("S9–S10 · pesanan custom & jual material", () => {
   it("carries custom specs into the production order", () => {
     const ctx = shop();
-    const so = createSalesOrder(ctx.db, {
+    const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db),
       channel: "supply",
       date: "2026-10-01",
       currency: "IDR",
@@ -490,7 +491,7 @@ describe("S9–S10 · pesanan custom & jual material", () => {
     const ctx = shop();
     const { db, teak } = ctx;
     const remnant = addOpeningStock(db, { itemId: teak.id, qty: 0.05, unitCost: 15_000_000, isRemnant: true });
-    const so = createSalesOrder(db, { channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: teak.id, qty: 0.05, unitPrice: 12_000_000 }] });
+    const so = createSalesOrder(db, { customerId: buyerOf(db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: teak.id, qty: 0.05, unitPrice: 12_000_000 }] });
     confirmSalesOrder(db, so.id);
     expect(productionShortages(db, so)).toHaveLength(0);
     deliverSalesOrder(db, so.id, [{ itemId: teak.id, qty: 0.05, picks: [{ lotId: remnant.id, qty: 0.05 }] }]);
@@ -507,7 +508,7 @@ describe("S11 · retur penjualan", () => {
     const ctx = shop();
     stockChairs(ctx, 5);
     const { db, chair } = ctx;
-    const so = createSalesOrder(db, { channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 5, unitPrice: 2_000_000 }] });
+    const so = createSalesOrder(db, { customerId: buyerOf(db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 5, unitPrice: 2_000_000 }] });
     confirmSalesOrder(db, so.id);
     deliverSalesOrder(db, so.id, [{ itemId: chair.id, qty: 5 }]);
     returnSale(db, so.id, [
@@ -527,7 +528,7 @@ describe("S11 · retur penjualan", () => {
 
   it("refuses returns before delivery", () => {
     const ctx = shop();
-    const so = createSalesOrder(ctx.db, { channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: ctx.chair.id, qty: 1, unitPrice: 1 }] });
+    const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: ctx.chair.id, qty: 1, unitPrice: 1 }] });
     expect(() => returnSale(ctx.db, so.id, [{ itemId: ctx.chair.id, qty: 1, condition: "baik" }])).toThrow(/Belum ada barang/);
   });
 });
@@ -645,9 +646,9 @@ describe("guards on money & documents", () => {
   it("rejects invalid sales terms", () => {
     const { db, chair } = shop();
     const base = { channel: "supply" as const, date: "2026-10-01", currency: "IDR" as const, exchangeRate: 1, lines: [{ itemId: chair.id, qty: 1, unitPrice: 100 }] };
-    expect(() => createSalesOrder(db, { ...base, dpPercent: 120 })).toThrow(/DP/);
-    expect(() => createSalesOrder(db, { ...base, discount: 500 })).toThrow(/Diskon melebihi/);
-    expect(() => createSalesOrder(db, { ...base, currency: "USD", exchangeRate: 0 })).toThrow(/Kurs/);
+    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, dpPercent: 120 })).toThrow(/DP/);
+    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, discount: 500 })).toThrow(/Diskon melebihi/);
+    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, currency: "USD", exchangeRate: 0 })).toThrow(/Kurs/);
   });
 
   it("refuses to use a work order's own partial output as its input", () => {
@@ -670,7 +671,7 @@ describe("planning & closing rules", () => {
     createWorkOrder(db, { type: "produksi", title: "Kursi", plannedOutputs: [{ itemId: chair.id, qty: 4 }] });
     const ins = insights(db, "2026-10-01");
     expect(ins.find((i) => i.id === "reorder")?.detail ?? "").not.toContain("Rangka");
-    const so = createSalesOrder(db, { channel: "supply", date: "2026-10-01", paymentDueDate: "2026-10-20", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 1, unitPrice: 1_000 }] });
+    const so = createSalesOrder(db, { customerId: buyerOf(db), channel: "supply", date: "2026-10-01", paymentDueDate: "2026-10-20", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 1, unitPrice: 1_000 }] });
     confirmSalesOrder(db, so.id);
     expect(receivables(db, "2026-10-10")).toHaveLength(0);
     expect(receivables(db, "2026-10-25")).toHaveLength(1);
@@ -680,7 +681,7 @@ describe("planning & closing rules", () => {
     const { completeSalesOrder } = await import("./sales");
     const ctx = shop();
     stockChairs(ctx, 1);
-    const so = createSalesOrder(ctx.db, { channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: ctx.chair.id, qty: 1, unitPrice: 1_000 }] });
+    const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: ctx.chair.id, qty: 1, unitPrice: 1_000 }] });
     confirmSalesOrder(ctx.db, so.id);
     deliverSalesOrder(ctx.db, so.id, [{ itemId: ctx.chair.id, qty: 1 }]);
     expect(() => transact(ctx.db, (d) => completeSalesOrder(d, so.id))).toThrow(/sisa tagihan/);
@@ -689,3 +690,8 @@ describe("planning & closing rules", () => {
     expect(so.status).toBe("selesai");
   });
 });
+
+/** Sales orders need a customer before they can be confirmed. */
+function buyerOf(db: Db) {
+  return (db.partners.find((p) => p.role === "customer") ?? createPartner(db, { role: "customer", name: "Pembeli" })).id;
+}

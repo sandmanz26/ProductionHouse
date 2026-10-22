@@ -28,6 +28,8 @@ import { EPS, isOpenWo, outstandingCheckouts, receivables, today } from "@/domai
 import { CommandPalette } from "./CommandPalette";
 import { useDb, useDbStore } from "@/store/db-store";
 import { useTheme } from "@/lib/theme";
+import { BRAND } from "@/brand/brand";
+import { Wordmark } from "@/brand/Logo";
 
 interface NavItem {
   to: string;
@@ -107,12 +109,10 @@ function useNavCounts(): NavCounts {
 function Brand() {
   const name = useDb().settings.companyName;
   return (
-    <div className="min-w-0 px-3 leading-tight">
-      <p className="text-[15px] font-semibold tracking-tight">
-        Mebel<span className="text-accent">OS</span>
-      </p>
-      <p className="truncate text-xs text-muted">{name}</p>
-    </div>
+    <NavLink to="/" className="block min-w-0 rounded-sm px-3 py-1 leading-tight focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none" aria-label={`${BRAND.name} — beranda`}>
+      <Wordmark />
+      <p className="mt-1 truncate pl-[30px] text-xs text-muted">{name}</p>
+    </NavLink>
   );
 }
 
@@ -248,14 +248,14 @@ export function AppShell({ children }: { children?: ReactNode }) {
         Lewati ke konten
       </a>
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-[var(--rule)] bg-surface lg:flex print:hidden">
-        <div className="flex h-14 items-center px-2">
+        <div className="flex h-16 items-center px-2">
           <Brand />
         </div>
         <div className="flex-1 overflow-y-auto px-3 pt-2 pb-6">
           <NavList />
         </div>
         <div className="border-t border-[var(--rule)] px-5 py-3 text-[11px] text-muted">
-          MebelOS 2.0 · offline, tersimpan lokal
+          {BRAND.name} {BRAND.version} · {BRAND.line}
         </div>
       </aside>
 

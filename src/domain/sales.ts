@@ -1,4 +1,4 @@
-import { assert, createLot, EPS, freeQtyFor, getItem, getLot, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, suggestLots, sum, takeFromLot } from "./core";
+import { assert, assertAmount, assertDate, assertPartnerRole, createLot, EPS, freeQtyFor, getItem, getLot, getUsableItem, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, suggestLots, sum, takeFromLot } from "./core";
 import { createWorkOrder, isProducible } from "./production";
 import type {
   ContainerType,
@@ -56,17 +56,23 @@ export function getSalesOrder(db: Db, id: ID): SalesOrder {
   return so;
 }
 
-function validate(db: Db, input: SalesInput) {
+function validate(db: Db, input: SalesInput, keep?: ReadonlySet<ID>) {
+  assertDate(input.date, "Tanggal order");
+  if (input.dueDate) assert(input.dueDate >= input.date, "Target kirim tidak boleh sebelum tanggal order.");
+  if (input.paymentDueDate) assert(input.paymentDueDate >= input.date, "Jatuh tempo bayar tidak boleh sebelum tanggal order.");
+  assertPartnerRole(db, input.customerId, "customer");
   assert(input.lines.length > 0, "Tambahkan minimal satu produk.");
-  assert(input.exchangeRate > 0, "Kurs harus lebih dari 0.");
+  assert(Number.isFinite(input.exchangeRate) && input.exchangeRate > 0, "Kurs harus lebih dari 0.");
   if (input.currency === "IDR") assert(input.exchangeRate === 1, "Kurs IDR harus 1.");
   for (const l of input.lines) {
-    const item = getItem(db, l.itemId);
-    assert(l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
-    assert(l.unitPrice >= 0, `Harga ${item.name} tidak boleh negatif.`);
+    const item = getUsableItem(db, l.itemId, keep);
+    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
+    assertAmount(l.unitPrice, `Harga ${item.name}`);
   }
-  assert((input.discount ?? 0) >= 0 && (input.shippingCharge ?? 0) >= 0, "Diskon/ongkir tidak boleh negatif.");
-  assert((input.dpPercent ?? 0) >= 0 && (input.dpPercent ?? 0) <= 100, "DP harus antara 0–100%.");
+  assertAmount(input.discount ?? 0, "Diskon");
+  assertAmount(input.shippingCharge ?? 0, "Ongkir");
+  const dp = input.dpPercent ?? 0;
+  assert(Number.isFinite(dp) && dp >= 0 && dp <= 100, "DP harus antara 0–100%.");
   const subtotal = sum(input.lines.map((l) => l.qty * l.unitPrice));
   assert((input.discount ?? 0) <= subtotal + (input.shippingCharge ?? 0), "Diskon melebihi nilai order.");
   if (input.channel === "ekspor") assert(input.export, "Lengkapi data ekspor.");
@@ -102,7 +108,11 @@ export function createSalesOrder(db: Db, input: SalesInput): SalesOrder {
 export function updateSalesOrder(db: Db, id: ID, input: SalesInput): SalesOrder {
   const so = getSalesOrder(db, id);
   assert(so.status === "draft" || so.status === "dikonfirmasi", "Order yang sudah dikirim tidak bisa diubah.");
-  validate(db, input);
+  validate(db, input, new Set(so.lines.map((l) => l.itemId)));
+  const paidSoFar = sum(so.payments.map((p) => p.amount));
+  assert(!so.payments.length || input.currency === so.currency, "Mata uang tidak bisa diganti setelah ada pembayaran.");
+  const newTotal = salesTotals(db, { ...so, lines: input.lines.map((l) => ({ id: "", ...l })), discount: input.discount ?? 0, shippingCharge: input.shippingCharge ?? 0 }).total;
+  assert(newTotal + 0.01 >= paidSoFar, "Total baru lebih kecil dari yang sudah dibayar — catat refund dulu.");
   Object.assign(so, {
     channel: input.channel,
     customerId: input.customerId,
@@ -133,6 +143,7 @@ export function updateExportInfo(db: Db, id: ID, info: ExportInfo): SalesOrder {
 export function confirmSalesOrder(db: Db, id: ID): SalesOrder {
   const so = getSalesOrder(db, id);
   assert(so.status === "draft", "Order sudah dikonfirmasi.");
+  assert(so.customerId, "Pilih pelanggan sebelum mengonfirmasi order.");
   so.status = "dikonfirmasi";
   return so;
 }

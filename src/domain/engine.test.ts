@@ -31,6 +31,7 @@ import {
   transact,
   unissue,
   cancelWorkOrder,
+  createPartner,
   type Db,
   type Item,
 } from "./index";
@@ -307,7 +308,7 @@ describe("sales", () => {
   it("captures COGS from lots and blocks over-delivery", () => {
     const { db, cabinet } = setup();
     addOpeningStock(db, { itemId: cabinet.id, qty: 3, unitCost: 1_200_000 });
-    const so = createSalesOrder(db, {
+    const so = createSalesOrder(db, { customerId: buyerOf(db),
       channel: "ekspor",
       date: "2026-10-01",
       currency: "USD",
@@ -455,3 +456,8 @@ describe("demo seed", () => {
     expect(migrate(JSON.parse(JSON.stringify(db)))).toEqual(db);
   });
 });
+
+/** Sales orders need a customer before they can be confirmed. */
+function buyerOf(db: Db) {
+  return (db.partners.find((p) => p.role === "customer") ?? createPartner(db, { role: "customer", name: "Pembeli" })).id;
+}

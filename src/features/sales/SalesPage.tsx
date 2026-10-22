@@ -108,7 +108,7 @@ export default function SalesPage() {
         columns={columns}
         rows={rows}
         onRowAction={(s) => navigate(`/penjualan/${s.id}`)}
-        empty={<EmptyBlock icon={<Ship className="size-5" />} title="Belum ada order" action={<Button onPress={() => navigate("/penjualan/baru")}>Buat order</Button>} />}
+        empty={<EmptyBlock icon={<Ship className="size-5" />} title="Belum ada order" description="Supply ke toko atau ekspor per kontainer — HPP kirim diambil dari lot produk." action={<Button onPress={() => navigate("/penjualan/baru")}>Buat order</Button>} />}
       />
     </>
   );

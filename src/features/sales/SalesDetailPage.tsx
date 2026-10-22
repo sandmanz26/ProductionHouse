@@ -118,7 +118,14 @@ export default function SalesDetailPage() {
                 <Pencil className="size-4" /> Ubah
               </Button>
             )}
-            {so.status === "draft" && <Button onPress={() => run((d) => confirmSalesOrder(d, so.id), `${so.code} dikonfirmasi`)}>Konfirmasi order</Button>}
+            {so.status === "draft" &&
+              (so.customerId ? (
+                <Button onPress={() => run((d) => confirmSalesOrder(d, so.id), `${so.code} dikonfirmasi`)}>Konfirmasi order</Button>
+              ) : (
+                <Button variant="secondary" onPress={() => navigate(`/penjualan/${so.id}/ubah`)}>
+                  Pilih pelanggan untuk konfirmasi
+                </Button>
+              ))}
             {canDeliver && (
               <Button onPress={() => setDelivering(true)}>
                 <Truck className="size-4" /> Kirim barang

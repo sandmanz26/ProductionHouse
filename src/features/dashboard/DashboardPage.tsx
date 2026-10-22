@@ -22,6 +22,7 @@ import { Code, EmptyBlock, MetricStrip, PageHeader, Section, StatusChip } from "
 import { formatDate, formatIDRCompact, formatPct } from "@/lib/format";
 import { WO_STATUS } from "@/lib/labels";
 import { useDb, useLookups } from "@/store/db-store";
+import { FirstSteps } from "./FirstSteps";
 
 const SEVERITY_BAR: Record<InsightSeverity, string> = {
   danger: "bg-danger",
@@ -81,10 +82,14 @@ export default function DashboardPage() {
         ]}
       />
 
+      <div className="mt-5 empty:hidden">
+        <FirstSteps />
+      </div>
+
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Section title="Perlu tindakan" description={`${data.insights.length} hal, diurutkan dari yang paling mendesak`} bodyClassName="p-0">
           {data.insights.length === 0 ? (
-            <EmptyBlock title="Tidak ada yang perlu ditindaklanjuti" />
+            <EmptyBlock title="Semua beres" description="Tidak ada sewa telat, bahan kurang, atau tagihan lewat tempo." />
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {data.insights.slice(0, 10).map((ins) => (
@@ -117,7 +122,7 @@ export default function DashboardPage() {
           bodyClassName="p-0"
         >
           {data.openWos.length === 0 ? (
-            <EmptyBlock title="Tidak ada pekerjaan aktif" action={<Button size="sm" onPress={() => navigate("/produksi/baru")}>Buat perintah kerja</Button>} />
+            <EmptyBlock title="Lantai produksi kosong" action={<Button size="sm" onPress={() => navigate("/produksi/baru")}>Buat perintah kerja</Button>} />
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {data.board

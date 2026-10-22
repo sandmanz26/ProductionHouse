@@ -58,7 +58,7 @@ export function MovesTable({ moves, showItem = true }: { moves: StockMove[]; sho
       columns={columns}
       rows={moves}
       dependencies={[lotCode]}
-      empty={<EmptyBlock icon={<ArrowLeftRight className="size-5" />} title="Belum ada mutasi" />}
+      empty={<EmptyBlock icon={<ArrowLeftRight className="size-5" />} title="Belum ada mutasi" description="Setiap barang masuk, keluar, dipotong, atau dipindah meninggalkan jejak di sini." />}
     />
   );
 }

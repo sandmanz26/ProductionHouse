@@ -2,13 +2,19 @@
 @import "@heroui/styles";
 
 /*
- * Visual direction: a workshop tool, not a marketing dashboard.
- * Small radii, hairline borders instead of shadows, IBM Plex for an engineered feel,
- * monospace digits for anything you compare (codes, quantities, money).
+ * Serat — visual direction (see docs/BRAND.md).
+ * A workshop ledger, not a marketing dashboard: small radii, hairline rules instead of shadows,
+ * a serif voice for titles (the "book"), sans for work, monospace for anything you compare.
+ * Palette: jati (accent), arang (ink), kertas (paper), serbuk (sawdust highlight).
  */
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Serif", ui-serif, Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --color-jati: oklch(0.5 0.115 50);
+  --color-arang: oklch(0.2 0.008 60);
+  --color-kertas: oklch(0.972 0.005 85);
+  --color-serbuk: oklch(0.83 0.06 78);
 }
 
 :root,
@@ -49,6 +55,13 @@ body {
   font-family: var(--font-sans);
   background: var(--background);
   font-size: 14px;
+}
+
+/* Page titles speak in the brand's serif; everything you work with stays sans. */
+.title-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 /* Digits that get compared column-wise. */

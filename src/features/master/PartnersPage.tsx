@@ -86,7 +86,7 @@ export default function PartnersPage() {
         rows={rows}
         dependencies={[usage]}
         onRowAction={(p) => setEditing(p)}
-        empty={<EmptyBlock icon={<Users className="size-5" />} title="Belum ada data" action={<Button onPress={() => setEditing("new")}>Tambah</Button>} />}
+        empty={<EmptyBlock icon={<Users className="size-5" />} title="Belum ada relasi" description="Pemasok kayu, toko hardware, buyer ekspor, penyewa — semua tercatat di sini." action={<Button onPress={() => setEditing("new")}>Tambah</Button>} />}
       />
       <TaskModal
         isOpen={editing !== null}

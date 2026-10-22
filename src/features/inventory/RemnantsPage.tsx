@@ -154,7 +154,7 @@ export default function RemnantsPage() {
         columns={columns}
         rows={rows.map((r) => ({ ...r, id: r.lot.id }))}
         dependencies={[products]}
-        empty={<EmptyBlock icon={<Recycle className="size-5" />} title="Belum ada sisa material" description="Sisa tercatat otomatis saat menyelesaikan perintah kerja." />}
+        empty={<EmptyBlock icon={<Recycle className="size-5" />} title="Belum ada sisa material" description="Potongan layak pakai tercatat saat perintah kerja ditutup — lengkap dengan ukuran dan harganya sendiri." />}
       />
       <LotAdjustDialog lot={adjusting} onClose={() => setAdjusting(null)} />
     </>

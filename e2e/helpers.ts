@@ -13,6 +13,7 @@ export async function freshDemo(page: Page): Promise<DemoDb> {
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+  await page.getByRole("button", { name: "Masuk ke bengkel contoh" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   return page.evaluate(() => JSON.parse(localStorage.getItem("mebelos:db")!).state.db as DemoDb);
 }

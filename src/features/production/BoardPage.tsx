@@ -34,7 +34,7 @@ export default function BoardPage() {
         actions={<Button onPress={() => navigate("/produksi/baru")}>Perintah kerja</Button>}
       />
       {total === 0 ? (
-        <EmptyBlock title="Tidak ada pekerjaan aktif" />
+        <EmptyBlock title="Lantai produksi kosong" description="Perintah kerja yang sedang berjalan muncul di sini per tahap." />
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-2 lg:-mx-8 lg:px-8">
           <div className="flex min-w-max gap-3 max-sm:min-w-0 max-sm:flex-col">

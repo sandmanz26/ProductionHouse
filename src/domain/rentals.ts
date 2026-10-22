@@ -1,7 +1,11 @@
 import {
   assert,
+  assertAmount,
+  assertDate,
+  assertPartnerRole,
   EPS,
   getItem,
+  getUsableItem,
   getLot,
   newId,
   nextCode,
@@ -100,23 +104,26 @@ function normalizeCharges(extra: RentalInput["extraCharges"]) {
   return (extra ?? [])
     .filter((c) => c.label.trim() || c.amount)
     .map((c) => {
-      assert(c.amount >= 0, "Biaya tambahan tidak boleh negatif.");
+      assertAmount(c.amount, "Biaya tambahan");
       return { id: newId(), label: c.label.trim() || "Biaya lain", amount: c.amount };
     });
 }
 
-function validate(db: Db, input: RentalInput) {
-  assert(input.project.trim(), "Isi nama acara/proyek.");
-  assert(input.startDate && input.endDate, "Tanggal mulai dan selesai wajib diisi.");
+function validate(db: Db, input: RentalInput, keep?: ReadonlySet<ID>) {
+  assert(input.project?.trim(), "Isi nama acara/proyek.");
+  assertDate(input.startDate, "Tanggal mulai");
+  assertDate(input.endDate, "Tanggal selesai");
+  assertPartnerRole(db, input.customerId, "customer");
   assert(input.endDate >= input.startDate, "Tanggal selesai tidak boleh sebelum tanggal mulai.");
   assert(input.lines.length > 0, "Tambahkan minimal satu produk.");
   for (const l of input.lines) {
-    const item = getItem(db, l.itemId);
+    const item = getUsableItem(db, l.itemId, keep);
     assert(item.kind === "product", `${item.name} bukan produk.`);
     assert(l.qty > EPS && Number.isInteger(l.qty), `Qty ${item.name} harus bilangan bulat > 0.`);
-    assert(l.ratePerDay >= 0, `Tarif ${item.name} tidak boleh negatif.`);
+    assertAmount(l.ratePerDay, `Tarif ${item.name}`);
   }
-  assert((input.deposit ?? 0) >= 0 && (input.discount ?? 0) >= 0, "Deposit/diskon tidak boleh negatif.");
+  assertAmount(input.deposit ?? 0, "Deposit");
+  assertAmount(input.discount ?? 0, "Diskon");
 }
 
 export function createRental(db: Db, input: RentalInput): Rental {
@@ -146,7 +153,21 @@ export function createRental(db: Db, input: RentalInput): Rental {
 export function updateRental(db: Db, id: ID, input: RentalInput): Rental {
   const r = getRental(db, id);
   assert(r.status === "dipesan", "Hanya booking yang belum diserahkan yang bisa diubah.");
-  validate(db, input);
+  validate(db, input, new Set(r.lines.map((l) => l.itemId)));
+  const draft: Rental = {
+    ...r,
+    kind: input.kind,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    lines: input.lines.map((l) => ({ id: "", ...l, ratePerDay: input.kind === "pinjam" ? 0 : l.ratePerDay })),
+    discount: input.discount ?? 0,
+    extraCharges: normalizeCharges(input.extraCharges),
+  };
+  const paidSoFar = sum(r.payments.map((p) => p.amount));
+  assert(
+    rentalCharges(draft, input.startDate).total + 0.01 >= paidSoFar,
+    "Total baru lebih kecil dari yang sudah dibayar — catat refund dulu.",
+  );
   Object.assign(r, {
     kind: input.kind,
     customerId: input.customerId,
@@ -166,6 +187,7 @@ export function updateRental(db: Db, id: ID, input: RentalInput): Rental {
 export function extendRental(db: Db, id: ID, endDate: ISODate): Rental {
   const r = getRental(db, id);
   assert(r.status === "dipesan" || r.status === "berjalan", "Sewa sudah ditutup.");
+  assertDate(endDate, "Tanggal selesai");
   assert(endDate >= r.startDate, "Tanggal selesai tidak boleh sebelum tanggal mulai.");
   r.endDate = endDate;
   return r;
@@ -224,7 +246,7 @@ export function returnRental(db: Db, id: ID, entries: ReturnInput[], at = nowIso
     const item = getItem(db, co.itemId);
     const outstanding = roundQty(co.qty - returnedQty(r, co.id));
     assert(e.qty <= outstanding + EPS, `Qty kembali ${item.name} melebihi yang masih di luar (${outstanding}).`);
-    assert((e.fee ?? 0) >= 0, "Biaya tidak boleh negatif.");
+    assertAmount(e.fee ?? 0, "Biaya ganti/perbaikan");
     const lot = getLot(db, co.lotId);
     if (e.condition === "hilang") {
       takeFromLot(db, lot.id, e.qty, "hilang", ref, { at, allowStatus: ["disewa"], note: e.note || "Hilang saat disewa" });

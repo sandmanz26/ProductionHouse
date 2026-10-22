@@ -1,4 +1,4 @@
-import { assert, EPS, newId, roundMoney, sum } from "./core";
+import { assert, assertDate, EPS, newId, roundMoney, sum } from "./core";
 import { diffDays, today } from "./dates";
 import { purchaseTotals } from "./purchasing";
 import { rentalCharges } from "./rentals";
@@ -63,7 +63,8 @@ function paymentsOf(db: Db, doc: PayableDoc, id: ID): Payment[] {
  * blocked so the balance can never silently turn into an unexplained credit.
  */
 export function addPayment(db: Db, doc: PayableDoc, id: ID, input: PaymentInput): Payment {
-  assert(input.date, "Tanggal pembayaran wajib diisi.");
+  assertDate(input.date, "Tanggal pembayaran");
+  assert(typeof input.amount === "number" && Number.isFinite(input.amount), "Jumlah pembayaran harus berupa angka.");
   assert(Math.abs(input.amount) > EPS, "Jumlah pembayaran tidak boleh 0.");
   if (doc === "sale") assert(findSale(db, id).status !== "batal", "Order sudah dibatalkan.");
   if (doc === "purchase") assert(findPurchase(db, id).status !== "batal", "Pembelian sudah dibatalkan.");
@@ -93,6 +94,11 @@ export function removePayment(db: Db, doc: PayableDoc, id: ID, paymentId: ID) {
   const list = paymentsOf(db, doc, id);
   const idx = list.findIndex((p) => p.id === paymentId);
   assert(idx >= 0, "Pembayaran tidak ditemukan.");
+  const removed = list[idx]!;
+  if (removed.amount < 0) {
+    // Undoing a refund puts the money back on the document; it must not exceed the bill.
+    assert(billedAmount(db, doc, id).balance + removed.amount >= -0.01 || doc === "rental", "Refund ini tidak bisa dihapus karena membuat pembayaran melebihi tagihan.");
+  }
   list.splice(idx, 1);
   return true;
 }
