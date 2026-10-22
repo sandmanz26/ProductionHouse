@@ -100,7 +100,7 @@ test("purchasing: timber volume calculator fills the quantity", async ({ page })
   await expect(page.getByText("0,3 m³")).toBeVisible();
   await page.getByRole("button", { name: "Pakai sebagai qty" }).click();
   await page.getByRole("button", { name: "Simpan & terima barang" }).click();
-  await expect(page).toHaveURL(/#\/pembelian\/[^b]/);
+  await expect(page).toHaveURL(/#\/pembelian\/[0-9a-f]{8}-[0-9a-f-]{27}$/);
   const after = await readDb(page);
   const p = after.purchases[after.purchases.length - 1];
   expect(p.lines[0].qty).toBe(0.3);

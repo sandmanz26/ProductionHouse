@@ -67,7 +67,7 @@ test("sales: a draft without a customer cannot be confirmed", async ({ page }) =
   await page.goto("/#/penjualan/baru");
   await pickOption(page, "Barang", "Kursi", /Kursi/);
   await page.getByRole("button", { name: "Simpan order" }).click();
-  await expect(page).toHaveURL(/#\/penjualan\/[^b]/);
+  await expect(page).toHaveURL(/#\/penjualan\/[0-9a-f]{8}-[0-9a-f-]{27}$/);
   await expect(page.getByRole("button", { name: "Konfirmasi order" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Pilih pelanggan untuk konfirmasi" })).toBeVisible();
 });
