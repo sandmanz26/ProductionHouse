@@ -1,3 +1,4 @@
+import { costingMethodOf, isAveragedLot, isOrderedLot, layerOrder } from "./costing-rules";
 import type { CounterKey, Db, Dimensions, DocRef, ID, Item, Lot, MoveType, PartnerRole, StockMove } from "./types";
 
 /** Raised for rule violations; the message is user-facing (Bahasa Indonesia). */
@@ -58,6 +59,7 @@ export function nextCode(db: Db, key: CounterKey): string {
 export function transact<R = void>(db: Db, fn: (draft: Db) => R): { db: Db; result: R } {
   const draft = structuredClone(db);
   const result = fn(draft);
+  settleAverages(draft);
   return { db: draft, result };
 }
 
@@ -124,6 +126,8 @@ export function takeFromLot(
   const lot = getLot(db, lotId);
   const item = getItem(db, lot.itemId);
   assert(Number.isFinite(qty) && qty > EPS, "Qty harus lebih dari 0.");
+  // Moving average: whatever physical lot is taken, it leaves at the item's current average.
+  if (isAveragedLot(lot) && costingMethodOf(db, item) === "rata_rata") averageItemCost(db, item.id, opts.at);
   const allowed = opts.allowStatus ?? ["tersedia"];
   assert(allowed.includes(lot.status), `Lot ${lot.code} berstatus "${lot.status}" dan tidak dapat dipakai.`);
   assert(
@@ -177,7 +181,7 @@ export interface LotSuggestion {
  * Lots reserved for other work orders are skipped.
  */
 export function suggestLots(
-  db: Db,
+  db: Pick<Db, "lots" | "items" | "settings">,
   itemId: ID,
   qty: number,
   opts: { workOrderId?: ID; excludeLotIds?: ID[]; useRemnants?: boolean } = {},
@@ -193,11 +197,12 @@ export function suggestLots(
       (useRemnants || !l.isRemnant),
   );
   const rank = (l: Lot) => (l.reservedForWo && l.reservedForWo === opts.workOrderId ? 0 : l.isRemnant ? 1 : 2);
+  const order = layerOrder(costingMethodOf(db, db.items.find((i) => i.id === itemId)));
   candidates.sort((a, b) => {
     const r = rank(a) - rank(b);
     if (r !== 0) return r;
     if (a.isRemnant && b.isRemnant) return a.qty - b.qty;
-    return a.createdAt.localeCompare(b.createdAt);
+    return order(a, b);
   });
 
   let remaining = qty;
@@ -341,4 +346,58 @@ export function assertDate(date: string | undefined, label = "Tanggal"): asserts
 
 export function assertLocation(db: Db, location: string) {
   assert(db.settings.locations.includes(location), `Lokasi "${location}" tidak dikenal — tambahkan dulu di Pengaturan.`);
+}
+
+/** Revaluation entries made by the cost formula itself carry this reference. */
+export const AVERAGE_REF: DocRef = { type: "adjustment", id: "rata-rata", code: "Rata-rata" };
+
+/**
+ * Perpetual moving average: gives every interchangeable lot of an item the same unit cost
+ * (total value ÷ total qty). Value is preserved; each changed lot gets a zero-qty revaluation.
+ */
+export function averageItemCost(db: Db, itemId: ID, at?: string): number | undefined {
+  const pool = db.lots.filter((l) => l.itemId === itemId && isAveragedLot(l));
+  const qty = sum(pool.map((l) => l.qty));
+  if (qty <= EPS) return undefined;
+  const avg = roundMoney(sum(pool.map((l) => l.qty * l.unitCost)) / qty);
+  for (const lot of pool) {
+    if (Math.abs(lot.unitCost - avg) < 0.005) continue;
+    lot.unitCost = avg;
+    recordMove(db, { lot, qty: 0, type: "revaluasi", ref: AVERAGE_REF, at, unitCost: avg, note: "Rata-rata bergerak" });
+  }
+  return avg;
+}
+
+/** Brings every moving-average item back to a single cost after a change (receipts, returns…). */
+export function settleAverages(db: Db, at?: string) {
+  for (const item of db.items) {
+    if (costingMethodOf(db, item) === "rata_rata") averageItemCost(db, item.id, at);
+  }
+}
+
+/**
+ * Puts quantity back into an existing lot at the cost it left with. When the lot's cost moved in
+ * the meantime (moving average, revaluation) the two are blended so no value is created or lost.
+ */
+export function returnToLot(
+  db: Db,
+  lot: Lot,
+  qty: number,
+  unitCost: number,
+  move: { type: MoveType; ref: DocRef; at?: string; note?: string },
+) {
+  const before = lot.qty;
+  if (before <= EPS) lot.unitCost = roundMoney(unitCost);
+  else if (Math.abs(lot.unitCost - unitCost) >= 0.005) {
+    lot.unitCost = roundMoney((before * lot.unitCost + qty * unitCost) / (before + qty));
+  }
+  lot.qty = roundQty(before + qty);
+  recordMove(db, { lot, qty, unitCost, ...move });
+  return lot;
+}
+
+/** Lot that must leave next under FIFO/LIFO, among the interchangeable lots on hand. */
+export function nextLayer(db: Pick<Db, "lots" | "items" | "settings">, itemId: ID): Lot | undefined {
+  const method = costingMethodOf(db, db.items.find((i) => i.id === itemId));
+  return db.lots.filter((l) => l.itemId === itemId && isOrderedLot(l)).sort(layerOrder(method))[0];
 }

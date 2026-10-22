@@ -1,10 +1,11 @@
 import { Button, toast } from "@heroui/react";
 import { Download, RotateCcw, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-import { DomainError, parseBackup, serializeBackup, updateSettings, type Currency, type Settings } from "@/domain";
+import { COSTING_LABEL, DomainError, parseBackup, serializeBackup, updateSettings, type Currency, type Settings } from "@/domain";
+import { CostingMethodPicker } from "@/components/costing";
 import { NumberInput, TextInput } from "@/components/fields";
 import { ConfirmButton, PageHeader, Row, Section } from "@/components/ui";
-import { formatIDR } from "@/lib/format";
+import { formatDate, formatIDR } from "@/lib/format";
 import { STORAGE_KEY, useDb, useDbStore, useRun } from "@/store/db-store";
 
 export default function SettingsPage() {
@@ -105,6 +106,42 @@ function SettingsForm({ initial }: { initial: Settings }) {
             <NumberInput label="Sisa dianggap lama setelah" value={s.remnantAgingDays} onChange={(v) => set("remnantAgingDays", v)} suffix="hari" maximumFractionDigits={0} />
             <NumberInput label="Ingatkan sewa sebelum jatuh tempo" value={s.rentalReminderDays} onChange={(v) => set("rentalReminderDays", v)} suffix="hari" maximumFractionDigits={0} />
           </div>
+        </Section>
+        <Section
+          title="Metode biaya persediaan"
+          description="Menentukan harga bahan yang dibebankan ke perintah kerja dan HPP barang yang dikirim. Sisa material, barang yang dibeli khusus untuk satu pekerjaan, dan unit rusak selalu memakai harga lotnya sendiri."
+          className="xl:col-span-2"
+        >
+          <CostingMethodPicker name="costing-method" value={s.costingMethod} onChange={(m) => set("costingMethod", m)} />
+          {s.costingMethod === "lifo" && (
+            <p className="mt-3 border-l-2 border-danger pl-3 text-[13px] text-danger">
+              LIFO tidak diakui PSAK 14 (sejak 2009) maupun UU PPh Pasal 10 ayat 6. Pakai hanya untuk analisa internal; laporan keuangan dan
+              SPT perlu dihitung ulang dengan FIFO atau rata-rata.
+            </p>
+          )}
+          {s.costingMethod !== initial.costingMethod && (
+            <p className="mt-3 border-l-2 border-warning pl-3 text-[13px]">
+              Berlaku untuk barang yang keluar setelah disimpan; nilai yang sudah tercatat tidak diubah
+              {s.costingMethod === "rata_rata" ? ", kecuali stok yang ada langsung dirata-ratakan" : ""}. UU PPh mensyaratkan metode dipakai
+              konsisten — perubahan untuk keperluan pajak perlu persetujuan DJP.
+            </p>
+          )}
+          {initial.costingHistory.length > 0 && (
+            <div className="mt-4">
+              <p className="eyebrow">Riwayat perubahan</p>
+              <ul className="mt-1 divide-y divide-[var(--rule)] text-[13px]">
+                {[...initial.costingHistory].reverse().slice(0, 8).map((h, i) => (
+                  <li key={i} className="flex flex-wrap justify-between gap-2 py-1.5">
+                    <span>
+                      {COSTING_LABEL[h.from]} → <b>{COSTING_LABEL[h.to]}</b>
+                      {h.itemId && <span className="text-muted"> · {db.items.find((x) => x.id === h.itemId)?.name ?? "item"}</span>}
+                    </span>
+                    <span className="num text-xs text-muted">{formatDate(h.at)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Section>
         <Section title="Data" description="Semua data tersimpan di browser perangkat ini (tanpa server). Cadangkan secara rutin dan simpan file di tempat aman." className="xl:col-span-2">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

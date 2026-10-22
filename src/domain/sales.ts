@@ -1,4 +1,5 @@
 import { assert, assertAmount, assertDate, assertPartnerRole, createLot, EPS, freeQtyFor, getItem, getLot, getUsableItem, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, suggestLots, sum, takeFromLot } from "./core";
+import { assertCostOrder, orderPicks } from "./costing";
 import { createWorkOrder, isProducible } from "./production";
 import type {
   ContainerType,
@@ -190,9 +191,10 @@ export function deliverSalesOrder(
       picks = s.picks;
     }
     assert(Math.abs(sum(picks.map((p) => p.qty)) - line.qty) < EPS, `Pilihan lot ${item.name} tidak sama dengan qty kirim.`);
-    for (const p of picks) {
+    for (const p of orderPicks(db, picks)) {
       const lot = getLot(db, p.lotId);
       assert(lot.itemId === line.itemId, "Lot tidak sesuai dengan produk.");
+      assertCostOrder(db, lot.id);
       takeFromLot(db, lot.id, p.qty, "keluar_penjualan", ref, { at });
       delivery.lines.push({ itemId: line.itemId, lotId: lot.id, qty: roundQty(p.qty), unitCost: lot.unitCost });
     }

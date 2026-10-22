@@ -55,6 +55,7 @@ import {
   transact,
   transferLot,
   createPartner,
+  SCHEMA_VERSION,
   type Db,
   type WorkOrder,
 } from "./index";
@@ -595,13 +596,15 @@ describe("S14 · data lama (skema v1) tetap terbaca", () => {
       rentals: [{ id: "r", code: "SW-0001", lines: [], checkouts: [], returns: [] }],
     };
     const db = migrate(v1);
-    expect(db.schemaVersion).toBe(2);
+    expect(db.schemaVersion).toBe(SCHEMA_VERSION);
     expect(db.workOrders[0]).toMatchObject({ stages: [], laborLogs: [], receipts: [] });
     expect(db.sales[0]).toMatchObject({ payments: [], returns: [] });
     expect(db.purchases[0]).toMatchObject({ payments: [] });
     expect(db.rentals[0]).toMatchObject({ payments: [], extraCharges: [] });
     expect(db.settings.defaultStages.length).toBeGreaterThan(0);
     expect(db.settings.companyName).toBe("Lama");
+    expect(db.settings.costingMethod).toBe("fifo");
+    expect(db.settings.costingHistory).toEqual([]);
   });
 });
 

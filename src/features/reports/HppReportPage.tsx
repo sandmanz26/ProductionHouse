@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   addDays,
+  COSTING_LABEL,
   inventoryValuation,
   productCostRows,
   rentalUtilization,
@@ -17,8 +18,9 @@ import { DataTable, PageHeader, Section, MetricStrip, StatusChip, type Column } 
 import { formatDate, formatIDR, formatIDRCompact, formatPct, formatQty } from "@/lib/format";
 import { WO_TYPE } from "@/lib/labels";
 import { useDb, useLookups } from "@/store/db-store";
+import { CostingComparison } from "./CostingComparison";
 
-type View = "produk" | "pekerjaan" | "sewa" | "nilai";
+type View = "produk" | "pekerjaan" | "sewa" | "nilai" | "metode";
 
 export default function HppReportPage() {
   const db = useDb();
@@ -167,6 +169,10 @@ export default function HppReportPage() {
               Nilai persediaan
               <Tabs.Indicator />
             </Tabs.Tab>
+            <Tabs.Tab id="metode">
+              Metode biaya
+              <Tabs.Indicator />
+            </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
       </Tabs>
@@ -181,6 +187,7 @@ export default function HppReportPage() {
           <p className="mt-2 text-xs text-muted">Utilisasi = unit-hari keluar ÷ (unit dimiliki × 90 hari). Unit dengan utilisasi rendah lebih baik dijual atau dipakai untuk produksi lain.</p>
         </>
       )}
+      {view === "metode" && <CostingComparison />}
       {view === "nilai" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Section title="Ringkasan nilai persediaan">
@@ -197,6 +204,10 @@ export default function HppReportPage() {
           <Section title="Cara membaca">
             <ul className="list-disc space-y-2 pl-4 text-sm text-muted">
               <li>Setiap lot punya harga pokoknya sendiri: pembelian (harga + ongkir), hasil produksi (HPP aktual), atau sisa (harga rata-rata bahan di pekerjaan asalnya).</li>
+              <li>
+                Metode biaya saat ini <b className="text-foreground">{COSTING_LABEL[db.settings.costingMethod]}</b> menentukan lot biasa mana yang keluar lebih dulu
+                (atau, untuk rata-rata, harga bersama semua lot). Bandingkan dampaknya di tab Metode biaya.
+              </li>
               <li>Sisa material mengurangi HPP pekerjaan yang menghasilkannya dan menambah nilai persediaan — tidak hilang sebagai biaya.</li>
               <li>Dekonstruksi tidak menaikkan nilai bahan di atas harga barunya; kelebihannya dicatat sebagai rugi.</li>
               <li>Unit yang disewakan tetap aset perusahaan dan tetap dihitung dalam persediaan.</li>

@@ -44,6 +44,13 @@ Ditambahkan setelah *roast* terhadap v1 ([`docs/ROAST.md`](docs/ROAST.md)):
   layar sambutan (bengkel contoh vs bengkel sendiri), langkah pertama untuk bengkel baru, dan
   suara yang konsisten di keadaan kosong & halaman buntu. Lihat `docs/BRAND.md`.
 
+## Baru di v3.1 — metode biaya persediaan
+
+FIFO (default), rata-rata bergerak, identifikasi khusus, dan LIFO (khusus analisa internal), dengan
+override per barang, riwayat perubahan, dan tab **Laporan HPP → Metode biaya** yang membandingkan
+ketiganya dari kartu stok. Sisa material dan barang khusus pekerjaan tetap memakai harganya sendiri
+(sesuai PSAK 14). Detail & sumber: [`docs/COSTING.md`](docs/COSTING.md).
+
 ## Menjalankan
 
 ```bash

@@ -3,6 +3,8 @@ import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
+  COSTING_LABEL,
+  COSTING_METHODS,
   createItem,
   isItemReferenced,
   removeItem,
@@ -10,6 +12,7 @@ import {
   standardProductCost,
   sum,
   updateItem,
+  type CostingMethod,
   type ID,
   type Item,
   type ItemInput,
@@ -21,7 +24,7 @@ import { RecordNotFound } from "@/components/NotFound";
 import { ItemPicker } from "@/components/pickers";
 import { ConfirmButton, PageHeader, Row, Section } from "@/components/ui";
 import { formatIDR, UOM_LABEL } from "@/lib/format";
-import { MATERIAL_CATEGORY, PRODUCT_CATEGORY } from "@/lib/labels";
+import { COSTING_HINT, MATERIAL_CATEGORY, PRODUCT_CATEGORY } from "@/lib/labels";
 import { useDb, useLookups, useRun } from "@/store/db-store";
 
 export default function ItemFormPage() {
@@ -70,6 +73,7 @@ function ItemForm({ existing }: { existing?: Item }) {
   const [stagesText, setStagesText] = useState(existing?.stages?.join(", ") ?? "");
   const [puLabel, setPuLabel] = useState(existing?.purchaseUnit?.label ?? "");
   const [puFactor, setPuFactor] = useState(existing?.purchaseUnit?.factor ?? 0);
+  const [costing, setCosting] = useState<CostingMethod | "default">(existing?.costingMethod ?? "default");
   const hasBom = isProduct || producible;
 
   const bomLines = bom.filter((b) => b.materialId).map((b) => ({ materialId: b.materialId!, qty: b.qty }));
@@ -93,6 +97,7 @@ function ItemForm({ existing }: { existing?: Item }) {
     packing: isProduct && packing.length && packing.width && packing.height ? packing : undefined,
     note: note || undefined,
     archived: existing?.archived,
+    costingMethod: costing === "default" ? undefined : costing,
   };
   const stdCost = hasBom ? standardProductCost(db, { ...input, id: existing?.id ?? "", sku } as Item) : 0;
   const materialCost = sum(bomLines.map((b) => (item(b.materialId)?.standardCost ?? 0) * b.qty));
@@ -157,6 +162,17 @@ function ItemForm({ existing }: { existing?: Item }) {
                 options={(Object.keys(UOM_LABEL) as Uom[]).map((u) => ({ id: u, label: UOM_LABEL[u] }))}
                 isDisabled={!!existing && db.lots.some((l) => l.itemId === existing.id)}
                 description={existing && db.lots.some((l) => l.itemId === existing.id) ? "Tidak bisa diubah karena sudah ada stok." : undefined}
+              />
+              <SelectInput
+                label="Metode biaya"
+                value={costing}
+                onChange={(v) => setCosting(v as CostingMethod | "default")}
+                options={[
+                  { id: "default", label: `Ikuti pengaturan (${COSTING_LABEL[db.settings.costingMethod]})` },
+                  ...COSTING_METHODS.map((m) => ({ id: m, label: COSTING_LABEL[m] })),
+                ]}
+                description={costing === "default" ? "Sama dengan metode perusahaan." : COSTING_HINT[costing]}
+                className="sm:col-span-2"
               />
               {!isProduct && (
                 <NumberInput

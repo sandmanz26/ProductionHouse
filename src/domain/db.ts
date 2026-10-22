@@ -1,7 +1,8 @@
 import { DomainError } from "./core";
+import { isCostingMethod } from "./costing-rules";
 import type { CounterKey, Db, Settings } from "./types";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const defaultSettings = (): Settings => ({
   companyName: "Production House Furnitur",
@@ -17,6 +18,9 @@ export const defaultSettings = (): Settings => ({
   remnantAgingDays: 90,
   rentalReminderDays: 2,
   defaultStages: ["Potong", "Rakit", "Amplas", "Finishing", "QC", "Packing"],
+  // FIFO: allowed by PSAK 14 and UU PPh, and matches how timber should rotate in the yard.
+  costingMethod: "fifo",
+  costingHistory: [],
 });
 
 const COUNTERS: CounterKey[] = ["lot", "purchase", "workOrder", "sale", "rental", "adjustment", "item", "partner"];
@@ -96,6 +100,7 @@ function checkIntegrity(db: Db) {
     if (it.kind !== "material" && it.kind !== "product") fail(`items[${i}] jenis tidak dikenal`);
     if (!isNum(it.standardCost)) fail(`items[${i}] harga standar bukan angka`);
     for (const b of it.bom ?? []) if (!itemIds.has(b.materialId) || !isNum(b.qty)) fail(`items[${i}] resep rusak`);
+    if (it.costingMethod !== undefined && !isCostingMethod(it.costingMethod)) fail(`items[${i}] metode biaya tidak dikenal`);
   });
   db.partners.forEach((p, i) => {
     if (!isStr(p.name) || (p.role !== "customer" && p.role !== "supplier")) fail(`partners[${i}] tidak valid`);
@@ -129,13 +134,16 @@ function checkIntegrity(db: Db) {
   }
 }
 
-/** Fills fields added in later schema versions so older data keeps working (v1 → v2). */
+/** Fills fields added in later schema versions so older data keeps working (v1 → v2 → v3). */
 function normalizeRecords(db: Db) {
   db.workOrders = db.workOrders.map((w) => ({ ...w, stages: w.stages ?? [], laborLogs: w.laborLogs ?? [], receipts: w.receipts ?? [] }));
   db.sales = db.sales.map((s) => ({ ...s, payments: s.payments ?? [], returns: s.returns ?? [] }));
   db.purchases = db.purchases.map((p) => ({ ...p, payments: p.payments ?? [] }));
   db.rentals = db.rentals.map((r) => ({ ...r, payments: r.payments ?? [], extraCharges: r.extraCharges ?? [] }));
   if (!db.settings.defaultStages?.length) db.settings.defaultStages = defaultSettings().defaultStages;
+  // v3: cost formula. Earlier versions suggested oldest lots first, which is FIFO.
+  if (!isCostingMethod(db.settings.costingMethod)) db.settings.costingMethod = "fifo";
+  if (!Array.isArray(db.settings.costingHistory)) db.settings.costingHistory = [];
 }
 
 export function parseBackup(json: string): Db {

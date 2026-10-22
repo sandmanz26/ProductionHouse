@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { freshDemo, idOf, readDb } from "./helpers";
+import { freshDemo, idOf, pickOption, readDb } from "./helpers";
 
 test("dashboard shows metrics and the command palette jumps to a work order", async ({ page }) => {
   await freshDemo(page);
@@ -90,8 +90,7 @@ test("rental: return all units in good condition", async ({ page }) => {
 test("purchasing: timber volume calculator fills the quantity", async ({ page }) => {
   await freshDemo(page);
   await page.goto("/#/pembelian/baru");
-  await page.getByRole("combobox", { name: "Material" }).fill("Kayu Jati");
-  await page.getByRole("option", { name: /Kayu Jati Grade A/ }).click();
+  await pickOption(page, "Material", "Kayu Jati", /Kayu Jati Grade A/);
   await page.getByRole("button", { name: "Hitung qty (kubikasi / satuan beli)" }).click();
   await page.getByRole("textbox", { name: "Batang" }).fill("10");
   await page.getByRole("textbox", { name: "Tebal" }).fill("5");

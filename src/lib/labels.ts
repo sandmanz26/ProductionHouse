@@ -1,4 +1,5 @@
 import type {
+  CostingMethod,
   LotOrigin,
   OutputGrade,
   PaymentMethod,
@@ -166,4 +167,12 @@ export const PAYMENT_METHOD: Record<PaymentMethod, string> = {
   giro: "Giro / cek",
   lc: "L/C",
   lainnya: "Lainnya",
+};
+
+/** What each formula means on the shop floor, in one line. */
+export const COSTING_HINT: Record<CostingMethod, string> = {
+  fifo: "Stok yang masuk paling dulu keluar paling dulu. Sisa stok bernilai harga terbaru.",
+  rata_rata: "Setiap barang keluar dengan harga rata-rata semua stok saat itu; dihitung ulang tiap barang masuk.",
+  identifikasi: "Harga lot yang benar-benar diambil. Cocok untuk barang unik atau pesanan proyek.",
+  lifo: "Stok yang masuk terakhir keluar lebih dulu. Hanya untuk analisa internal.",
 };

@@ -19,10 +19,12 @@
 
 ## Metode biaya (HPP)
 
-Biaya dihitung per **lot (identifikasi spesifik)**, sehingga sisa material membawa harganya sendiri.
+Biaya dihitung per **lot**, sehingga sisa material membawa harganya sendiri. Lot biasa (yang bisa
+saling menggantikan) mengikuti **metode biaya** perusahaan atau barang: FIFO, rata-rata bergerak,
+identifikasi khusus, atau LIFO. Lihat [`COSTING.md`](COSTING.md).
 
 ### Pengambilan bahan
-Urutan saran lot: (1) lot yang dicadangkan untuk perintah kerja ini → (2) lot **sisa** (terkecil yang cukup lebih dulu, agar potongan kecil habis) → (3) lot reguler FIFO. Lot yang dicadangkan untuk perintah kerja lain tidak disarankan.
+Urutan saran lot: (1) lot yang dicadangkan untuk perintah kerja ini → (2) lot **sisa** (terkecil yang cukup lebih dulu, agar potongan kecil habis) → (3) lot reguler menurut metode biaya (FIFO: terlama; LIFO: terbaru). Lot yang dicadangkan untuk perintah kerja lain tidak disarankan.
 
 ### Penyelesaian perintah kerja
 ```

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { freshDemo, idOf, readDb } from "./helpers";
+import { freshDemo, idOf, pickOption, readDb } from "./helpers";
 
 /** Wrong input from the screen must be refused with a clear message and leave the data as it was. */
 
@@ -65,8 +65,7 @@ test("backup: a corrupted file is rejected and current data is kept", async ({ p
 test("sales: a draft without a customer cannot be confirmed", async ({ page }) => {
   await freshDemo(page);
   await page.goto("/#/penjualan/baru");
-  await page.getByRole("combobox", { name: "Barang" }).first().fill("Kursi");
-  await page.getByRole("option").first().click();
+  await pickOption(page, "Barang", "Kursi", /Kursi/);
   await page.getByRole("button", { name: "Simpan order" }).click();
   await expect(page).toHaveURL(/#\/penjualan\/[^b]/);
   await expect(page.getByRole("button", { name: "Konfirmasi order" })).toHaveCount(0);

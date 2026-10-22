@@ -10,6 +10,7 @@ import {
   getLot,
   getUsableItem,
   newId,
+  returnToLot,
   nextCode,
   nowIso,
   recordMove,
@@ -20,6 +21,7 @@ import {
   takeFromLot,
   type LotSuggestion,
 } from "./core";
+import { assertCostOrder, orderPicks } from "./costing";
 import type {
   CostLine,
   CostSummary,
@@ -432,13 +434,16 @@ export function issueMaterials(db: Db, woId: ID, picks: { lotId: ID; qty: number
   assert(valid.length > 0, "Tidak ada bahan yang diambil.");
   ensureRunning(db, wo, at);
   const ref = woRef(wo);
-  for (const pick of valid) {
+  const plannedLotIds = new Set(wo.plannedInputs.map((i) => i.lotId).filter(Boolean));
+  for (const pick of orderPicks(db, valid)) {
     const lot = getLot(db, pick.lotId);
     assert(
       !lot.reservedForWo || lot.reservedForWo === wo.id,
       `Lot ${lot.code} dicadangkan untuk perintah kerja lain.`,
     );
     assert(!lot.receiptId || !wo.receipts.some((r) => r.id === lot.receiptId), "Hasil pekerjaan ini tidak bisa dipakai sebagai bahannya sendiri.");
+    // The unit named in the plan (the chair to repair or dismantle) is specific by definition.
+    if (!plannedLotIds.has(lot.id)) assertCostOrder(db, lot.id);
     takeFromLot(db, lot.id, pick.qty, "keluar_produksi", ref, { at, allowStatus: issuableStatuses(wo, lot) });
     wo.issues.push({ id: newId(), lotId: lot.id, itemId: lot.itemId, qty: roundQty(pick.qty), unitCost: lot.unitCost, at });
   }
@@ -478,9 +483,7 @@ export function unissue(db: Db, woId: ID, issueId: ID, qty: number, at = nowIso(
   const issue = wo.issues.find((i) => i.id === issueId);
   assert(issue, "Data pengambilan tidak ditemukan.");
   assert(qty > EPS && qty <= issue.qty + EPS, "Qty pengembalian melebihi yang diambil.");
-  const lot = getLot(db, issue.lotId);
-  lot.qty = roundQty(lot.qty + qty);
-  recordMove(db, { lot, qty, type: "kembali_produksi", ref: woRef(wo), at, unitCost: issue.unitCost });
+  returnToLot(db, getLot(db, issue.lotId), qty, issue.unitCost, { type: "kembali_produksi", ref: woRef(wo), at });
   issue.qty = roundQty(issue.qty - qty);
   if (issue.qty <= EPS) wo.issues = wo.issues.filter((i) => i.id !== issueId);
   return wo;
@@ -869,9 +872,8 @@ export function completeWorkOrder(
     if (r.kind === "utuh") {
       const lotId = r.lotId ?? largestIssueLot(wo, r.itemId);
       const lot = getLot(db, lotId);
-      lot.qty = roundQty(lot.qty + r.qty);
       const unitCost = wo.issues.find((i) => i.lotId === lotId)?.unitCost ?? lot.unitCost;
-      recordMove(db, { lot, qty: r.qty, type: "kembali_produksi", ref, at, unitCost });
+      returnToLot(db, lot, r.qty, unitCost, { type: "kembali_produksi", ref, at });
       entry.lotId = lotId;
     } else if (r.kind === "sisa") {
       const lot = createLot(db, {
@@ -916,14 +918,16 @@ export function completeWorkOrder(
     outputs.push({ id: newId(), itemId: o.itemId, qty: o.qty, sharePct: o.sharePct, dimensions: o.dimensions, grade: o.grade });
   }
 
-  // Partial output still in stock is revalued from provisional to actual HPP.
+  // Partial output still in stock is revalued from provisional to actual HPP. The difference is
+  // applied as a delta, so a lot already blended into a moving average keeps its other value.
   for (const r of wo.receipts) {
     const actual = unitOf.get(r.itemId);
     if (actual === undefined) continue;
-    for (const lot of db.lots.filter((l) => l.receiptId === r.id)) {
-      if (Math.abs(lot.unitCost - actual) < 0.005) continue;
-      lot.unitCost = actual;
-      recordMove(db, { lot, qty: 0, type: "revaluasi", ref, at, unitCost: actual, note: "HPP sementara → HPP aktual" });
+    const delta = actual - r.provisionalUnitCost;
+    if (Math.abs(delta) < 0.005) continue;
+    for (const lot of db.lots.filter((l) => l.receiptId === r.id && l.qty > EPS)) {
+      lot.unitCost = roundMoney(Math.max(0, lot.unitCost + delta));
+      recordMove(db, { lot, qty: 0, type: "revaluasi", ref, at, unitCost: lot.unitCost, note: "HPP sementara → HPP aktual" });
     }
   }
 

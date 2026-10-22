@@ -2,7 +2,7 @@ import { Button, Link } from "@heroui/react";
 import { Pencil, Plus, Recycle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { EPS, emptySummary, type Lot } from "@/domain";
+import { COSTING_LABEL, costingMethodOf, EPS, emptySummary, layerOrder, nextLayer, type Lot } from "@/domain";
 import { RecordNotFound } from "@/components/NotFound";
 import { DataTable, PageHeader, Section, MetricStrip, StatusChip, type Column } from "@/components/ui";
 import { formatDate, formatDims, formatIDR, formatIDRCompact, formatQty } from "@/lib/format";
@@ -21,7 +21,10 @@ export default function ItemStockPage() {
   const [adjusting, setAdjusting] = useState<Lot | null>(null);
   const [moving, setMoving] = useState<Lot | null>(null);
   const it = db.items.find((i) => i.id === id);
-  const lots = useMemo(() => db.lots.filter((l) => l.itemId === id && l.qty > EPS).sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [db.lots, id]);
+  const method = costingMethodOf(db, it);
+  // Lots are listed in the order the cost formula lets them leave.
+  const lots = db.lots.filter((l) => l.itemId === id && l.qty > EPS).sort(layerOrder(method));
+  const next = id && (method === "fifo" || method === "lifo") ? nextLayer(db, id) : undefined;
   const moves = useMemo(() => db.moves.filter((m) => m.itemId === id).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60), [db.moves, id]);
   const woCode = useMemo(() => new Map(db.workOrders.map((w) => [w.id, w.code])), [db.workOrders]);
   if (!it) return <RecordNotFound what="Item" back="/stok/material" />;
@@ -47,6 +50,7 @@ export default function ItemStockPage() {
         <div className="flex flex-wrap gap-1">
           <StatusChip tone={LOT_STATUS[l.status].tone}>{LOT_STATUS[l.status].label}</StatusChip>
           {l.reservedForWo && <StatusChip tone="accent">Untuk {woCode.get(l.reservedForWo)}</StatusChip>}
+          {next?.id === l.id && <StatusChip tone="default">Keluar berikutnya</StatusChip>}
         </div>
       ),
     },
@@ -105,8 +109,19 @@ export default function ItemStockPage() {
         }
       />
       <MetricStrip className="mb-5" items={[{ label: "Tersedia", value: formatQty(s.available, it.uom), hint: s.remnant ? `termasuk sisa ${formatQty(s.remnant, it.uom)}` : undefined }, { label: "Nilai", value: formatIDRCompact(s.value) }, { label: "Harga rata-rata", value: formatIDR(s.avgUnitCost || it.standardCost), hint: `Harga standar ${formatIDR(it.standardCost)}` }, { label: it.kind === "product" ? "Disewa / rusak" : "Dicadangkan", value: it.kind === "product" ? `${s.rented} / ${s.damaged}` : formatQty(s.reserved, it.uom) }]} />
-      <Section title="Lot stok" description="Setiap lot membawa harga pokoknya sendiri — inilah yang membuat HPP akurat." className="mb-6" bodyClassName="p-0">
-        <DataTable label="Lot stok" columns={columns} rows={lots} dependencies={[woCode]} />
+      <Section
+        title="Lot stok"
+        description={`Metode biaya ${COSTING_LABEL[method]}${it.costingMethod ? " (khusus item ini)" : ""}. ${
+          method === "rata_rata"
+            ? "Semua lot biasa memakai harga rata-rata yang sama; sisa dan barang khusus pekerjaan memakai harganya sendiri."
+            : method === "identifikasi"
+              ? "Setiap lot keluar dengan harga pokoknya sendiri."
+              : `Lot biasa keluar dari yang ${method === "fifo" ? "terlama" : "terbaru"}; urutan di tabel mengikuti urutan keluar.`
+        }`}
+        className="mb-6"
+        bodyClassName="p-0"
+      >
+        <DataTable label="Lot stok" columns={columns} rows={lots} dependencies={[woCode, next]} />
       </Section>
       <Section title="Mutasi terakhir" bodyClassName="p-0">
         <MovesTable moves={moves} showItem={false} />

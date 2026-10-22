@@ -1,4 +1,5 @@
 import { assert, assertAmount, DomainError, EPS, getItem, isActiveLot, newId, nextCode } from "./core";
+import { isCostingMethod, setCostingMethod } from "./costing";
 import type { Db, ID, Item, Partner, Settings } from "./types";
 
 export type ItemInput = Omit<Item, "id" | "sku"> & { sku?: string };
@@ -6,6 +7,7 @@ export type ItemInput = Omit<Item, "id" | "sku"> & { sku?: string };
 function validateItem(db: Db, input: ItemInput, selfId?: ID) {
   assert(input.name?.trim(), "Nama item wajib diisi.");
   assertAmount(input.standardCost, "Harga standar");
+  assert(input.costingMethod === undefined || isCostingMethod(input.costingMethod), "Metode biaya tidak dikenal.");
   for (const [key, label] of [
     ["salePrice", "Harga jual"],
     ["rentalRatePerDay", "Tarif sewa"],
@@ -68,6 +70,7 @@ export function updateItem(db: Db, id: ID, input: ItemInput): Item {
   const item = getItem(db, id);
   validateItem(db, input, id);
   assert(input.kind === item.kind, "Jenis item tidak dapat diubah.");
+  const methodBefore = item.costingMethod ?? null;
   if (input.uom !== item.uom) {
     assert(
       !db.lots.some((l) => l.itemId === id && isActiveLot(l)),
@@ -79,7 +82,9 @@ export function updateItem(db: Db, id: ID, input: ItemInput): Item {
     name: input.name.trim(),
     sku: input.sku?.trim().toUpperCase() || item.sku,
     bom: normalizeBom(input),
+    costingMethod: methodBefore ?? undefined,
   });
+  if ((input.costingMethod ?? null) !== methodBefore) setCostingMethod(db, input.costingMethod ?? null, { itemId: id });
   return item;
 }
 
@@ -139,7 +144,8 @@ export function deletePartner(db: Db, id: ID) {
 }
 
 export function updateSettings(db: Db, patch: Partial<Settings>): Settings {
-  const next = { ...db.settings, ...patch };
+  const { costingMethod, costingHistory: _ignored, ...rest } = patch;
+  const next = { ...db.settings, ...rest };
   assert(next.companyName?.trim(), "Nama perusahaan wajib diisi.");
   assertAmount(next.laborRatePerHour, "Tarif tenaga kerja");
   assertAmount(next.overheadPerLaborHour, "Overhead per jam");
@@ -158,5 +164,7 @@ export function updateSettings(db: Db, patch: Partial<Settings>): Settings {
   }
   next.defaultStages = (next.defaultStages ?? []).map((s) => s.trim()).filter(Boolean);
   db.settings = next;
-  return next;
+  // The cost formula goes through its own path so every change is logged.
+  if (costingMethod !== undefined) setCostingMethod(db, costingMethod);
+  return db.settings;
 }

@@ -1,7 +1,7 @@
 import { Button } from "@heroui/react";
 import { Recycle } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EPS, issueMaterials, roundQty, suggestIssue, sum, type ID, type WorkOrder } from "@/domain";
+import { COSTING_LABEL, costingMethodOf, EPS, issueMaterials, nextLayer, roundQty, suggestIssue, sum, type ID, type WorkOrder } from "@/domain";
 import { NumberInput, SwitchInput } from "@/components/fields";
 import { ItemPicker } from "@/components/pickers";
 import { StatusChip, TaskModal } from "@/components/ui";
@@ -28,7 +28,7 @@ export function IssueDialog({
       isOpen={!!request}
       onOpenChange={(open) => !open && onClose()}
       title="Ambil bahan dari gudang"
-      description="Lot dipilih otomatis: cadangan untuk pekerjaan ini → sisa material (terkecil dulu) → stok terlama. Ubah qty per lot bila perlu."
+      description="Lot dipilih otomatis: cadangan untuk pekerjaan ini → sisa material (terkecil dulu) → stok biasa menurut metode biaya. Ubah qty per lot bila perlu."
     >
       {request && <IssueForm wo={wo} initial={request} onDone={onClose} />}
     </TaskModal>
@@ -44,6 +44,8 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
   const [useRemnants, setUseRemnants] = useState(true);
   const [overrides, setOverrides] = useState<{ key: string; values: Record<ID, number> }>({ key: "", values: {} });
   const it = item(itemId ?? undefined);
+  const method = costingMethodOf(db, it);
+  const next = itemId && (method === "fifo" || method === "lifo") ? nextLayer(db, itemId) : undefined;
 
   const suggestionKey = `${itemId}|${qty}|${useRemnants}`;
   const { lots, suggested } = useMemo(() => {
@@ -94,6 +96,16 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
       />
 
       {itemId && (
+        <p className="-mt-1 text-xs text-muted">
+          Metode biaya <b className="text-foreground">{COSTING_LABEL[method]}</b>
+          {method === "fifo" && " — stok biasa harus keluar dari lot terlama dulu."}
+          {method === "lifo" && " — stok biasa harus keluar dari lot terbaru dulu."}
+          {method === "rata_rata" && " — lot mana pun yang diambil, harganya rata-rata stok saat ini."}
+          {method === "identifikasi" && " — harga mengikuti lot yang dipilih."} Sisa material dan barang khusus pekerjaan ini selalu boleh dipakai lebih dulu.
+        </p>
+      )}
+
+      {itemId && (
         <div className="rounded-md border border-[var(--rule)]">
           {lots.length === 0 ? (
             <p className="p-4 text-sm text-muted">Tidak ada stok tersedia untuk item ini.</p>
@@ -111,6 +123,7 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
                         </StatusChip>
                       )}
                       {l.reservedForWo === wo.id && <StatusChip tone="accent">Dibeli untuk pekerjaan ini</StatusChip>}
+                      {next?.id === l.id && <StatusChip tone="default">Keluar berikutnya ({COSTING_LABEL[method]})</StatusChip>}
                       {l.status === "rusak" && <StatusChip tone="danger">Rusak</StatusChip>}
                     </div>
                     <p className="mt-0.5 text-xs text-muted">

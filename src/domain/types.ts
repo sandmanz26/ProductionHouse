@@ -80,6 +80,8 @@ export interface Item {
   stages?: string[];
   /** Unit used when buying, e.g. 1 roll = 50 m. Stock is always kept in `uom`. */
   purchaseUnit?: { label: string; factor: number };
+  /** Overrides the company-wide cost formula for this item (see Settings.costingMethod). */
+  costingMethod?: CostingMethod;
   // ---- product-only fields ----
   salePrice?: number;
   rentalRatePerDay?: number;
@@ -536,6 +538,24 @@ export interface Rental {
 
 // ------------------------------------------------------------------ Settings & Db
 
+/**
+ * Cost formula for interchangeable stock (PSAK 14 / IAS 2):
+ *  - fifo: oldest layer leaves first (PSAK & UU PPh)
+ *  - rata_rata: perpetual moving average (PSAK & UU PPh)
+ *  - lifo: newest layer leaves first (management reporting only; not PSAK, not UU PPh)
+ *  - identifikasi: the cost of the exact lot taken (PSAK, for non-interchangeable goods)
+ * Remnants, lots bought for a specific work order and damaged units are always specific.
+ */
+export type CostingMethod = "fifo" | "lifo" | "rata_rata" | "identifikasi";
+
+export interface CostingChange {
+  at: ISODateTime;
+  from: CostingMethod;
+  to: CostingMethod;
+  /** Set when the change is an item override; absent for the company default. */
+  itemId?: ID;
+}
+
 export interface Settings {
   companyName: string;
   companyAddress: string;
@@ -555,6 +575,9 @@ export interface Settings {
   rentalReminderDays: number;
   /** Default production route for new work orders. */
   defaultStages: string[];
+  costingMethod: CostingMethod;
+  /** Audit trail: UU PPh requires the method to be applied consistently. */
+  costingHistory: CostingChange[];
 }
 
 export type CounterKey = "lot" | "purchase" | "workOrder" | "sale" | "rental" | "adjustment" | "item" | "partner";
