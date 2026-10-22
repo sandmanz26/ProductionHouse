@@ -1,5 +1,5 @@
 import { Button, Link } from "@heroui/react";
-import { Combine, Pencil, Plus, Recycle } from "lucide-react";
+import { Combine, GitFork, Pencil, Plus, Recycle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { COSTING_LABEL, costingMethodOf, EPS, emptySummary, layerOrder, nextLayer, type Lot } from "@/domain";
@@ -102,6 +102,9 @@ export default function ItemStockPage() {
         description={`${it.sku} · ${categoryLabel(it.category)} · satuan ${it.uom}`}
         actions={
           <>
+            <Button variant="secondary" onPress={() => navigate(`/jalur/${it.id}`)}>
+              <GitFork className="size-4" /> Jalur produksi
+            </Button>
             <Button variant="secondary" onPress={() => navigate(`/master/item/${it.id}`)}>
               <Pencil className="size-4" /> Data master
             </Button>

@@ -1,5 +1,5 @@
 import { Button, Card } from "@heroui/react";
-import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, GitFork, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
@@ -121,6 +121,9 @@ function ItemForm({ existing }: { existing?: Item }) {
         actions={
           existing && (
             <>
+              <Button variant="secondary" onPress={() => navigate(`/jalur/${existing.id}`)}>
+                <GitFork className="size-4" /> Jalur produksi
+              </Button>
               {existing.archived ? (
                 <Button variant="secondary" onPress={() => run((d) => restoreItem(d, existing.id), "Item dipulihkan")}>
                   <RotateCcw className="size-4" /> Pulihkan

@@ -446,3 +446,69 @@ export function plantFlow(db: Db, opts: PlantFlowOptions = {}): FlowGraph {
   b.link(finished, b.node({ id: "fate:bad", label: "Rusak / hilang", column: 4, kind: "rugi" }), fate.damaged + fate.lost);
   return b.build();
 }
+
+// ------------------------------------------------------------------ Item history
+
+/**
+ * Everything that ever came into stock of one item, by where it came from (which route, which
+ * supplier), and what became of it — sold to whom, turned into which product, still here.
+ */
+export function itemFlow(db: Db, itemId: ID): FlowGraph {
+  const b = new Builder();
+  const item = db.items.find((i) => i.id === itemId);
+  if (!item) return { nodes: [], links: [] };
+  const center = b.node({ id: `item:${itemId}`, label: item.name, sub: item.sku, column: 1, kind: item.kind === "product" ? "produk" : "bahan" });
+  const lots = db.lots.filter((l) => l.itemId === itemId);
+  const lotIds = new Set(lots.map((l) => l.id));
+  const woRoute = (wo: WorkOrder) => {
+    const recipe = wo.recipeId ? db.recipes.find((r) => r.id === wo.recipeId) : undefined;
+    if (recipe) return { id: `src:resep:${recipe.id}`, label: recipe.name, kind: (wo.type === "dekonstruksi" ? "sisa" : "proses") as FlowKind };
+    const label = { produksi: "Produksi (BOM)", konversi: "Konversi", gabung: "Gabung", dekonstruksi: "Hasil bongkar", perbaikan: "Perbaikan" }[wo.type];
+    return { id: `src:wo:${wo.type}`, label, kind: (wo.type === "dekonstruksi" ? "sisa" : "proses") as FlowKind };
+  };
+  const woCodes = new Map<string, Set<string>>();
+  for (const m of db.moves) {
+    if (!lotIds.has(m.lotId) || m.qty <= EPS) continue;
+    const value = m.qty * m.unitCost;
+    if (m.type === "masuk_pembelian") {
+      const p = db.purchases.find((x) => x.id === m.ref.id);
+      const name = db.partners.find((x) => x.id === p?.supplierId)?.name ?? "Pemasok umum";
+      b.link(b.node({ id: `src:beli:${name}`, label: `Beli · ${name}`, column: 0, kind: "bahan", to: "/pembelian" }), center, value);
+    } else if (m.type === "masuk_produksi" || m.type === "masuk_sisa") {
+      const wo = db.workOrders.find((w) => w.id === m.ref.id);
+      if (!wo) continue;
+      const r = m.type === "masuk_sisa" ? { id: "src:sisa", label: "Sisa dari pekerjaan lain", kind: "sisa" as FlowKind } : woRoute(wo);
+      woCodes.set(r.id, (woCodes.get(r.id) ?? new Set()).add(wo.code));
+      b.link(b.node({ id: r.id, label: r.label, column: 0, kind: r.kind }), center, value);
+    } else if (m.type === "saldo_awal" || m.type === "penyesuaian") {
+      b.link(b.node({ id: "src:saldo", label: "Saldo awal & penyesuaian", column: 0, kind: "stok" }), center, value);
+    } else if (m.type === "retur_penjualan") {
+      b.link(b.node({ id: "src:retur", label: "Retur dari pelanggan", column: 0, kind: "stok" }), center, value);
+    }
+  }
+  for (const [id, codesSet] of woCodes) {
+    const n = b.nodes.get(id);
+    if (n) n.sub = codes([...codesSet]);
+  }
+
+  // Where it went, grouped the way people ask: sold to whom, made into what.
+  const fate = lotFate(db, lots.filter((l) => !l.splitFrom).map((l) => l.id));
+  for (const d of fate.byDoc.values()) {
+    if (d.value <= 0.5) continue;
+    if (d.kind === "sold") {
+      const so = db.sales.find((s) => s.id === d.ref.id);
+      const name = db.partners.find((p) => p.id === so?.customerId)?.name ?? "Pelanggan";
+      b.link(center, b.node({ id: `to:cust:${name}`, label: `Terjual · ${name}`, column: 2, kind: "produk", to: "/penjualan" }), d.value);
+    } else {
+      const wo = db.workOrders.find((w) => w.id === d.ref.id);
+      const out = wo?.plannedOutputs[0] ? db.items.find((i) => i.id === wo.plannedOutputs[0]!.itemId) : undefined;
+      const label = out ? `Jadi ${out.name}` : "Diolah di produksi";
+      b.link(center, b.node({ id: `to:make:${out?.id ?? "x"}`, label, column: 2, kind: out?.kind === "product" ? "produk" : "bahan", to: out ? `/jalur/${out.id}` : undefined }), d.value);
+    }
+  }
+  b.link(center, b.node({ id: "to:stock", label: "Masih di gudang", column: 2, kind: "stok", to: `/stok/item/${itemId}` }), fate.inStock);
+  b.link(center, b.node({ id: "to:rent", label: "Sedang disewa", column: 2, kind: "stok", to: "/sewa" }), fate.rented);
+  b.link(center, b.node({ id: "to:bad", label: "Rusak", column: 2, kind: "rugi" }), fate.damaged);
+  b.link(center, b.node({ id: "to:lost", label: "Hilang / dibuang", column: 2, kind: "rugi" }), fate.lost);
+  return b.build();
+}

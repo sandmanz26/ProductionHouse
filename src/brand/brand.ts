@@ -4,7 +4,7 @@
  */
 export const BRAND = {
   name: "Serat",
-  version: "3.2",
+  version: "3.3",
   /** The promise, used on the welcome screen and in metadata. */
   line: "Setiap potongan punya harga.",
   descriptor: "Buku kerja produksi untuk bengkel mebel",

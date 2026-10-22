@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   Armchair,
   BookOpen,
+  GitFork,
   Calculator,
   CalendarClock,
   Hammer,
@@ -57,6 +58,7 @@ const NAV: { title?: string; items: NavItem[] }[] = [
       { to: "/produksi", label: "Perintah kerja", icon: Hammer, end: true, badge: (c) => (c.woOpen ? { value: c.woOpen, tone: "accent" } : undefined) },
       { to: "/produksi/papan", label: "Papan produksi", icon: SquareKanban },
       { to: "/resep", label: "Resep proses", icon: BookOpen },
+      { to: "/jalur", label: "Jalur produksi", icon: GitFork },
       {
         to: "/pembelian",
         label: "Pembelian",

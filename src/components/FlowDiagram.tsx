@@ -141,6 +141,7 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
   const [narrow, setNarrow] = useState(false);
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const hasFlow = graph.links.length > 0;
 
   useLayoutEffect(() => {
     const el = wrap.current;
@@ -152,7 +153,8 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [asTable]);
+    // The wrapper only exists when there is something to draw; re-attach when it appears.
+  }, [asTable, hasFlow]);
 
   const { nodes, bands, height, columns } = useMemo(() => layout(graph, width), [graph, width]);
   const kinds = [...new Set(nodes.map((n) => n.kind))];

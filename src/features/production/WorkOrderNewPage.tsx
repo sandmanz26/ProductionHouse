@@ -59,7 +59,7 @@ export default function WorkOrderNewPage() {
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [note, setNote] = useState("");
-  const [outputs, setOutputs] = useState<LineState[]>([newLine()]);
+  const [outputs, setOutputs] = useState<LineState[]>(() => [newLine(params.get("barang"))]);
   const [extras, setExtras] = useState<LineState[]>([]);
   const [sourceLotId, setSourceLotId] = useState<ID | null>(initialLot);
   const [sourceQty, setSourceQty] = useState(1);

@@ -56,8 +56,10 @@ const emptyLine = (itemId: ID | null = null, qty = 1, unitPrice = 0): Line => ({
   thickness: 0,
 });
 
-function initialLines(db: Db, woId: string | null, fromSuggestions: boolean): Line[] {
+function initialLines(db: Db, woId: string | null, fromSuggestions: boolean, itemId?: string | null): Line[] {
   const price = (id: ID) => db.items.find((i) => i.id === id)?.standardCost ?? 0;
+  // Opened from a production route: buy this item.
+  if (itemId && db.items.some((i) => i.id === itemId)) return [emptyLine(itemId, 1, price(itemId))];
   if (woId) {
     const wo = db.workOrders.find((w) => w.id === woId);
     if (wo) {
@@ -108,7 +110,7 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
           width: l.dimensions?.width ?? 0,
           thickness: l.dimensions?.thickness ?? 0,
         }))
-      : initialLines(db, params.get("wo"), params.get("dari") === "saran"),
+      : initialLines(db, params.get("wo"), params.get("dari") === "saran", params.get("barang")),
   );
   const [extras, setExtras] = useState<Extra[]>(() =>
     existing?.extraCosts.length ? existing.extraCosts.map((c) => ({ key: k(), label: c.label, amount: c.amount })) : [{ key: k(), label: "Ongkos kirim", amount: 0 }],

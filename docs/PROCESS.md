@@ -76,3 +76,49 @@ seukuran yang diikat jadi satu. Hasilnya:
 
 Ditolak: barang berbeda, sisa dicampur stok biasa, cadangan pekerjaan yang berbeda, lot yang
 sedang disewa/rusak, lokasi yang tidak dikenal, atau kurang dari dua lot.
+
+## Jalur produksi (per barang)
+
+Menu **Operasional → Jalur produksi**, atau tombol **Jalur produksi** di halaman stok atau data
+master barang. Pilih satu barang, lalu terlihat semua cara mendapatkannya, bertingkat sampai ke
+bahan dasar.
+
+### Jenis jalur
+
+| Tanda | Jalur | Sumber datanya |
+|---|---|---|
+| **BUAT** | BOM standar | BOM barang itu (produk, atau komponen dengan BOM) |
+| **RESEP** | Setiap resep yang menghasilkan barang itu | Menu Resep proses. Satu barang boleh punya banyak resep (kayu baru vs kayu reclaimed) |
+| **BELI** | Beli dari pemasok | Riwayat pembelian (pemasok, berapa kali, harga pokok terakhir termasuk ongkir). Bahan mentah yang tidak bisa dibuat selalu punya jalur ini |
+| **BONGKAR** | Hasil bongkar | Resep atau pekerjaan dekonstruksi yang menghasilkan barang itu. Ditandai sebagai **hasil sampingan** (garis putus-putus) dan tidak pernah dihitung "termurah" |
+| **PERNAH** | Konversi / gabung yang pernah dilakukan tanpa resep | Pekerjaan selesai, dikelompokkan menurut bahan yang masuk. Bahan per unit dihitung dari pemakaian nyata |
+
+Contoh di data demo: **Kursi Makan Jati Sekar** bisa dibuat dari jati baru (BOM / resep standar)
+atau dari **jati reclaimed**. Jati reclaimed diolah dari **kayu bongkaran**, dan kayu bongkaran
+dibeli dari pengepul atau didapat dari membongkar meja makan atau kursi rusak. **Rangka Kursi
+Bar** dibuat sendiri (BOM) sekaligus dibeli dari subkon UD Rangka Kudus.
+
+### Peta
+- Kiri ke kanan: bahan dasar → jalur → barang yang dipilih (selalu di tepi kanan; peta otomatis
+  bergeser ke sana).
+- Bahan yang sama dipakai banyak jalur hanya muncul **sekali**.
+- **Siklus** (kursi → bongkar kursi → kayu bongkaran → … → kursi) dihentikan dengan penanda ↺,
+  bukan diulang tanpa akhir.
+- Bahan yang hanya dibeli tidak diberi kotak jalur sendiri; pemasoknya tertulis di kartunya.
+- **Kedalaman** 1–4 tingkat. Kartu dengan tulisan "jalur lebih jauh" bisa diklik untuk dipetakan.
+- **Bahan pembantu** (hardware, finishing, kemasan) disembunyikan secara bawaan. Jumlahnya
+  tertulis di kotak jalur ("+3 pembantu").
+- Arahkan kursor ke kartu atau jalur untuk menyorot rantainya. Qty per unit muncul di garis. Klik
+  barang untuk memusatkan peta ke barang itu, klik jalur resep untuk membuka resepnya. Tersedia
+  juga tampilan tabel.
+
+### Perbandingan jalur
+HPP standar per unit tiap jalur (harga bahan & tarif saat ini; pembelian = harga pokok terakhir),
+mana yang **termurah**, selisih jalur lain, berapa kali dipakai, berapa unit diperoleh, dan
+berapa yang sedang berjalan. Tombol **Buat / Beli** membuka perintah kerja atau pembelian yang
+sudah terisi.
+
+### Riwayat nyata
+Diagram aliran nilai untuk barang itu: dari mana saja stoknya pernah datang (per jalur / resep /
+pemasok), dan ke mana perginya (terjual ke pelanggan mana, **menjadi produk apa**, disewa, di
+gudang). Pertanyaan "kayu ini jadi apa saja?" terjawab di sini.

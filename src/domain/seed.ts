@@ -72,6 +72,13 @@ export function buildDemoDb(): Db {
   const thinner = m("FN-THN", "Thinner Super", "finishing", "liter", 29_000, { reorderPoint: 5 });
   const kardus = m("KM-KRD5", "Kardus 5 Lapis + Sudut", "kemasan", "pcs", 38_000, { reorderPoint: 10 });
   const lem = m("FN-LEM-PVAC", "Lem Kayu PVAc D3", "finishing", "liter", 45_000, { reorderPoint: 3 });
+  // Reclaimed timber: bought from collectors or recovered by dismantling, then processed.
+  const bongkaran = m("KY-JATI-BKR", "Kayu Jati Bongkaran (mentah)", "kayu_solid", "m3", 5_200_000, { trackRemnant: true, minRemnantQty: 0.004 });
+  const reclaimed = m("KY-JATI-RCL", "Kayu Jati Reclaimed (olahan)", "kayu_solid", "m3", 0, {
+    trackRemnant: true,
+    minRemnantQty: 0.004,
+    note: "Bongkaran yang sudah dicabut pakunya, diserut, dan dioven ulang.",
+  });
 
   // ---------------------------------------------------------------- Products
   const p = (
@@ -250,12 +257,49 @@ export function buildDemoDb(): Db {
     type: "dekonstruksi",
     inputs: [{ itemId: meja.id, qty: 1 }],
     outputs: [
-      { itemId: jati.id, qty: 0.08 },
+      { itemId: bongkaran.id, qty: 0.08 },
       { itemId: sekrup.id, qty: 10 },
     ],
     laborHours: 3,
     expectedWastePct: 20,
     stages: ["Bongkar", "Cabut paku & sekrup", "Sortir papan"],
+  });
+  createRecipe(db, {
+    name: "Bongkar kursi rusak",
+    type: "dekonstruksi",
+    inputs: [{ itemId: kursi.id, qty: 1 }],
+    outputs: [{ itemId: bongkaran.id, qty: 0.018 }],
+    laborHours: 1,
+    expectedWastePct: 35,
+    stages: ["Bongkar", "Sortir papan"],
+    note: "Untuk kursi yang rangkanya patah dan tidak layak diperbaiki.",
+  });
+  const rOlah = createRecipe(db, {
+    name: "Olah kayu bongkaran",
+    type: "produksi",
+    inputs: [{ itemId: bongkaran.id, qty: 1.25 }],
+    outputs: [{ itemId: reclaimed.id, qty: 1 }],
+    laborHours: 10,
+    expectedWastePct: 20,
+    stages: ["Cabut paku", "Serut & ketam", "Potong ulang", "Oven ulang"],
+  });
+  reclaimed.standardCost = recipeCost(db, rOlah).outputs[0]!.unitCost;
+  const rKursiReclaimed = createRecipe(db, {
+    name: "Kursi Sekar — kayu reclaimed",
+    type: "produksi",
+    inputs: [
+      { itemId: reclaimed.id, qty: 0.035 },
+      { itemId: linen.id, qty: 0.6 },
+      { itemId: busa.id, qty: 0.25 },
+      { itemId: sekrup.id, qty: 12 },
+      { itemId: melamine.id, qty: 0.15 },
+      { itemId: thinner.id, qty: 0.1 },
+    ],
+    outputs: [{ itemId: kursi.id, qty: 1 }],
+    laborHours: 7,
+    expectedRemnantPct: 4,
+    stages: kursi.stages,
+    note: "Serat lebih berkarakter — untuk koleksi 'Jejak Kayu'. Butuh sedikit lebih banyak kayu karena cacat paku.",
   });
 
   // ---------------------------------------------------------------- Partners
@@ -265,6 +309,8 @@ export function buildDemoDb(): Db {
   const supBangunan = sup("TB Sinar Abadi", { phone: "0291-591-222", address: "Kudus" });
   const supTekstil = sup("Tekstil Mandiri Bandung", { phone: "022-7301-889", address: "Bandung" });
   sup("Rotan Cirebon Jaya", { phone: "0231-882-117", address: "Cirebon" });
+  const supRangka = sup("UD Rangka Kudus", { phone: "0291-430-118", address: "Kudus" });
+  const supBekas = sup("Pengepul Kayu Bekas Jepara", { phone: "0813-2551-0901", address: "Jepara" });
   const griya = cus("PT Griya Interior Nusantara", { contact: "Ibu Maya", phone: "021-5550-7788", address: "Jakarta Selatan", country: "Indonesia" });
   const nordic = cus("Nordic Living B.V.", { contact: "Jesper Holm", email: "buying@nordicliving.example", address: "Keizersgracht 120, Amsterdam", country: "Belanda" });
   const kopi = cus("Kopi Senja Group", { contact: "Pak Arif", phone: "0813-1100-2299", address: "Semarang", country: "Indonesia" });
@@ -589,6 +635,34 @@ export function buildDemoDb(): Db {
 
   const plyLot = db.lots.find((l) => l.itemId === ply.id && l.status === "tersedia" && !l.isRemnant && l.qty >= 2);
   if (plyLot) transferLot(db, plyLot.id, 2, "Workshop", "Untuk kitchen set minggu depan");
+
+  // ---------------------------------------------------------------- Other routes to the same things
+  // Reclaimed teak: bought from a collector, processed, then made into chairs.
+  const poBekas = createPurchase(db, {
+    supplierId: supBekas.id,
+    date: dateAgo(16),
+    lines: [{ itemId: bongkaran.id, qty: 0.6, unitPrice: 5_000_000 }],
+    extraCosts: [{ label: "Angkut pikap", amount: 150_000 }],
+    note: "Bongkaran rumah joglo, Kudus",
+  });
+  receivePurchase(db, poBekas.id, { at: at(16) });
+  const woOlah = createWorkOrderFromRecipe(db, rOlah.id, { batches: 0.4, title: "Olah bongkaran joglo" });
+  woOlah.createdAt = at(15);
+  issueMaterials(db, woOlah.id, suggestIssue(db, woOlah, bongkaran.id, 0.5).picks, at(15));
+  complete(woOlah, 12, { outputs: [{ itemId: reclaimed.id, qty: 0.4 }], returns: [{ itemId: bongkaran.id, kind: "limbah", qty: 0.1 }] });
+  const woReclaimed = createWorkOrderFromRecipe(db, rKursiReclaimed.id, { batches: 4, title: "Kursi Sekar 'Jejak Kayu' — sampel" });
+  woReclaimed.createdAt = at(11);
+  for (const l of rKursiReclaimed.inputs) issueMaterials(db, woReclaimed.id, suggestIssue(db, woReclaimed, l.itemId, l.qty * 4).picks, at(11));
+  complete(woReclaimed, 7, { outputs: [{ itemId: kursi.id, qty: 4 }], returns: [] });
+
+  // Bar-stool frames: made in-house by BOM, and part of the need bought from a vendor.
+  const poRangka = createPurchase(db, {
+    supplierId: supRangka.id,
+    date: dateAgo(3),
+    lines: [{ itemId: rangka.id, qty: 4, unitPrice: 420_000 }],
+    note: "Subkon rangka — kapasitas potong penuh minggu ini",
+  });
+  receivePurchase(db, poRangka.id, { at: at(3) });
 
   return db;
 }

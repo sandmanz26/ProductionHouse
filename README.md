@@ -44,6 +44,14 @@ Ditambahkan setelah *roast* terhadap v1 ([`docs/ROAST.md`](docs/ROAST.md)):
   layar sambutan (bengkel contoh vs bengkel sendiri), langkah pertama untuk bengkel baru, dan
   suara yang konsisten di keadaan kosong & halaman buntu. Lihat `docs/BRAND.md`.
 
+## Baru di v3.3 — jalur produksi per barang
+
+Klik satu barang untuk melihat semua jalan menuju barang itu: BOM, setiap resep, dibeli dari
+pemasok, hasil bongkar, serta konversi/gabung yang pernah dilakukan. Jalurnya bertingkat sampai
+ke bahan dasar (mis. kursi ← jati reclaimed ← kayu bongkaran ← dibeli dari pengepul / bongkar
+kursi rusak). Peta juga membandingkan HPP per jalur dan menampilkan riwayat nyata ke mana barang
+itu pergi. Lihat [`docs/PROCESS.md`](docs/PROCESS.md#jalur-produksi-per-barang).
+
 ## Baru di v3.2 — peta proses, resep, gabung
 
 - **Peta proses** (diagram Sankey, lebar = rupiah): per perintah kerja, per resep, telusur lot

@@ -449,7 +449,7 @@ describe("demo seed", () => {
     const db = buildDemoDb();
     expectLedgerConsistent(db);
     expect(db.lots.every((l) => l.qty >= 0)).toBe(true);
-    expect(db.workOrders.filter((w) => w.status === "selesai").length).toBe(4);
+    expect(db.workOrders.filter((w) => w.status === "selesai").length).toBe(6); // incl. reclaimed-timber processing and the reclaimed chairs
     expect(db.lots.some((l) => l.isRemnant && l.qty > 0)).toBe(true);
     expect(insights(db).length).toBeGreaterThan(0);
     // migrate is idempotent on its own output
