@@ -59,7 +59,7 @@ export default function PurchasesPage() {
     <>
       <PageHeader
         title="Pembelian"
-        description="Bahan yang dibeli masuk gudang sebagai lot dengan harga pokok (harga + ongkir dibagi otomatis). Pembelian khusus proyek dicadangkan untuk proyek itu, sisanya otomatis jadi stok bebas setelah proyek selesai."
+        description="Harga pokok = harga + ongkir (dibagi otomatis). Pembelian khusus proyek dicadangkan sampai proyek selesai."
         actions={
           <Button onPress={() => navigate("/pembelian/baru")}>
             <Plus className="size-4" /> Pembelian baru

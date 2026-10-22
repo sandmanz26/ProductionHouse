@@ -69,7 +69,7 @@ export default function SalesPage() {
     <>
       <PageHeader
         title="Penjualan & Ekspor"
-        description="Supply ke klien domestik atau ekspor. HPP penjualan diambil dari lot produk yang dikirim, jadi margin selalu nyata."
+        description="Supply domestik dan ekspor. Margin dihitung dari HPP lot yang benar-benar dikirim."
         actions={
           <Button onPress={() => navigate("/penjualan/baru")}>
             <Plus className="size-4" /> Order baru

@@ -94,11 +94,11 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
       />
 
       {itemId && (
-        <div className="rounded-2xl border border-separator">
+        <div className="rounded-md border border-[var(--rule)]">
           {lots.length === 0 ? (
             <p className="p-4 text-sm text-muted">Tidak ada stok tersedia untuk item ini.</p>
           ) : (
-            <ul className="divide-y divide-separator">
+            <ul className="divide-y divide-[var(--rule)]">
               {lots.map((l) => (
                 <li key={l.id} className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[1fr_9rem]">
                   <div className="min-w-0">
@@ -127,7 +127,7 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
         </div>
       )}
 
-      <div className="flex flex-col gap-1 rounded-2xl bg-default/60 p-3 text-sm">
+      <div className="flex flex-col gap-1 rounded-md bg-default/60 p-3 text-sm">
         <div className="flex justify-between">
           <span>Diambil</span>
           <b className="tabular-nums">

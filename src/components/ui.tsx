@@ -1,8 +1,9 @@
-import { Button, Card, Chip, Modal, Table, type Key } from "@heroui/react";
+import { Button, Modal, Table, type Key } from "@heroui/react";
 import { ArrowLeft } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import type { Tone } from "@/lib/labels";
+import { useIsCompact } from "@/lib/use-media";
 
 export function PageHeader({
   title,
@@ -20,7 +21,7 @@ export function PageHeader({
 }) {
   const navigate = useNavigate();
   return (
-    <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {back && (
           <Button isIconOnly variant="ghost" size="sm" aria-label="Kembali" onPress={() => navigate(back)} className="mt-0.5">
@@ -29,10 +30,10 @@ export function PageHeader({
         )}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h1>
             {badge}
           </div>
-          {description && <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>}
+          {description && <p className="mt-0.5 max-w-3xl text-[13px] text-muted">{description}</p>}
         </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
@@ -40,12 +41,28 @@ export function PageHeader({
   );
 }
 
-export function StatusChip({ tone, children, size = "sm" }: { tone: Tone; children: ReactNode; size?: "sm" | "md" }) {
+/** Status as a coloured dot + label. Colour is reserved for states, not decoration. */
+export function StatusChip({ tone, children }: { tone: Tone; children: ReactNode; size?: "sm" | "md" }) {
   return (
-    <Chip color={tone} variant="soft" size={size}>
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${toneLabel[tone]}`}>
+      <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${toneDot[tone]}`} />
       {children}
-    </Chip>
+    </span>
   );
+}
+
+/** Neutral bordered tag for categories / document types. */
+export function Tag({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-sm border border-[var(--rule)] px-1.5 text-[11px] leading-5 font-medium whitespace-nowrap text-[var(--ink-soft)]">
+      {children}
+    </span>
+  );
+}
+
+/** Monospace document / lot code. */
+export function Code({ children }: { children: ReactNode }) {
+  return <span className="num text-[13px] font-medium whitespace-nowrap">{children}</span>;
 }
 
 const toneText: Record<Tone, string> = {
@@ -55,50 +72,60 @@ const toneText: Record<Tone, string> = {
   warning: "text-warning",
   danger: "text-danger",
 };
-const toneBg: Record<Tone, string> = {
-  default: "bg-default text-default-foreground",
-  accent: "bg-accent-soft text-accent-soft-foreground",
-  success: "bg-success-soft text-success-soft-foreground",
-  warning: "bg-warning-soft text-warning-soft-foreground",
-  danger: "bg-danger-soft text-danger-soft-foreground",
+const toneLabel: Record<Tone, string> = {
+  default: "text-[var(--ink-soft)]",
+  accent: "text-foreground",
+  success: "text-foreground",
+  warning: "text-warning",
+  danger: "text-danger",
+};
+const toneDot: Record<Tone, string> = {
+  default: "bg-[var(--ink-soft)] opacity-50",
+  accent: "bg-accent",
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
 };
 
-export function StatCard({
-  label,
-  value,
-  hint,
-  icon,
-  tone = "default",
-  onPress,
-}: {
+export interface Metric {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
-  icon?: ReactNode;
   tone?: Tone;
   onPress?: () => void;
-}) {
-  const content = (
-    <Card className="h-full">
-      <Card.Content className="flex flex-row items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium tracking-wide text-muted uppercase">{label}</p>
-          <p className={`mt-1 text-xl font-semibold tabular-nums sm:text-2xl ${toneText[tone]}`}>{value}</p>
-          {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
-        </div>
-        {icon && <div className={`grid size-9 shrink-0 place-items-center rounded-xl ${toneBg[tone]}`}>{icon}</div>}
-      </Card.Content>
-    </Card>
-  );
-  if (!onPress) return content;
+}
+
+/** One bordered strip of key numbers, separated by rules — no icon tiles. */
+export function MetricStrip({ items, className }: { items: Metric[]; className?: string }) {
+  const cols = { 1: "sm:grid-cols-1", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-4", 5: "sm:grid-cols-5" }[
+    Math.min(5, items.length) as 1 | 2 | 3 | 4 | 5
+  ];
   return (
-    <button
-      type="button"
-      onClick={onPress}
-      className="rounded-3xl text-left transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
+    <div
+      className={`grid grid-cols-2 overflow-hidden rounded-md bg-surface shadow-[var(--surface-shadow)] ${cols} ${className ?? ""}`}
     >
-      {content}
-    </button>
+      {items.map((m, i) => {
+        const body = (
+          <>
+            <p className="eyebrow">{m.label}</p>
+            <p className={`num mt-1 text-lg font-medium sm:text-xl ${toneText[m.tone ?? "default"]}`}>{m.value}</p>
+            {m.hint && <p className="mt-0.5 text-xs text-muted">{m.hint}</p>}
+          </>
+        );
+        const cls = `min-w-0 border-[var(--rule)] px-4 py-3 text-left ${i > 0 ? "border-l" : ""} ${
+          i >= 2 ? "max-sm:border-t" : ""
+        } ${i % 2 === 0 ? "max-sm:border-l-0" : ""}`;
+        return m.onPress ? (
+          <button key={m.label} type="button" onClick={m.onPress} className={`${cls} transition-colors hover:bg-default/50 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none`}>
+            {body}
+          </button>
+        ) : (
+          <div key={m.label} className={cls}>
+            {body}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -118,27 +145,27 @@ export function Section({
   bodyClassName?: string;
 }) {
   return (
-    <Card className={className}>
+    <section className={`rounded-md bg-surface shadow-[var(--surface-shadow)] ${className ?? ""}`}>
       {(title || actions) && (
-        <Card.Header className="flex flex-row flex-wrap items-start justify-between gap-2">
+        <header className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--rule)] px-4 py-3">
           <div className="min-w-0">
-            {title && <Card.Title className="text-base">{title}</Card.Title>}
-            {description && <Card.Description>{description}</Card.Description>}
+            {title && <h2 className="text-sm font-semibold">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-        </Card.Header>
+        </header>
       )}
-      <Card.Content className={bodyClassName}>{children}</Card.Content>
-    </Card>
+      <div className={bodyClassName ?? "p-4"}>{children}</div>
+    </section>
   );
 }
 
 export function EmptyBlock({ icon, title, description, action }: { icon?: ReactNode; title: string; description?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-      {icon && <div className="mb-1 grid size-11 place-items-center rounded-2xl bg-default text-muted">{icon}</div>}
-      <p className="font-medium">{title}</p>
-      {description && <p className="max-w-sm text-sm text-muted">{description}</p>}
+    <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
+      {icon && <div className="mb-1 text-muted">{icon}</div>}
+      <p className="text-sm font-medium">{title}</p>
+      {description && <p className="max-w-sm text-xs text-muted">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -150,8 +177,8 @@ export function KeyValue({ items, columns = 2 }: { items: [ReactNode, ReactNode]
     <dl className={`grid grid-cols-1 gap-x-6 gap-y-3 ${cols}`}>
       {items.map(([k, v], i) => (
         <div key={i} className="min-w-0">
-          <dt className="text-xs text-muted">{k}</dt>
-          <dd className="mt-0.5 text-sm font-medium break-words">{v || "—"}</dd>
+          <dt className="eyebrow">{k}</dt>
+          <dd className="mt-0.5 text-sm break-words">{v || "—"}</dd>
         </div>
       ))}
     </dl>
@@ -161,9 +188,9 @@ export function KeyValue({ items, columns = 2 }: { items: [ReactNode, ReactNode]
 /** Label/value row for cost breakdowns. */
 export function Row({ label, value, strong, muted, tone }: { label: ReactNode; value: ReactNode; strong?: boolean; muted?: boolean; tone?: Tone }) {
   return (
-    <div className={`flex items-baseline justify-between gap-4 py-1.5 text-sm ${strong ? "font-semibold" : ""} ${muted ? "text-muted" : ""}`}>
+    <div className={`flex items-baseline justify-between gap-4 py-1 text-sm ${strong ? "font-semibold" : ""} ${muted ? "text-muted" : ""}`}>
       <span className="min-w-0">{label}</span>
-      <span className={`shrink-0 tabular-nums ${tone ? toneText[tone] : ""}`}>{value}</span>
+      <span className={`num shrink-0 ${tone ? toneText[tone] : ""}`}>{value}</span>
     </div>
   );
 }
@@ -192,11 +219,52 @@ export function DataTable<T extends { id: string }>({
   empty?: ReactNode;
   dependencies?: unknown[];
 }) {
+  const compact = useIsCompact();
   const byId = new Map(rows.map((r) => [r.id, r]));
   const hasHeader = columns.some((c) => c.isRowHeader);
   const cols = columns.map((c, i) => ({ ...c, isRowHeader: c.isRowHeader || (!hasHeader && i === 0) }));
+
+  if (compact) {
+    // Phones: each row becomes a stacked card — no sideways scrolling on the shop floor.
+    if (rows.length === 0) return <div role="table" aria-label={label}>{empty ?? <EmptyBlock title="Belum ada data" />}</div>;
+    const head = cols.find((c) => c.isRowHeader)!;
+    const actions = cols.filter((c) => !c.isRowHeader && c.header === "");
+    const fields = cols.filter((c) => !c.isRowHeader && c.header !== "");
+    return (
+      <ul aria-label={label} className="divide-y divide-[var(--rule)]">
+        {rows.map((row) => {
+          const inner = (
+            <>
+              <div className="min-w-0 font-medium">{head.cell(row)}</div>
+              <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                {fields.map((c) => (
+                  <div key={c.key} className="min-w-0">
+                    <dt className="eyebrow">{c.header}</dt>
+                    <dd className={`text-sm ${c.align === "end" ? "num" : ""}`}>{c.cell(row)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          );
+          return (
+            <li key={row.id} className="px-4 py-3">
+              {onRowAction ? (
+                <button type="button" className="w-full text-left" onClick={() => onRowAction(row)}>
+                  {inner}
+                </button>
+              ) : (
+                inner
+              )}
+              {actions.length > 0 && <div className="mt-2 flex justify-end gap-2">{actions.map((c) => <div key={c.key}>{c.cell(row)}</div>)}</div>}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
   return (
-    <Table>
+    <Table variant="secondary">
       <Table.ScrollContainer>
         <Table.Content
           aria-label={label}
@@ -217,7 +285,7 @@ export function DataTable<T extends { id: string }>({
             {(row) => (
               <Table.Row id={row.id} columns={cols} className={onRowAction ? "cursor-pointer" : undefined}>
                 {(c) => (
-                  <Table.Cell className={`${c.align === "end" ? "text-right whitespace-nowrap tabular-nums" : ""} ${c.className ?? ""}`}>
+                  <Table.Cell className={`${c.align === "end" ? `text-right whitespace-nowrap ${c.header === "" ? "" : "num"}` : ""} ${c.className ?? ""}`}>
                     {c.cell(row)}
                   </Table.Cell>
                 )}

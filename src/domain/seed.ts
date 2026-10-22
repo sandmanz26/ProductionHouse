@@ -2,14 +2,24 @@
  * Demo dataset built exclusively through domain operations, so every number (lots, remnants,
  * HPP, ledger) is internally consistent. Dates are relative to "today" to keep the demo fresh.
  */
-import { addOpeningStock } from "./inventory";
+import { addPayment } from "./finance";
+import { addOpeningStock, transferLot } from "./inventory";
 import { addDays, today } from "./dates";
 import { emptyDb } from "./db";
 import { createItem, createPartner } from "./master";
-import { completeWorkOrder, createWorkOrder, issueMaterials, standardProductCost, suggestIssue } from "./production";
+import {
+  addLaborLog,
+  completeWorkOrder,
+  createWorkOrder,
+  issueMaterials,
+  receiveOutput,
+  setStageStatus,
+  standardProductCost,
+  suggestIssue,
+} from "./production";
 import { createPurchase, receivePurchase } from "./purchasing";
 import { checkoutRental, createRental, returnRental } from "./rentals";
-import { confirmSalesOrder, createSalesOrder, deliverSalesOrder } from "./sales";
+import { confirmSalesOrder, createSalesOrder, deliverSalesOrder, returnSale } from "./sales";
 import type { Db, ID, WorkOrder } from "./types";
 
 const at = (daysAgo: number, hour = 9) => {
@@ -79,6 +89,7 @@ export function buildDemoDb(): Db {
       { materialId: thinner.id, qty: 0.1 },
     ],
     laborHours: 6,
+    stages: ["Potong", "Rakit", "Amplas", "Jok", "Finishing", "QC", "Packing"],
     salePrice: 1_950_000,
     rentalRatePerDay: 75_000,
     hsCode: "9401.61",
@@ -122,6 +133,7 @@ export function buildDemoDb(): Db {
       { materialId: sekrup.id, qty: 30 },
     ],
     laborHours: 16,
+    stages: ["Rangka besi", "Anyam rotan", "Jok", "QC", "Packing"],
     salePrice: 8_200_000,
     rentalRatePerDay: 350_000,
     hsCode: "9401.71",
@@ -151,6 +163,33 @@ export function buildDemoDb(): Db {
     hsCode: "9403.60",
     note: "Didesain untuk menghabiskan sisa potongan jati.",
   });
+
+  // Semi-finished component: produced in-house, then used in the bar stool's BOM.
+  const rangka = m("KMP-RGK-BAR", "Rangka Kursi Bar (komponen)", "kayu_solid", "pcs", 0, {
+    bom: [
+      { materialId: jati.id, qty: 0.022 },
+      { materialId: sekrup.id, qty: 10 },
+    ],
+    laborHours: 2.5,
+    stages: ["Potong", "Rakit"],
+    note: "Komponen setengah jadi — dibuat dulu, lalu dirakit menjadi Kursi Bar.",
+  });
+  rangka.standardCost = standardProductCost(db, rangka);
+  const kursiBar = p("KRS-BAR", "Kursi Bar Jati", "kursi", {
+    bom: [
+      { materialId: rangka.id, qty: 1 },
+      { materialId: linen.id, qty: 0.4 },
+      { materialId: busa.id, qty: 0.2 },
+      { materialId: melamine.id, qty: 0.12 },
+    ],
+    laborHours: 3,
+    stages: ["Rakit", "Jok", "Finishing", "QC"],
+    salePrice: 2_350_000,
+    rentalRatePerDay: 90_000,
+    hsCode: "9401.61",
+    packing: { length: 45, width: 45, height: 110, cartonsPerUnit: 1, grossWeightKg: 8.5, netWeightKg: 7 },
+  });
+  linen.purchaseUnit = { label: "roll (50 m)", factor: 50 };
 
   for (const prod of db.items.filter((i) => i.kind === "product")) prod.standardCost = standardProductCost(db, prod);
 
@@ -195,6 +234,7 @@ export function buildDemoDb(): Db {
     invoiceNo: "JM/IX/0912",
   });
   receivePurchase(db, po1.id, { at: at(45) });
+  addPayment(db, "purchase", po1.id, { date: dateAgo(30), amount: 17_490_000, method: "transfer", note: "Lunas" });
   const po2 = createPurchase(db, {
     supplierId: supBangunan.id,
     date: dateAgo(40),
@@ -204,6 +244,7 @@ export function buildDemoDb(): Db {
     ],
     extraCosts: [{ label: "Bongkar muat", amount: 75_000 }],
   });
+  po2.dueDate = addDays(today(), 2);
   receivePurchase(db, po2.id, { at: at(40) });
   const po3 = createPurchase(db, {
     supplierId: supTekstil.id,
@@ -211,7 +252,9 @@ export function buildDemoDb(): Db {
     lines: [{ itemId: linen.id, qty: 50, unitPrice: 92_000 }],
     extraCosts: [{ label: "Ekspedisi", amount: 120_000 }],
   });
+  po3.dueDate = addDays(today(), 15);
   receivePurchase(db, po3.id, { at: at(30) });
+  addPayment(db, "purchase", po3.id, { date: dateAgo(30), amount: 2_000_000, method: "transfer", note: "DP" });
 
   const complete = (wo: WorkOrder, daysAgo: number, input: Parameters<typeof completeWorkOrder>[2]) =>
     completeWorkOrder(db, wo.id, input, { at: at(daysAgo, 16) });
@@ -314,6 +357,11 @@ export function buildDemoDb(): Db {
   wo5.createdAt = at(4);
   // Export-grade chairs need full-length boards, so remnants are skipped here.
   issueMaterials(db, wo5.id, suggestIssue(db, wo5, jati.id, 0.3, false).picks, at(3));
+  const [sPotong, sRakit] = wo5.stages;
+  addLaborLog(db, wo5.id, { stageId: sPotong!.id, worker: "Tim Pak Darto", hours: 16, at: at(3, 15) });
+  setStageStatus(db, wo5.id, sPotong!.id, "selesai", at(2, 16));
+  addLaborLog(db, wo5.id, { stageId: sRakit!.id, worker: "Mas Joko (borongan)", pieces: 12, pieceRate: 45_000, at: at(1, 16) });
+  receiveOutput(db, wo5.id, { itemId: kursi.id, qty: 6, at: at(1, 17) });
 
   // WO 6 (planned): decorative benches from teak offcuts
   const wo6 = createWorkOrder(db, {
@@ -323,6 +371,15 @@ export function buildDemoDb(): Db {
     dueDate: addDays(today(), 14),
   });
   wo6.createdAt = at(1);
+
+  // WO 7 (planned): bar stools need frames — a component that can be produced in-house
+  const wo7 = createWorkOrder(db, {
+    type: "produksi",
+    title: "Kursi Bar untuk Hotel Arunika",
+    plannedOutputs: [{ itemId: kursiBar.id, qty: 6 }],
+    dueDate: addDays(today(), 18),
+  });
+  wo7.createdAt = at(0);
 
   // Dedicated purchase for WO5 (draft, waiting)
   createPurchase(db, {
@@ -359,7 +416,9 @@ export function buildDemoDb(): Db {
     shippingCharge: 1_500_000,
   });
   confirmSalesOrder(db, so1.id);
+  addPayment(db, "sale", so1.id, { date: dateAgo(25), amount: 11_250_000, method: "transfer", note: "DP 50%" });
   deliverSalesOrder(db, so1.id, [{ itemId: lemari.id, qty: 4 }], { at: at(13) });
+  addPayment(db, "sale", so1.id, { date: dateAgo(10), amount: 11_250_000, method: "transfer", note: "Pelunasan" });
 
   const so2 = createSalesOrder(db, {
     channel: "ekspor",
@@ -385,6 +444,9 @@ export function buildDemoDb(): Db {
   });
   confirmSalesOrder(db, so2.id);
   wo5.salesOrderId = so2.id;
+  so2.dpPercent = 30;
+  so2.paymentDueDate = addDays(today(), 20);
+  addPayment(db, "sale", so2.id, { date: dateAgo(5), amount: 1_224, method: "transfer", note: "DP 30% (T/T)" });
 
   const so3 = createSalesOrder(db, {
     channel: "supply",
@@ -398,7 +460,10 @@ export function buildDemoDb(): Db {
     ],
   });
   confirmSalesOrder(db, so3.id);
+  so3.paymentDueDate = dateAgo(1);
   deliverSalesOrder(db, so3.id, [{ itemId: mejaKerja.id, qty: 1 }, { itemId: kursi.id, qty: 4 }], { at: at(4) });
+  returnSale(db, so3.id, [{ itemId: kursi.id, qty: 1, condition: "rusak", note: "Kaki goyang saat diterima" }], { at: at(3) });
+  addPayment(db, "sale", so3.id, { date: dateAgo(4), amount: 5_000_000, method: "tunai", note: "Bayar sebagian" });
 
   createSalesOrder(db, {
     channel: "supply",
@@ -422,6 +487,7 @@ export function buildDemoDb(): Db {
       { itemId: sofa.id, qty: 1, ratePerDay: 350_000 },
     ],
     deposit: 2_000_000,
+    extraCharges: [{ label: "Antar-jemput & setting", amount: 350_000 }],
   });
   checkoutRental(db, r1.id, undefined, at(9));
 
@@ -454,6 +520,9 @@ export function buildDemoDb(): Db {
     endDate: addDays(today(), 5),
     lines: [{ itemId: meja.id, qty: 1, ratePerDay: 0 }],
   });
+
+  const plyLot = db.lots.find((l) => l.itemId === ply.id && l.status === "tersedia" && !l.isRemnant && l.qty >= 2);
+  if (plyLot) transferLot(db, plyLot.id, 2, "Workshop", "Untuk kitchen set minggu depan");
 
   return db;
 }

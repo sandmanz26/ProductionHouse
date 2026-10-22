@@ -1,5 +1,8 @@
 import type {
   LotOrigin,
+  OutputGrade,
+  PaymentMethod,
+  StageStatus,
   LotStatus,
   MaterialCategory,
   MoveType,
@@ -87,6 +90,7 @@ export const LOT_ORIGIN: Record<LotOrigin, string> = {
   sisa_produksi: "Sisa produksi",
   dekonstruksi: "Hasil bongkar",
   retur_sewa: "Retur sewa",
+  retur_penjualan: "Retur penjualan",
   penyesuaian: "Penyesuaian",
 };
 
@@ -116,6 +120,9 @@ export const MOVE_TYPE: Record<MoveType, string> = {
   hilang: "Hilang",
   penyesuaian: "Penyesuaian",
   limbah: "Limbah",
+  transfer: "Pindah lokasi",
+  retur_penjualan: "Masuk · retur penjualan",
+  revaluasi: "Revaluasi HPP",
 };
 
 export const MATERIAL_CATEGORY: Record<MaterialCategory, string> = {
@@ -144,3 +151,19 @@ export const PRODUCT_CATEGORY: Record<ProductCategory, string> = {
 
 export const categoryLabel = (c: string) =>
   (MATERIAL_CATEGORY as Record<string, string>)[c] ?? (PRODUCT_CATEGORY as Record<string, string>)[c] ?? c;
+
+export const STAGE_STATUS: Record<StageStatus, { label: string; tone: Tone }> = {
+  menunggu: { label: "Menunggu", tone: "default" },
+  proses: { label: "Dikerjakan", tone: "accent" },
+  selesai: { label: "Selesai", tone: "success" },
+};
+
+export const OUTPUT_GRADE: Record<OutputGrade, string> = { baik: "Lolos QC", reject: "Reject QC" };
+
+export const PAYMENT_METHOD: Record<PaymentMethod, string> = {
+  transfer: "Transfer",
+  tunai: "Tunai",
+  giro: "Giro / cek",
+  lc: "L/C",
+  lainnya: "Lainnya",
+};

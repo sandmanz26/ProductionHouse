@@ -1,9 +1,12 @@
 import { Button, Card } from "@heroui/react";
-import { Plus, Ruler, Trash2 } from "lucide-react";
+import { Calculator, Plus, Ruler, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
   createPurchase,
+  cubicMeters,
+  toStockPrice,
+  toStockQty,
   isOpenWo,
   landedUnitCosts,
   receivePurchase,
@@ -15,6 +18,7 @@ import {
   type Db,
   type ID,
   type PurchaseInput,
+  type Uom,
 } from "@/domain";
 import { DateInput, NumberInput, SelectInput, TextAreaInput, TextInput } from "@/components/fields";
 import { RecordNotFound } from "@/components/NotFound";
@@ -88,6 +92,8 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
   const [supplierId, setSupplierId] = useState<ID | null>(existing?.supplierId ?? null);
   const [date, setDate] = useState(existing?.date ?? today());
   const [invoiceNo, setInvoiceNo] = useState(existing?.invoiceNo ?? "");
+  const [dueDate, setDueDate] = useState(existing?.dueDate ?? "");
+  const [helperFor, setHelperFor] = useState<string | null>(null);
   const [note, setNote] = useState(existing?.note ?? "");
   const [workOrderId, setWorkOrderId] = useState<string>(existing?.workOrderId ?? params.get("wo") ?? "");
   const [lines, setLines] = useState<Line[]>(() =>
@@ -120,6 +126,7 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
     supplierId: supplierId ?? undefined,
     date,
     invoiceNo: invoiceNo || undefined,
+    dueDate: dueDate || undefined,
     note: note || undefined,
     workOrderId: workOrderId || undefined,
     lines: lines
@@ -170,6 +177,7 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
               <PartnerPicker role="supplier" value={supplierId} onChange={setSupplierId} />
               <DateInput label="Tanggal" value={date} onChange={setDate} isRequired />
               <TextInput label="No. nota / faktur" value={invoiceNo} onChange={setInvoiceNo} />
+              <DateInput label="Jatuh tempo bayar" value={dueDate} onChange={setDueDate} description="Kosongkan bila bayar tunai." />
               <SelectInput
                 label="Dibeli untuk"
                 value={workOrderId}
@@ -185,12 +193,15 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
               {lines.map((l) => {
                 const it = item(l.itemId ?? undefined);
                 return (
-                  <div key={l.key} className="rounded-2xl border border-separator p-3">
+                  <div key={l.key} className="rounded-md border border-[var(--rule)] p-3">
                     <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_8rem_10rem_auto]">
                       <ItemPicker kind="material" value={l.itemId} onChange={(itemId) => update(l.key, { itemId, unitPrice: l.unitPrice || item(itemId ?? undefined)?.standardCost || 0 })} label="Material" />
                       <NumberInput label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix={it ? UOM_LABEL[it.uom] : undefined} />
                       <NumberInput label="Harga satuan" value={l.unitPrice} onChange={(unitPrice) => update(l.key, { unitPrice })} money />
                       <div className="flex gap-1">
+                        <Button isIconOnly variant={helperFor === l.key ? "secondary" : "ghost"} aria-label="Hitung qty (kubikasi / satuan beli)" onPress={() => setHelperFor(helperFor === l.key ? null : l.key)}>
+                          <Calculator className="size-4" />
+                        </Button>
                         <Button isIconOnly variant={l.withDims ? "secondary" : "ghost"} aria-label="Ukuran" onPress={() => update(l.key, { withDims: !l.withDims })}>
                           <Ruler className="size-4" />
                         </Button>
@@ -199,6 +210,16 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
                         </Button>
                       </div>
                     </div>
+                    {helperFor === l.key && it && (
+                      <QtyHelper
+                        uom={it.uom}
+                        purchaseUnit={it.purchaseUnit}
+                        onApply={(qty, unitPrice) => {
+                          update(l.key, { qty, ...(unitPrice !== undefined ? { unitPrice } : {}) });
+                          setHelperFor(null);
+                        }}
+                      />
+                    )}
                     {l.withDims && (
                       <div className="mt-2 grid grid-cols-3 gap-2 sm:w-96">
                         <NumberInput label="Panjang (mm)" value={l.length} onChange={(length) => update(l.key, { length })} maximumFractionDigits={0} />
@@ -255,7 +276,7 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
             <Card.Content>
               <Row label={`Barang (${input.lines.length})`} value={formatIDR(goods)} />
               <Row label="Biaya tambahan" value={formatIDR(extraTotal)} />
-              <div className="my-2 border-t border-separator" />
+              <div className="my-2 border-t border-[var(--rule)]" />
               <Row label="Total" value={formatIDR(goods + extraTotal)} strong />
               {workOrderId && <p className="mt-3 text-xs text-muted">Barang akan dicadangkan untuk {woOptions.find((o) => o.id === workOrderId)?.label.split(" · ")[0]}.</p>}
             </Card.Content>
@@ -272,4 +293,68 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
       </div>
     </>
   );
+}
+
+/**
+ * Quantity helper on a purchase line: timber volume from piece size (kubikasi), or conversion
+ * from the supplier's unit (roll, dus) to the stock unit.
+ */
+function QtyHelper({
+  uom,
+  purchaseUnit,
+  onApply,
+}: {
+  uom: Uom;
+  purchaseUnit?: { label: string; factor: number };
+  onApply: (qty: number, unitPrice?: number) => void;
+}) {
+  const [pcs, setPcs] = useState(1);
+  const [t, setT] = useState(3);
+  const [w, setW] = useState(15);
+  const [len, setLen] = useState(2);
+  const [pq, setPq] = useState(1);
+  const [pp, setPp] = useState(0);
+  const unit = { purchaseUnit };
+  if (uom === "m3") {
+    const vol = cubicMeters(pcs, t, w, len);
+    return (
+      <div className="mt-2 rounded-sm border border-dashed border-[var(--rule)] p-3">
+        <p className="eyebrow mb-2">Kubikasi: batang × tebal × lebar × panjang</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <NumberInput label="Batang" value={pcs} onChange={setPcs} maximumFractionDigits={0} />
+          <NumberInput label="Tebal" value={t} onChange={setT} suffix="cm" />
+          <NumberInput label="Lebar" value={w} onChange={setW} suffix="cm" />
+          <NumberInput label="Panjang" value={len} onChange={setLen} suffix="m" />
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="num text-sm">{vol.toLocaleString("id-ID", { maximumFractionDigits: 4 })} m³</span>
+          <Button size="sm" variant="secondary" isDisabled={!vol} onPress={() => onApply(vol)}>
+            Pakai sebagai qty
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (purchaseUnit) {
+    return (
+      <div className="mt-2 rounded-sm border border-dashed border-[var(--rule)] p-3">
+        <p className="eyebrow mb-2">
+          Satuan beli: 1 {purchaseUnit.label} = {purchaseUnit.factor} {uom}
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberInput label={`Jumlah (${purchaseUnit.label})`} value={pq} onChange={setPq} />
+          <NumberInput label={`Harga per ${purchaseUnit.label}`} value={pp} onChange={setPp} money />
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="num text-sm">
+            = {toStockQty(unit, pq)} {uom} @ {formatIDR(toStockPrice(unit, pp))}
+          </span>
+          <Button size="sm" variant="secondary" onPress={() => onApply(toStockQty(unit, pq), pp ? toStockPrice(unit, pp) : undefined)}>
+            Pakai
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return <p className="mt-2 text-xs text-muted">Kalkulator tersedia untuk material ber-satuan m³, atau yang punya satuan beli di data master.</p>;
 }

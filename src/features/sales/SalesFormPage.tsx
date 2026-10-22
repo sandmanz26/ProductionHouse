@@ -14,11 +14,11 @@ import {
   type SalesChannel,
   type SalesInput,
 } from "@/domain";
-import { DateInput, NumberInput, SelectInput, TextAreaInput } from "@/components/fields";
+import { DateInput, NumberInput, SelectInput, TextAreaInput, TextInput } from "@/components/fields";
 import { RecordNotFound } from "@/components/NotFound";
 import { ItemPicker, PartnerPicker } from "@/components/pickers";
 import { PageHeader, Row, Section } from "@/components/ui";
-import { formatIDR, formatMoney, formatPct, formatQty } from "@/lib/format";
+import { formatIDR, formatMoney, formatPct, formatQty, UOM_LABEL } from "@/lib/format";
 import { useDb, useLookups, useRun } from "@/store/db-store";
 import { emptyExport } from "./export-info";
 import { ExportFields } from "./ExportFields";
@@ -30,6 +30,7 @@ interface Line {
   itemId: ID | null;
   qty: number;
   unitPrice: number;
+  spec: string;
 }
 let seq = 0;
 const k = () => `s${++seq}`;
@@ -57,10 +58,12 @@ function SalesForm({ existingId }: { existingId?: ID }) {
   const [currency, setCurrency] = useState<Currency>(existing?.currency ?? "IDR");
   const [rate, setRate] = useState(existing?.exchangeRate ?? 1);
   const [lines, setLines] = useState<Line[]>(
-    existing?.lines.map((l) => ({ key: k(), itemId: l.itemId, qty: l.qty, unitPrice: l.unitPrice })) ?? [{ key: k(), itemId: null, qty: 1, unitPrice: 0 }],
+    existing?.lines.map((l) => ({ key: k(), itemId: l.itemId, qty: l.qty, unitPrice: l.unitPrice, spec: l.spec ?? "" })) ?? [{ key: k(), itemId: null, qty: 1, unitPrice: 0, spec: "" }],
   );
   const [discount, setDiscount] = useState(existing?.discount ?? 0);
   const [shipping, setShipping] = useState(existing?.shippingCharge ?? 0);
+  const [dpPercent, setDpPercent] = useState(existing?.dpPercent ?? 0);
+  const [paymentDueDate, setPaymentDueDate] = useState(existing?.paymentDueDate ?? "");
   const [exp, setExp] = useState<ExportInfo>(existing?.export ?? emptyExport());
   const [note, setNote] = useState(existing?.note ?? "");
 
@@ -83,9 +86,11 @@ function SalesForm({ existingId }: { existingId?: ID }) {
     dueDate: dueDate || undefined,
     currency,
     exchangeRate: currency === "IDR" ? 1 : rate,
-    lines: lines.filter((l) => l.itemId).map((l) => ({ itemId: l.itemId!, qty: l.qty, unitPrice: l.unitPrice })),
+    lines: lines.filter((l) => l.itemId).map((l) => ({ itemId: l.itemId!, qty: l.qty, unitPrice: l.unitPrice, spec: l.spec || undefined })),
     discount,
     shippingCharge: shipping,
+    dpPercent: dpPercent || undefined,
+    paymentDueDate: paymentDueDate || undefined,
     export: channel === "ekspor" ? exp : undefined,
     note: note || undefined,
   };
@@ -141,7 +146,7 @@ function SalesForm({ existingId }: { existingId?: ID }) {
             </div>
           </Section>
 
-          <Section title="Produk">
+          <Section title="Barang" description="Produk, atau material (mis. jual sisa/limbah bernilai).">
             <div className="flex flex-col gap-3">
               {lines.map((l) => {
                 const it = item(l.itemId ?? undefined);
@@ -150,7 +155,6 @@ function SalesForm({ existingId }: { existingId?: ID }) {
                   <div key={l.key}>
                     <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_7rem_10rem_auto]">
                       <ItemPicker
-                        kind="product"
                         value={l.itemId}
                         onChange={(itemId) =>
                           update(l.key, {
@@ -158,14 +162,23 @@ function SalesForm({ existingId }: { existingId?: ID }) {
                             unitPrice: l.unitPrice || Math.round(((item(itemId ?? undefined)?.salePrice ?? 0) / (currency === "IDR" ? 1 : rate)) * 100) / 100,
                           })
                         }
-                        aria-label="Produk"
+                        aria-label="Barang"
                       />
-                      <NumberInput aria-label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix="pcs" maximumFractionDigits={0} />
+                      <NumberInput aria-label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix={it ? UOM_LABEL[it.uom] : undefined} maximumFractionDigits={it?.kind === "product" ? 0 : 3} />
                       <NumberInput aria-label={`Harga (${currency})`} value={l.unitPrice} onChange={(unitPrice) => update(l.key, { unitPrice })} money={currency === "IDR"} suffix={currency !== "IDR" ? currency : undefined} maximumFractionDigits={2} />
                       <Button isIconOnly variant="ghost" aria-label="Hapus" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
+                    {it?.kind === "product" && (
+                      <TextInput
+                        aria-label="Spesifikasi custom"
+                        className="mt-2"
+                        value={l.spec}
+                        onChange={(spec) => update(l.key, { spec })}
+                        placeholder="Spesifikasi custom (opsional): ukuran, finishing, kain…"
+                      />
+                    )}
                     {it && (
                       <p className={`mt-1 text-xs ${free < l.qty ? "text-warning" : "text-muted"}`}>
                         Stok siap kirim {formatQty(free, it.uom)}
@@ -176,7 +189,7 @@ function SalesForm({ existingId }: { existingId?: ID }) {
                 );
               })}
               <div>
-                <Button size="sm" variant="tertiary" onPress={() => setLines([...lines, { key: k(), itemId: null, qty: 1, unitPrice: 0 }])}>
+                <Button size="sm" variant="tertiary" onPress={() => setLines([...lines, { key: k(), itemId: null, qty: 1, unitPrice: 0, spec: "" }])}>
                   <Plus className="size-4" /> Tambah produk
                 </Button>
               </div>
@@ -193,6 +206,8 @@ function SalesForm({ existingId }: { existingId?: ID }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <NumberInput label={`Diskon (${currency})`} value={discount} onChange={setDiscount} money={currency === "IDR"} maximumFractionDigits={2} />
               <NumberInput label={`Ongkir ditagihkan (${currency})`} value={shipping} onChange={setShipping} money={currency === "IDR"} maximumFractionDigits={2} />
+              <NumberInput label="DP diminta" value={dpPercent} onChange={setDpPercent} suffix="%" maxValue={100} description="mis. 30% di depan, sisanya sebelum kirim." />
+              <DateInput label="Jatuh tempo pelunasan" value={paymentDueDate} onChange={setPaymentDueDate} />
               <TextAreaInput className="sm:col-span-2" label="Catatan" value={note} onChange={setNote} rows={2} />
             </div>
           </Section>
@@ -206,10 +221,10 @@ function SalesForm({ existingId }: { existingId?: ID }) {
               <Row label="Subtotal" value={formatMoney(subtotal, currency)} />
               {discount > 0 && <Row label="Diskon" value={`− ${formatMoney(discount, currency)}`} />}
               {shipping > 0 && <Row label="Ongkir" value={formatMoney(shipping, currency)} />}
-              <div className="my-2 border-t border-separator" />
+              <div className="my-2 border-t border-[var(--rule)]" />
               <Row label="Total" value={formatMoney(total, currency)} strong />
               {currency !== "IDR" && <Row label="Setara" value={formatIDR(total * rate)} muted />}
-              <div className="mt-3 rounded-2xl bg-default/60 p-3">
+              <div className="mt-3 rounded-md bg-default/60 p-3">
                 <Row label="Estimasi HPP" value={formatIDR(estCost)} />
                 <Row label="Estimasi margin kotor" value={`${formatIDR(margin)} · ${subtotal ? formatPct(margin / (subtotal * input.exchangeRate)) : "—"}`} tone={margin < 0 ? "danger" : "success"} />
               </div>

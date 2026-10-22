@@ -92,7 +92,17 @@ export interface RentalInput {
   lines: { itemId: ID; qty: number; ratePerDay: number }[];
   deposit?: number;
   discount?: number;
+  extraCharges?: { label: string; amount: number }[];
   note?: string;
+}
+
+function normalizeCharges(extra: RentalInput["extraCharges"]) {
+  return (extra ?? [])
+    .filter((c) => c.label.trim() || c.amount)
+    .map((c) => {
+      assert(c.amount >= 0, "Biaya tambahan tidak boleh negatif.");
+      return { id: newId(), label: c.label.trim() || "Biaya lain", amount: c.amount };
+    });
 }
 
 function validate(db: Db, input: RentalInput) {
@@ -123,6 +133,8 @@ export function createRental(db: Db, input: RentalInput): Rental {
     lines: input.lines.map((l) => ({ id: newId(), ...l, ratePerDay: input.kind === "pinjam" ? 0 : l.ratePerDay })),
     deposit: input.deposit ?? 0,
     discount: input.discount ?? 0,
+    extraCharges: normalizeCharges(input.extraCharges),
+    payments: [],
     checkouts: [],
     returns: [],
     note: input.note,
@@ -144,6 +156,7 @@ export function updateRental(db: Db, id: ID, input: RentalInput): Rental {
     lines: input.lines.map((l) => ({ id: newId(), ...l, ratePerDay: input.kind === "pinjam" ? 0 : l.ratePerDay })),
     deposit: input.deposit ?? 0,
     discount: input.discount ?? 0,
+    extraCharges: normalizeCharges(input.extraCharges),
     note: input.note,
   });
   return r;
@@ -246,6 +259,7 @@ export function returnRental(db: Db, id: ID, entries: ReturnInput[], at = nowIso
 export function cancelRental(db: Db, id: ID): Rental {
   const r = getRental(db, id);
   assert(r.status === "dipesan", "Hanya booking yang belum diserahkan yang bisa dibatalkan.");
+  assert(r.payments.length === 0, "Booking sudah ada pembayaran — kembalikan/hapus pembayaran dulu.");
   r.status = "batal";
   return r;
 }
@@ -273,6 +287,7 @@ export function createRepairsFromRental(db: Db, id: ID): WorkOrder[] {
 export interface RentalCharges {
   days: number;
   base: number;
+  extra: number;
   lateDays: number;
   lateFee: number;
   damageFee: number;
@@ -306,17 +321,82 @@ export function rentalCharges(r: Rental, asOf: ISODate = today()): RentalCharges
     lateFee += overdueDays * rateOf(c.itemId) * c.outstanding;
   }
   const damageFee = sum(r.returns.map((x) => x.fee));
-  const total = Math.max(0, base + lateFee + damageFee - r.discount);
+  const extra = sum((r.extraCharges ?? []).map((c) => c.amount));
+  const total = Math.max(0, base + extra + lateFee + damageFee - r.discount);
+  const paid = sum((r.payments ?? []).map((p) => p.amount));
   return {
     days,
     base: roundMoney(base),
+    extra: roundMoney(extra),
     lateDays,
     lateFee: roundMoney(lateFee),
     damageFee: roundMoney(damageFee),
     discount: r.discount,
     total: roundMoney(total),
     deposit: r.deposit,
-    balance: roundMoney(total - r.deposit),
+    balance: roundMoney(total - r.deposit - paid),
     isOverdue: r.status === "berjalan" && out.length > 0 && overdueDays > 0,
   };
+}
+
+export interface UtilizationRow {
+  itemId: ID;
+  owned: number;
+  unitDays: number;
+  utilization: number;
+  rentals: number;
+  revenue: number;
+  damaged: number;
+}
+
+/**
+ * Rental utilisation per product over a window: unit-days out on rent ÷ (units owned × days).
+ * Units out are counted from checkout until their return (or `to` while still out).
+ */
+export function rentalUtilization(db: Db, from: ISODate, to: ISODate): UtilizationRow[] {
+  const windowDays = Math.max(1, diffDays(from, to) + 1);
+  const rows = new Map<ID, UtilizationRow>();
+  const row = (itemId: ID) => {
+    let x = rows.get(itemId);
+    if (!x) {
+      const owned = sum(db.lots.filter((l) => l.itemId === itemId && l.qty > EPS && l.status !== "rusak").map((l) => l.qty));
+      x = { itemId, owned, unitDays: 0, utilization: 0, rentals: 0, revenue: 0, damaged: 0 };
+      rows.set(itemId, x);
+    }
+    return x;
+  };
+  for (const r of db.rentals) {
+    if (r.status === "batal" || r.status === "dipesan") continue;
+    const ids = new Set<ID>();
+    for (const c of r.checkouts) {
+      const start = localDateOf(c.at) > from ? localDateOf(c.at) : from;
+      const rets = r.returns.filter((x) => x.checkoutId === c.id);
+      let remaining = c.qty;
+      const add = (qty: number, endDate: ISODate) => {
+        const end = endDate < to ? endDate : to;
+        const d = diffDays(start, end) + 1;
+        if (d > 0) row(c.itemId).unitDays += qty * d;
+      };
+      for (const ret of rets) {
+        add(ret.qty, localDateOf(ret.at));
+        remaining -= ret.qty;
+        if (ret.condition === "rusak") row(c.itemId).damaged += ret.qty;
+      }
+      if (remaining > EPS) add(remaining, to);
+      ids.add(c.itemId);
+    }
+    const ch = rentalCharges(r, to);
+    const base = sum(r.lines.map((l) => l.qty * l.ratePerDay));
+    for (const itemId of ids) {
+      const x = row(itemId);
+      x.rentals += 1;
+      const share = base > 0 ? sum(r.lines.filter((l) => l.itemId === itemId).map((l) => l.qty * l.ratePerDay)) / base : 1 / ids.size;
+      x.revenue += (ch.base + ch.lateFee) * share;
+    }
+  }
+  for (const x of rows.values()) {
+    x.utilization = x.owned > 0 ? Math.min(1, x.unitDays / (x.owned * windowDays)) : 0;
+    x.revenue = roundMoney(x.revenue);
+  }
+  return [...rows.values()].sort((a, b) => b.utilization - a.utilization);
 }

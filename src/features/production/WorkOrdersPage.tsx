@@ -76,7 +76,7 @@ export default function WorkOrdersPage() {
     <>
       <PageHeader
         title="Produksi"
-        description="Perintah kerja untuk produksi baru, konversi produk, dekonstruksi, dan perbaikan. Sisa material dan HPP dihitung otomatis saat pekerjaan diselesaikan."
+        description="Produksi, konversi, bongkar, dan perbaikan. HPP dihitung saat pekerjaan ditutup."
         actions={
           <Button onPress={() => navigate("/produksi/baru")}>
             <Plus className="size-4" /> Perintah kerja

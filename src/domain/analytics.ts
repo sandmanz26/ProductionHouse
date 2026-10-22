@@ -1,6 +1,7 @@
 import { EPS, freeQtyFor, roundQty, sum } from "./core";
 import { diffDays, today } from "./dates";
-import { isOpenWo, requirements } from "./production";
+import { dpStatus, payables, receivables, refundsDue } from "./finance";
+import { currentStage, isOpenWo, requirements } from "./production";
 import { outstandingCheckouts, rentalCharges } from "./rentals";
 import { exportWarnings, salesTotals } from "./sales";
 import type { Db, ID, ISODate, Item, Lot } from "./types";
@@ -71,7 +72,8 @@ export interface ReorderRow {
 export function reorderSuggestions(db: Db): ReorderRow[] {
   const demand = openDemand(db);
   return db.items
-    .filter((i) => i.kind === "material" && !i.archived)
+    // Components made in-house are planned through work orders, not bought.
+    .filter((i) => i.kind === "material" && !i.archived && !(i.bom?.length ?? 0))
     .map((item) => {
       const free = freeQtyFor(db, item.id);
       const d = roundQty(demand.get(item.id) ?? 0);
@@ -198,7 +200,7 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
 
   // Material shortage for open work orders
   for (const wo of db.workOrders.filter(isOpenWo)) {
-    const short = requirements(db, wo).filter((r) => r.shortage > EPS);
+    const short = requirements(db, wo).filter((r) => r.shortage > EPS && !r.producible);
     if (short.length) {
       out.push({
         id: `wo-short-${wo.id}`,
@@ -231,6 +233,70 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
         to: `/produksi/${wo.id}`,
       });
     }
+  }
+
+  // Components that can be produced in-house
+  for (const wo of db.workOrders.filter(isOpenWo)) {
+    const comps = requirements(db, wo).filter((r) => r.producible && r.shortage - r.inComponentOrders > EPS);
+    if (comps.length) {
+      out.push({
+        id: `wo-comp-${wo.id}`,
+        severity: "accent",
+        title: `${wo.code}: komponen bisa diproduksi sendiri`,
+        detail: comps.map((c) => `${name(c.itemId)} ${q(c.shortage - c.inComponentOrders, items.get(c.itemId)?.uom)}`).join(", "),
+        to: `/produksi/${wo.id}`,
+        action: "Buat perintah komponen",
+      });
+    }
+  }
+
+  // Money
+  for (const so of db.sales) {
+    if (so.status !== "dikonfirmasi" || !so.dpPercent) continue;
+    const dp = dpStatus(db, so);
+    if (!dp.met) {
+      out.push({
+        id: `dp-${so.id}`,
+        severity: "warning",
+        title: `${so.code}: DP ${so.dpPercent}% belum diterima`,
+        detail: `Kurang ${rupiah((dp.required - dp.received) * so.exchangeRate)} — pertimbangkan menahan produksi.`,
+        to: `/penjualan/${so.id}`,
+        action: "Catat pembayaran",
+      });
+    }
+  }
+  const ar = receivables(db, asOf).filter((r) => r.delivered && r.overdueDays > 0);
+  if (ar.length) {
+    out.push({
+      id: "ar-overdue",
+      severity: "danger",
+      title: `${ar.length} tagihan lewat jatuh tempo`,
+      detail: `Total ${rupiah(sum(ar.map((r) => r.balanceIdr)))} — terlama ${Math.max(...ar.map((r) => r.overdueDays))} hari (${ar[0]!.code}).`,
+      to: "/keuangan",
+      action: "Lihat piutang",
+    });
+  }
+  const ap = payables(db, asOf).filter((p) => p.overdueDays >= -3);
+  if (ap.length) {
+    out.push({
+      id: "ap-due",
+      severity: "warning",
+      title: `${ap.length} utang pemasok jatuh tempo ≤ 3 hari`,
+      detail: `Total ${rupiah(sum(ap.map((p) => p.balanceIdr)))}.`,
+      to: "/keuangan",
+      action: "Lihat utang",
+    });
+  }
+  const refunds = refundsDue(db);
+  if (refunds.length) {
+    out.push({
+      id: "refunds",
+      severity: "warning",
+      title: `${refunds.length} deposit sewa harus dikembalikan`,
+      detail: refunds.map((r) => `${r.code} ${rupiah(-r.balanceIdr)}`).join(", "),
+      to: `/sewa/${refunds[0]!.id}`,
+      action: "Catat refund",
+    });
   }
 
   // Reorder
@@ -313,3 +379,31 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
   return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
 }
 
+
+export interface StageColumn {
+  name: string;
+  workOrders: { id: ID; code: string; title: string; dueDate?: ISODate; late: boolean; status: string }[];
+}
+
+/** Work-in-progress board: open work orders grouped by their current stage. */
+export function stageBoard(db: Db, asOf: ISODate = today()): StageColumn[] {
+  const columns = new Map<string, StageColumn>();
+  const order = [...db.settings.defaultStages];
+  const col = (name: string) => {
+    let c = columns.get(name);
+    if (!c) {
+      c = { name, workOrders: [] };
+      columns.set(name, c);
+      if (!order.includes(name)) order.push(name);
+    }
+    return c;
+  };
+  for (const n of db.settings.defaultStages) col(n);
+  for (const wo of db.workOrders.filter(isOpenWo)) {
+    const stage = wo.status === "rencana" ? undefined : currentStage(wo);
+    const c = col(wo.status === "rencana" ? "Antre" : (stage?.name ?? "Siap ditutup"));
+    c.workOrders.push({ id: wo.id, code: wo.code, title: wo.title, dueDate: wo.dueDate, late: !!wo.dueDate && wo.dueDate < asOf, status: wo.status });
+  }
+  const names = ["Antre", ...order.filter((n) => n !== "Antre" && n !== "Siap ditutup"), "Siap ditutup"];
+  return names.filter((n) => columns.has(n)).map((n) => columns.get(n)!);
+}

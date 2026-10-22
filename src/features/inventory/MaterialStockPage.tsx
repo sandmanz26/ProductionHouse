@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { emptySummary, freeQtyFor, openDemand, sum, type Item, type MaterialCategory, type StockSummary } from "@/domain";
 import { SelectInput } from "@/components/fields";
-import { DataTable, EmptyBlock, PageHeader, StatCard, StatusChip, type Column } from "@/components/ui";
+import { DataTable, EmptyBlock, PageHeader, MetricStrip, StatusChip, type Column } from "@/components/ui";
 import { formatIDR, formatIDRCompact, formatQty } from "@/lib/format";
 import { MATERIAL_CATEGORY } from "@/lib/labels";
 import { useDb, useLookups } from "@/store/db-store";
@@ -83,18 +83,14 @@ export default function MaterialStockPage() {
     <>
       <PageHeader
         title="Stok Material"
-        description="Bahan baku per lot. Stok tersedia sudah termasuk sisa material dan barang yang dicadangkan untuk perintah kerja."
+        description="Tersedia = termasuk sisa material dan stok yang dicadangkan untuk perintah kerja."
         actions={
           <Button variant="secondary" onPress={() => navigate("/pembelian/baru?dari=saran")}>
             <ShoppingCart className="size-4" /> Beli yang menipis
           </Button>
         }
       />
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Nilai material" value={formatIDRCompact(totalValue)} />
-        <StatCard label="Di antaranya sisa material" value={formatIDRCompact(remnantValue)} tone="success" onPress={() => navigate("/stok/sisa")} />
-        <StatCard label="Perlu perhatian" value={attention} hint="Menipis, kurang, atau habis" tone={attention ? "warning" : "default"} />
-      </div>
+      <MetricStrip className="mb-5" items={[{ label: "Nilai material", value: formatIDRCompact(totalValue) }, { label: "Di antaranya sisa material", value: formatIDRCompact(remnantValue), tone: "success", onPress: () => navigate("/stok/sisa") }, { label: "Perlu perhatian", value: attention, hint: "Menipis, kurang, atau habis", tone: attention ? "warning" : "default" }]} />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <SearchField value={q} onChange={setQ} aria-label="Cari material" className="sm:w-72">
           <SearchField.Group>

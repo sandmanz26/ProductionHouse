@@ -45,7 +45,7 @@ export default function ExportDocsPage() {
           </Tabs.ListContainer>
         </Tabs>
       </div>
-      <div className="print-sheet mx-auto max-w-4xl overflow-x-auto rounded-2xl border border-separator bg-white p-6 text-[13px] text-neutral-900 shadow-sm sm:p-10">
+      <div className="print-sheet mx-auto max-w-4xl overflow-x-auto rounded-md border border-[var(--rule)] bg-white p-6 text-[13px] text-neutral-900 shadow-sm sm:p-10">
         {doc === "proforma" ? <Proforma so={so} /> : <Packing so={so} />}
       </div>
     </>

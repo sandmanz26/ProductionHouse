@@ -20,12 +20,26 @@ tersimpan di browser (localStorage) dengan cadangan/pulihkan JSON.
 | Dokumen ekspor | Proforma invoice & packing list siap cetak, estimasi isi kontainer (20GP/40GP/40HC), peringatan V-Legal (SVLK) & DDS EUDR untuk tujuan UE |
 | Banyak hal harus dipantau | Beranda "Perlu perhatian": sewa terlambat, bahan kurang, saran pembelian, sisa menua, dokumen ekspor belum lengkap |
 
+## Baru di v2 — skenario produksi yang rumit
+
+Ditambahkan setelah *roast* terhadap v1 ([`docs/ROAST.md`](docs/ROAST.md)):
+
+- **Komponen setengah jadi & bahan olahan** — material bisa punya BOM (rangka kursi, kayu KD). MRP bertingkat menyarankan perintah kerja komponen; HPP komponen ikut naik ke produk.
+- **Tahapan produksi + papan WIP** — rute per produk (potong → rakit → amplas → jok → finishing → QC → packing), dimajukan dari papan atau HP.
+- **Catatan kerja harian & borongan** — jam × tarif atau unit × tarif borongan; HPP memakai catatan nyata, bukan rencana.
+- **Hasil bertahap** — terima sebagian unit lebih dulu (HPP sementara); saat ditutup, stok direvaluasi ke HPP aktual dan selisih atas unit yang sudah terjual dilaporkan sebagai **selisih HPP**.
+- **QC reject** — unit gagal QC masuk sebagai rusak, siap perintah perbaikan; tingkat reject di laporan.
+- **Pembayaran** — DP %, pelunasan, refund deposit; piutang & utang dengan umur (aging); order tidak bisa ditutup bila belum lunas.
+- **Retur penjualan**, **transfer antar lokasi**, **kubikasi kayu** (T × L × P), **satuan beli** (roll, dus), **spesifikasi custom** per baris order, **jual material/sisa**, **biaya antar/setting sewa**, **utilisasi unit sewa**.
+- **UI** — tanpa pola generik: IBM Plex, garis tipis alih-alih bayangan, strip metrik, tabel otomatis jadi kartu di HP, command palette `Ctrl/⌘ K`.
+
 ## Menjalankan
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # unit test engine domain (Vitest)
+npm test           # unit + skenario test engine domain (Vitest)
+npm run test:e2e   # E2E Playwright terhadap UI asli (desktop + mobile)
 npm run lint
 npm run build      # output statis di dist/ — bisa di-host di mana saja (hash router, base relatif)
 ```
@@ -47,7 +61,10 @@ src/
     analytics.ts   Valuasi persediaan, saran pembelian, insight otomatis
     db.ts          Skema, migrasi, cadangan
     seed.ts        Data demo
-    engine.test.ts Unit test (HPP, sisa, alokasi, sewa, konsistensi ledger)
+    finance.ts     Pembayaran, piutang/utang, aging
+    engine.test.ts    Unit test (HPP, sisa, alokasi, sewa, konsistensi ledger)
+    scenarios.test.ts Test skenario lapangan S1–S14 (komponen, KD, tahapan, borongan, hasil bertahap, reject, DP, retur, transfer…)
+e2e/             Test Playwright untuk alur utama di browser
   store/         Zustand + persist (localStorage aman, sinkron antar tab)
   components/    Shell aplikasi & komponen UI di atas HeroUI v3
   features/      Halaman per modul

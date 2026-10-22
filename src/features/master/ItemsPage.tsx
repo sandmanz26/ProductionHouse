@@ -65,7 +65,7 @@ export default function ItemsPage() {
     <>
       <PageHeader
         title="Produk & Material"
-        description="Data master: BOM (kebutuhan bahan per produk), harga, tarif sewa, HS code, dan data kemasan untuk ekspor."
+        description="Resep bahan (BOM), rute tahapan, harga, tarif sewa, data ekspor."
         actions={
           <Button onPress={() => navigate(`/master/item/baru?jenis=${kind}`)}>
             <Plus className="size-4" /> {kind === "product" ? "Produk baru" : "Material baru"}

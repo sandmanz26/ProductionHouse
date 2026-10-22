@@ -21,6 +21,12 @@ function validateItem(db: Db, input: ItemInput, selfId?: ID) {
   }
 }
 
+/** Products always carry a BOM list; materials only when they are produced in-house. */
+function normalizeBom(input: ItemInput) {
+  if (input.kind === "product") return input.bom ?? [];
+  return input.bom?.length ? input.bom : undefined;
+}
+
 export function createItem(db: Db, input: ItemInput): Item {
   validateItem(db, input);
   const item: Item = {
@@ -28,7 +34,7 @@ export function createItem(db: Db, input: ItemInput): Item {
     id: newId(),
     name: input.name.trim(),
     sku: input.sku?.trim().toUpperCase() || nextCode(db, "item"),
-    bom: input.kind === "product" ? (input.bom ?? []) : undefined,
+    bom: normalizeBom(input),
   };
   db.items.push(item);
   return item;
@@ -42,7 +48,7 @@ export function updateItem(db: Db, id: ID, input: ItemInput): Item {
     ...input,
     name: input.name.trim(),
     sku: input.sku?.trim().toUpperCase() || item.sku,
-    bom: input.kind === "product" ? (input.bom ?? []) : undefined,
+    bom: normalizeBom(input),
   });
   return item;
 }

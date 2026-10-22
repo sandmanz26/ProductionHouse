@@ -75,7 +75,7 @@ export default function RentalsPage() {
     <>
       <PageHeader
         title="Sewa & Pinjam"
-        description="Furnitur untuk event, syuting, pemotretan, atau mitra. Sistem mencegah double booking dan mencatat kondisi setiap unit saat kembali."
+        description="Event, syuting, pemotretan, mitra. Bentrok tanggal dicek otomatis."
         actions={
           <Button onPress={() => navigate("/sewa/baru")}>
             <Plus className="size-4" /> Booking baru

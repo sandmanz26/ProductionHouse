@@ -12,7 +12,10 @@ import {
   Package,
   Plus,
   Recycle,
+  Search,
   Settings,
+  SquareKanban,
+  Wallet,
   Ship,
   ShoppingCart,
   Sun,
@@ -21,7 +24,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { EPS, isOpenWo, outstandingCheckouts, today } from "@/domain";
+import { EPS, isOpenWo, outstandingCheckouts, receivables, today } from "@/domain";
+import { CommandPalette } from "./CommandPalette";
 import { useDb, useDbStore } from "@/store/db-store";
 import { useTheme } from "@/lib/theme";
 
@@ -38,6 +42,7 @@ interface NavCounts {
   rentalLate: number;
   purchasesWaiting: number;
   remnants: number;
+  arOverdue: number;
 }
 
 const NAV: { title?: string; items: NavItem[] }[] = [
@@ -45,7 +50,8 @@ const NAV: { title?: string; items: NavItem[] }[] = [
   {
     title: "Operasional",
     items: [
-      { to: "/produksi", label: "Produksi", icon: Hammer, badge: (c) => (c.woOpen ? { value: c.woOpen, tone: "accent" } : undefined) },
+      { to: "/produksi", label: "Perintah kerja", icon: Hammer, end: true, badge: (c) => (c.woOpen ? { value: c.woOpen, tone: "accent" } : undefined) },
+      { to: "/produksi/papan", label: "Papan produksi", icon: SquareKanban },
       {
         to: "/pembelian",
         label: "Pembelian",
@@ -54,6 +60,7 @@ const NAV: { title?: string; items: NavItem[] }[] = [
       },
       { to: "/penjualan", label: "Penjualan & Ekspor", icon: Ship },
       { to: "/sewa", label: "Sewa & Pinjam", icon: CalendarClock, badge: (c) => (c.rentalLate ? { value: c.rentalLate, tone: "danger" } : undefined) },
+      { to: "/keuangan", label: "Piutang & Utang", icon: Wallet, badge: (c) => (c.arOverdue ? { value: c.arOverdue, tone: "danger" } : undefined) },
     ],
   },
   {
@@ -92,6 +99,7 @@ function useNavCounts(): NavCounts {
       rentalLate: db.rentals.filter((r) => r.status === "berjalan" && r.endDate < t && outstandingCheckouts(r).length > 0).length,
       purchasesWaiting: db.purchases.filter((p) => p.status === "draft").length,
       remnants: db.lots.filter((l) => l.isRemnant && l.status === "tersedia" && l.qty > EPS).length,
+      arOverdue: receivables(db, t).filter((r) => r.overdueDays > 0).length,
     };
   }, [db]);
 }
@@ -99,14 +107,11 @@ function useNavCounts(): NavCounts {
 function Brand() {
   const name = useDb().settings.companyName;
   return (
-    <div className="flex items-center gap-2.5 px-3 py-1">
-      <div className="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground shadow-sm">
-        <Armchair className="size-5" />
-      </div>
-      <div className="min-w-0 leading-tight">
-        <p className="font-semibold tracking-tight">MebelOS</p>
-        <p className="truncate text-xs text-muted">{name}</p>
-      </div>
+    <div className="min-w-0 px-3 leading-tight">
+      <p className="text-[15px] font-semibold tracking-tight">
+        Mebel<span className="text-accent">OS</span>
+      </p>
+      <p className="truncate text-xs text-muted">{name}</p>
     </div>
   );
 }
@@ -114,10 +119,10 @@ function Brand() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const counts = useNavCounts();
   return (
-    <nav aria-label="Navigasi utama" className="flex flex-col gap-5">
+    <nav aria-label="Navigasi utama" className="flex flex-col gap-4">
       {NAV.map((group, gi) => (
         <div key={gi}>
-          {group.title && <p className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-muted uppercase">{group.title}</p>}
+          {group.title && <p className="eyebrow mb-1 px-3">{group.title}</p>}
           <ul className="flex flex-col gap-0.5">
             {group.items.map((item) => {
               const badge = item.badge?.(counts);
@@ -128,20 +133,18 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                     end={item.end}
                     onClick={onNavigate}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                      `relative flex items-center gap-2.5 rounded-sm px-3 py-1.5 text-[13px] transition-colors ${
                         isActive
-                          ? "bg-accent-soft font-medium text-accent-soft-foreground"
-                          : "text-foreground/80 hover:bg-default hover:text-foreground"
+                          ? "bg-default font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-accent"
+                          : "text-foreground/75 hover:bg-default/60 hover:text-foreground"
                       }`
                     }
                   >
-                    <item.icon className="size-4 shrink-0" />
+                    <item.icon className="size-4 shrink-0 opacity-70" strokeWidth={1.75} />
                     <span className="flex-1 truncate">{item.label}</span>
                     {badge && (
                       <span
-                        className={`min-w-5 rounded-full px-1.5 text-center text-[11px] leading-5 font-semibold ${
-                          badge.tone === "danger" ? "bg-danger text-danger-foreground" : "bg-default text-default-foreground"
-                        }`}
+                        className={`num min-w-5 text-right text-[11px] ${badge.tone === "danger" ? "font-semibold text-danger" : "text-muted"}`}
                       >
                         {badge.value}
                       </span>
@@ -195,8 +198,8 @@ function DemoBanner() {
   const navigate = useNavigate();
   if (!isDemo) return null;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-accent-soft px-4 py-2 text-center text-xs text-accent-soft-foreground">
-      <span>Anda sedang melihat <b>data demo</b>. Semua data tersimpan di perangkat ini.</span>
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-[var(--rule)] px-4 py-1.5 text-center text-xs text-muted">
+      <span>Data demo — tersimpan hanya di perangkat ini.</span>
       <button type="button" className="font-semibold underline underline-offset-2" onClick={() => navigate("/pengaturan")}>
         Mulai dengan data kosong
       </button>
@@ -204,9 +207,36 @@ function DemoBanner() {
   );
 }
 
+function SearchButton({ onPress }: { onPress: () => void }) {
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      className="flex h-8 w-full max-w-sm items-center gap-2 rounded-sm border border-[var(--rule)] bg-surface px-2.5 text-[13px] text-muted transition-colors hover:border-[var(--ink-soft)] focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
+    >
+      <Search className="size-3.5" />
+      <span className="flex-1 truncate text-left">Cari kode, barang, klien…</span>
+      <kbd className="num hidden text-[11px] sm:inline">{mac ? "⌘K" : "Ctrl K"}</kbd>
+    </button>
+  );
+}
+
 export function AppShell({ children }: { children?: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -217,15 +247,15 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2">
         Lewati ke konten
       </a>
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-separator bg-surface lg:flex print:hidden">
-        <div className="flex h-16 items-center px-2">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-[var(--rule)] bg-surface lg:flex print:hidden">
+        <div className="flex h-14 items-center px-2">
           <Brand />
         </div>
         <div className="flex-1 overflow-y-auto px-3 pt-2 pb-6">
           <NavList />
         </div>
-        <div className="border-t border-separator px-5 py-3 text-[11px] text-muted">
-          MebelOS v1.0 · data tersimpan di perangkat ini
+        <div className="border-t border-[var(--rule)] px-5 py-3 text-[11px] text-muted">
+          MebelOS 2.0 · offline, tersimpan lokal
         </div>
       </aside>
 
@@ -233,18 +263,17 @@ export function AppShell({ children }: { children?: ReactNode }) {
         <div className="print:hidden">
           <DemoBanner />
         </div>
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-separator bg-background/85 px-4 backdrop-blur lg:px-8 print:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-[var(--rule)] bg-background/90 px-4 backdrop-blur lg:px-8 print:hidden">
           <Button isIconOnly variant="ghost" size="sm" aria-label="Buka menu" className="lg:hidden" onPress={() => setDrawerOpen(true)}>
             <Menu className="size-5" />
           </Button>
-          <div className="lg:hidden">
-            <p className="font-semibold tracking-tight">MebelOS</p>
+          <div className="flex-1">
+            <SearchButton onPress={() => setPaletteOpen(true)} />
           </div>
-          <div className="flex-1" />
           <ThemeToggle />
           <QuickCreate />
         </header>
-        <main id="main" className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
+        <main id="main" className="mx-auto w-full max-w-7xl px-4 py-5 lg:px-8 lg:py-6 print:max-w-none print:p-0">
           {children ?? <Outlet />}
         </main>
       </div>
@@ -261,6 +290,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             </Drawer.Dialog>
           </Drawer.Content>
       </Drawer.Backdrop>
+      <CommandPalette isOpen={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

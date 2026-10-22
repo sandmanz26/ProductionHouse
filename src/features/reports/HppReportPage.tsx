@@ -1,13 +1,24 @@
 import { Link, Tabs, type Key } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { inventoryValuation, productCostRows, standardProductCost, sum, type ProductCostRow, type WorkOrder } from "@/domain";
-import { DataTable, PageHeader, Section, StatCard, StatusChip, type Column } from "@/components/ui";
+import {
+  addDays,
+  inventoryValuation,
+  productCostRows,
+  rentalUtilization,
+  standardProductCost,
+  sum,
+  today,
+  type ProductCostRow,
+  type UtilizationRow,
+  type WorkOrder,
+} from "@/domain";
+import { DataTable, PageHeader, Section, MetricStrip, StatusChip, type Column } from "@/components/ui";
 import { formatDate, formatIDR, formatIDRCompact, formatPct, formatQty } from "@/lib/format";
 import { WO_TYPE } from "@/lib/labels";
 import { useDb, useLookups } from "@/store/db-store";
 
-type View = "produk" | "pekerjaan" | "nilai";
+type View = "produk" | "pekerjaan" | "sewa" | "nilai";
 
 export default function HppReportPage() {
   const db = useDb();
@@ -21,13 +32,22 @@ export default function HppReportPage() {
     [db.workOrders],
   );
   const valuation = useMemo(() => inventoryValuation(db), [db]);
+  const util = useMemo(() => rentalUtilization(db, addDays(today(), -89), today()), [db]);
 
   const totals = useMemo(() => {
     const gross = sum(done.map((w) => w.cost!.materialGross));
     const credit = sum(done.map((w) => w.cost!.returnCredit + w.cost!.scrapRecovery));
     const total = sum(done.map((w) => w.cost!.total));
     const material = sum(done.map((w) => w.cost!.materialNet));
-    return { gross, credit, total, material, labor: sum(done.map((w) => w.cost!.labor + w.cost!.overhead)) };
+    return {
+      gross,
+      credit,
+      total,
+      material,
+      labor: sum(done.map((w) => w.cost!.labor + w.cost!.overhead)),
+      variance: sum(done.map((w) => w.cost!.variance ?? 0)),
+      rejects: sum(done.map((w) => w.cost!.rejectQty ?? 0)),
+    };
   }, [done]);
 
   const productCols: Column<ProductCostRow & { id: string }>[] = [
@@ -92,24 +112,41 @@ export default function HppReportPage() {
     { key: "labor", header: "TK + overhead", align: "end", cell: (w) => formatIDR(w.cost!.labor + w.cost!.overhead + w.cost!.extra) },
     { key: "total", header: "Total HPP", align: "end", cell: (w) => <b>{formatIDR(w.cost!.total)}</b> },
     { key: "yield", header: "Rendemen", align: "end", cell: (w) => formatPct(w.cost!.yieldRatio) },
+    { key: "rej", header: "Reject", align: "end", cell: (w) => (w.cost!.rejectQty ? <span className="text-danger">{w.cost!.rejectQty}</span> : "—") },
+    { key: "var", header: "Selisih HPP", align: "end", cell: (w) => (w.cost!.variance ? formatIDR(w.cost!.variance) : "—") },
+  ];
+
+  const utilCols: Column<UtilizationRow & { id: string }>[] = [
+    { key: "item", header: "Produk sewa", isRowHeader: true, cell: (r) => item(r.itemId)?.name ?? "?" },
+    { key: "owned", header: "Unit dimiliki", align: "end", cell: (r) => r.owned },
+    { key: "days", header: "Unit-hari keluar", align: "end", cell: (r) => r.unitDays },
+    {
+      key: "util",
+      header: "Utilisasi 90 hari",
+      align: "end",
+      cell: (r) => <span className={r.utilization < 0.15 ? "text-warning" : ""}>{formatPct(r.utilization)}</span>,
+    },
+    { key: "n", header: "Jumlah sewa", align: "end", cell: (r) => r.rentals },
+    { key: "rev", header: "Pendapatan", align: "end", cell: (r) => formatIDR(r.revenue) },
+    { key: "dmg", header: "Kembali rusak", align: "end", cell: (r) => (r.damaged ? <span className="text-danger">{r.damaged}</span> : "—") },
   ];
 
   return (
     <>
       <PageHeader
         title="Laporan HPP"
-        description="HPP aktual dari pekerjaan yang selesai: bahan neto (setelah dikurangi sisa yang kembali ke gudang) + tenaga kerja + overhead. Bandingkan dengan standar BOM untuk menemukan pemborosan."
+        description="HPP aktual vs standar BOM, utilisasi sewa, dan nilai persediaan."
       />
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total HPP produksi" value={formatIDRCompact(totals.total)} hint={`${done.length} pekerjaan selesai`} />
-        <StatCard
-          label="Bahan terpakai"
-          value={formatIDRCompact(totals.material)}
-          hint={totals.total ? `${formatPct(totals.material / totals.total, 0)} dari HPP` : undefined}
-        />
-        <StatCard label="Dihemat lewat sisa" value={formatIDRCompact(totals.credit)} hint={totals.gross ? `${formatPct(totals.credit / totals.gross)} dari bahan diambil` : undefined} tone="success" />
-        <StatCard label="TK & overhead" value={formatIDRCompact(totals.labor)} />
-      </div>
+      <MetricStrip
+        className="mb-5"
+        items={[
+          { label: "Total HPP produksi", value: formatIDRCompact(totals.total), hint: `${done.length} pekerjaan selesai` },
+          { label: "Bahan terpakai", value: formatIDRCompact(totals.material), hint: totals.total ? `${formatPct(totals.material / totals.total, 0)} dari HPP` : undefined },
+          { label: "Dihemat lewat sisa", value: formatIDRCompact(totals.credit), hint: totals.gross ? `${formatPct(totals.credit / totals.gross)} dari bahan diambil` : undefined },
+          { label: "TK & overhead", value: formatIDRCompact(totals.labor) },
+          { label: "Selisih HPP", value: formatIDRCompact(totals.variance), hint: `${totals.rejects} unit reject QC`, tone: totals.variance > 0 ? "warning" : "default" },
+        ]}
+      />
 
       <Tabs selectedKey={view} onSelectionChange={(k: Key) => setView(k as View)} className="mb-4">
         <Tabs.ListContainer>
@@ -120,6 +157,10 @@ export default function HppReportPage() {
             </Tabs.Tab>
             <Tabs.Tab id="pekerjaan">
               Per pekerjaan
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="sewa">
+              Utilisasi sewa
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="nilai">
@@ -134,6 +175,12 @@ export default function HppReportPage() {
         <DataTable label="HPP per produk" columns={productCols} rows={products.map((p) => ({ ...p, id: p.item.id }))} onRowAction={(r) => navigate(`/master/item/${r.item.id}`)} />
       )}
       {view === "pekerjaan" && <DataTable label="HPP per pekerjaan" columns={woCols} rows={done} onRowAction={(w) => navigate(`/produksi/${w.id}`)} />}
+      {view === "sewa" && (
+        <>
+          <DataTable label="Utilisasi sewa" columns={utilCols} rows={util.map((u) => ({ ...u, id: u.itemId }))} />
+          <p className="mt-2 text-xs text-muted">Utilisasi = unit-hari keluar ÷ (unit dimiliki × 90 hari). Unit dengan utilisasi rendah lebih baik dijual atau dipakai untuk produksi lain.</p>
+        </>
+      )}
       {view === "nilai" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Section title="Ringkasan nilai persediaan">
@@ -142,7 +189,7 @@ export default function HppReportPage() {
             <ValRow label="Produk jadi" value={valuation.products} total={valuation.total} />
             <ValRow label="— di antaranya sedang disewa" value={valuation.rented} total={valuation.total} muted />
             <ValRow label="— di antaranya rusak" value={valuation.damaged} total={valuation.total} muted />
-            <div className="mt-2 flex justify-between border-t border-separator pt-2 font-semibold">
+            <div className="mt-2 flex justify-between border-t border-[var(--rule)] pt-2 font-semibold">
               <span>Total persediaan</span>
               <span className="tabular-nums">{formatIDR(valuation.total)}</span>
             </div>

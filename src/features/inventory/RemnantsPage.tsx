@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { remnantRows, scrapLot, sum, type Item, type Lot, type RemnantRow } from "@/domain";
 import { SelectInput } from "@/components/fields";
-import { ConfirmButton, DataTable, EmptyBlock, PageHeader, StatCard, StatusChip, type Column } from "@/components/ui";
+import { ConfirmButton, DataTable, EmptyBlock, PageHeader, MetricStrip, StatusChip, type Column } from "@/components/ui";
 import { formatDims, formatIDR, formatIDRCompact, formatQty } from "@/lib/format";
 import { docRoute } from "@/lib/routes";
 import { useDb, useRun } from "@/store/db-store";
@@ -120,23 +120,26 @@ export default function RemnantsPage() {
     <>
       <PageHeader
         title="Sisa Material"
-        description="Potongan dan bahan sisa produksi yang masih layak pakai. Saat mengambil bahan, sistem menyarankan sisa terlebih dahulu sehingga HPP turun dan limbah berkurang."
+        description="Potongan layak pakai. Disarankan lebih dulu saat ambil bahan."
         actions={
           <Button variant="secondary" onPress={() => navigate("/produksi/baru")}>
             <Hammer className="size-4" /> Produksi dari sisa
           </Button>
         }
       />
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Nilai sisa tersedia" value={formatIDRCompact(sum(all.map((r) => r.value)))} tone="success" icon={<Recycle className="size-4" />} />
-        <StatCard label="Jumlah potongan" value={all.length} hint={`${materials.length} jenis material`} />
-        <StatCard
-          label={`Berumur > ${db.settings.remnantAgingDays} hari`}
-          value={formatIDRCompact(sum(aging.map((r) => r.value)))}
-          hint={`${aging.length} potongan — pakai atau jual`}
-          tone={aging.length ? "warning" : "default"}
-        />
-      </div>
+      <MetricStrip
+        className="mb-5"
+        items={[
+          { label: "Nilai sisa tersedia", value: formatIDRCompact(sum(all.map((r) => r.value))) },
+          { label: "Jumlah potongan", value: all.length, hint: `${materials.length} jenis material` },
+          {
+            label: `Berumur > ${db.settings.remnantAgingDays} hari`,
+            value: formatIDRCompact(sum(aging.map((r) => r.value))),
+            hint: `${aging.length} potongan — pakai atau jual`,
+            tone: aging.length ? "warning" : "default",
+          },
+        ]}
+      />
       <div className="mb-4">
         <SelectInput
           aria-label="Filter material"

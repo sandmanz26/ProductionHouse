@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { cancelPurchase, landedUnitCosts, purchaseTotals, receivePurchase, type PurchaseLine } from "@/domain";
 import { SelectInput } from "@/components/fields";
+import { PaymentsSection } from "@/components/PaymentsSection";
 import { RecordNotFound } from "@/components/NotFound";
 import { ConfirmButton, DataTable, KeyValue, PageHeader, Row, Section, StatusChip, TaskModal, type Column } from "@/components/ui";
 import { formatDate, formatDateTime, formatDims, formatIDR, formatQty } from "@/lib/format";
@@ -102,9 +103,10 @@ export default function PurchaseDetailPage() {
             {p.extraCosts.map((c) => (
               <Row key={c.id} label={c.label} value={formatIDR(c.amount)} />
             ))}
-            <div className="my-2 border-t border-separator" />
+            <div className="my-2 border-t border-[var(--rule)]" />
             <Row label="Total pembelian" value={formatIDR(totals.total)} strong />
           </Section>
+          {p.status !== "batal" && <PaymentsSection doc="purchase" id={p.id} payments={p.payments} extraNote={p.dueDate ? `Jatuh tempo ${formatDate(p.dueDate)}.` : undefined} />}
           <Section title="Info">
             <KeyValue
               columns={1}

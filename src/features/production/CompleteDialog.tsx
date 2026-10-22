@@ -5,10 +5,12 @@ import {
   completeWorkOrder,
   computeCost,
   defaultCompletion,
+  isProducible,
   roundQty,
   sum,
   type CompletionInput,
   type ID,
+  type OutputGrade,
   type ReturnKind,
   type WorkOrder,
 } from "@/domain";
@@ -16,7 +18,7 @@ import { NumberInput, SelectInput, SwitchInput } from "@/components/fields";
 import { ItemPicker } from "@/components/pickers";
 import { Section, TaskModal } from "@/components/ui";
 import { formatIDR, formatQty, UOM_LABEL } from "@/lib/format";
-import { RETURN_KIND, WO_TYPE } from "@/lib/labels";
+import { OUTPUT_GRADE, RETURN_KIND, WO_TYPE } from "@/lib/labels";
 import { useDb, useLookups, useRun } from "@/store/db-store";
 import { CostBreakdown } from "./CostBreakdown";
 
@@ -25,6 +27,7 @@ interface OutRow {
   itemId: ID | null;
   qty: number;
   sharePct: number;
+  grade: OutputGrade;
 }
 
 interface RetRow {
@@ -67,6 +70,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
       itemId: o.itemId || null,
       qty: o.qty,
       sharePct: roundQty(100 / arr.length),
+      grade: "baik" as OutputGrade,
     })),
   );
   const [manualShare, setManualShare] = useState(false);
@@ -89,7 +93,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
   const input: CompletionInput = {
     outputs: outputs
       .filter((o) => o.itemId)
-      .map((o) => ({ itemId: o.itemId!, qty: o.qty, sharePct: manualShare ? o.sharePct : undefined })),
+      .map((o) => ({ itemId: o.itemId!, qty: o.qty, sharePct: manualShare ? o.sharePct : undefined, grade: o.grade })),
     returns: returns.map((r) => ({
       itemId: r.itemId,
       kind: r.kind,
@@ -117,7 +121,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
 
   const updateOut = (key: string, patch: Partial<OutRow>) => setOutputs(outputs.map((o) => (o.key === key ? { ...o, ...patch } : o)));
   const updateRet = (key: string, patch: Partial<RetRow>) => setReturns(returns.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const outputKind = wo.type === "dekonstruksi" ? undefined : "product";
+  const outputFilter = wo.type === "dekonstruksi" ? undefined : isProducible;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_22rem]">
@@ -127,14 +131,22 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
           description={
             wo.type === "dekonstruksi"
               ? "Bahan yang berhasil dibongkar. Nilainya dibatasi maksimal harga bahan baru."
-              : "Produk jadi yang masuk gudang."
+              : wo.receipts.length
+                ? `Sisa hasil yang masuk sekarang. ${wo.receipts.reduce((a, r) => a + r.qty, 0)} unit sudah diterima sebagian dan ikut dihitung HPP-nya.`
+                : "Barang jadi yang masuk gudang. Unit yang gagal QC tambahkan sebagai baris Reject."
           }
         >
           <div className="flex flex-col gap-2">
             {outputs.map((o) => (
-              <div key={o.key} className={`grid items-end gap-2 ${manualShare ? "grid-cols-[1fr_6.5rem_6rem_auto]" : "grid-cols-[1fr_7rem_auto]"}`}>
-                <ItemPicker kind={outputKind} value={o.itemId} onChange={(id) => updateOut(o.key, { itemId: id })} aria-label="Item hasil" />
+              <div key={o.key} className={`grid items-end gap-2 ${manualShare ? "grid-cols-[1fr_6.5rem_8rem_6rem_auto]" : "grid-cols-[1fr_6.5rem_8rem_auto]"}`}>
+                <ItemPicker filter={outputFilter} value={o.itemId} onChange={(id) => updateOut(o.key, { itemId: id })} aria-label="Item hasil" />
                 <NumberInput aria-label="Qty hasil" value={o.qty} onChange={(qty) => updateOut(o.key, { qty })} suffix={o.itemId ? UOM_LABEL[item(o.itemId)?.uom ?? "pcs"] : undefined} />
+                <SelectInput
+                  aria-label="Hasil QC"
+                  value={o.grade}
+                  onChange={(v) => updateOut(o.key, { grade: v as OutputGrade })}
+                  options={(Object.keys(OUTPUT_GRADE) as OutputGrade[]).map((g) => ({ id: g, label: OUTPUT_GRADE[g] }))}
+                />
                 {manualShare && <NumberInput aria-label="Porsi biaya" value={o.sharePct} onChange={(sharePct) => updateOut(o.key, { sharePct })} maxValue={100} suffix="%" />}
                 <Button isIconOnly variant="ghost" aria-label="Hapus" isDisabled={outputs.length === 1} onPress={() => setOutputs(outputs.filter((x) => x.key !== o.key))}>
                   <Trash2 className="size-4" />
@@ -142,8 +154,8 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
               </div>
             ))}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button size="sm" variant="tertiary" onPress={() => setOutputs([...outputs, { key: k(), itemId: null, qty: 1, sharePct: 0 }])}>
-                <Plus className="size-4" /> Tambah hasil
+              <Button size="sm" variant="tertiary" onPress={() => setOutputs([...outputs, { key: k(), itemId: outputs[0]?.itemId ?? null, qty: 1, sharePct: 0, grade: "reject" }])}>
+                <Plus className="size-4" /> Tambah baris (mis. reject QC)
               </Button>
               {outputs.length > 1 && (
                 <SwitchInput
@@ -167,7 +179,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
               const rows = returns.filter((r) => r.itemId === itemId);
               const used = sum(rows.map((r) => r.qty));
               return (
-                <div key={itemId} className="rounded-2xl border border-separator p-3">
+                <div key={itemId} className="rounded-md border border-[var(--rule)] p-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="font-medium">{it?.name ?? "?"}</p>
                     <p className="text-xs text-muted">
@@ -179,7 +191,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                     {rows.map((r) => {
                       const belowMin = r.kind === "sisa" && r.qty > 0 && (it?.minRemnantQty ?? 0) > r.qty;
                       return (
-                        <div key={r.key} className="flex flex-col gap-2 rounded-xl bg-default/40 p-2">
+                        <div key={r.key} className="flex flex-col gap-2 rounded-sm bg-default/40 p-2">
                           <div className="grid grid-cols-[1fr_7rem_auto] items-end gap-2 sm:grid-cols-[12rem_8rem_1fr_auto]">
                             <SelectInput
                               aria-label="Jenis"

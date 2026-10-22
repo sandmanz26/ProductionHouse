@@ -18,7 +18,8 @@ import {
 } from "@/domain";
 import { DateInput, NumberInput, SelectInput, TextInput } from "@/components/fields";
 import { RecordNotFound } from "@/components/NotFound";
-import { ConfirmButton, DataTable, KeyValue, PageHeader, Row, Section, StatusChip, TaskModal } from "@/components/ui";
+import { PaymentsSection } from "@/components/PaymentsSection";
+import { ConfirmButton, DataTable, KeyValue, PageHeader, Row, Section, StatusChip, Tag, TaskModal } from "@/components/ui";
 import { formatDate, formatDateTime, formatIDR } from "@/lib/format";
 import { RENTAL_STATUS, RETURN_CONDITION, WO_STATUS } from "@/lib/labels";
 import { useDb, useLookups, useRun } from "@/store/db-store";
@@ -58,7 +59,7 @@ export default function RentalDetailPage() {
         title={r.project}
         badge={
           <>
-            <StatusChip tone={r.kind === "sewa" ? "accent" : "default"}>{r.kind === "sewa" ? "Sewa" : "Pinjam"}</StatusChip>
+            <Tag>{r.kind === "sewa" ? "Sewa" : "Pinjam"}</Tag>
             <StatusChip tone={RENTAL_STATUS[r.status].tone}>{RENTAL_STATUS[r.status].label}</StatusChip>
           </>
         }
@@ -180,18 +181,14 @@ export default function RentalDetailPage() {
                 {ch.lateFee > 0 && <Row label={`Denda telat (${ch.lateDays} hari)`} value={formatIDR(ch.lateFee)} tone="danger" />}
               </>
             )}
+            {r.extraCharges.map((c) => (
+              <Row key={c.id} label={c.label} value={formatIDR(c.amount)} />
+            ))}
             {ch.damageFee > 0 && <Row label="Biaya rusak / hilang" value={formatIDR(ch.damageFee)} tone="danger" />}
             {ch.discount > 0 && <Row label="Diskon" value={`− ${formatIDR(ch.discount)}`} />}
-            <Row label="Total" value={formatIDR(ch.total)} strong />
-            <Row label="Deposit diterima" value={`− ${formatIDR(ch.deposit)}`} muted />
-            <div className="my-2 border-t border-separator" />
-            <Row
-              label={ch.balance >= 0 ? "Kekurangan bayar" : "Deposit dikembalikan"}
-              value={formatIDR(Math.abs(ch.balance))}
-              strong
-              tone={ch.balance > 0 ? "warning" : "success"}
-            />
+            <Row label="Total tagihan" value={formatIDR(ch.total)} strong />
           </Section>
+          {r.status !== "batal" && <PaymentsSection doc="rental" id={r.id} payments={r.payments} extraNote={`Deposit ${formatIDR(r.deposit)} dipotong dari tagihan.`} />}
           {repairWos.length > 0 && (
             <Section title="Perbaikan">
               {repairWos.map((w) => (
@@ -247,7 +244,7 @@ function ReturnForm({ rental, onDone }: { rental: Rental; onDone: () => void }) 
         const mine = rows.filter((r) => r.checkoutId === c.id);
         const used = mine.reduce((a, r) => a + r.qty, 0);
         return (
-          <div key={c.id} className="rounded-2xl border border-separator p-3">
+          <div key={c.id} className="rounded-md border border-[var(--rule)] p-3">
             <p className="font-medium">
               {it?.name} <span className="text-sm font-normal text-muted">· {db.lots.find((l) => l.id === c.lotId)?.code} · masih di klien {c.outstanding}</span>
             </p>

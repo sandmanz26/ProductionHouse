@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { EPS, emptySummary, type Lot } from "@/domain";
 import { RecordNotFound } from "@/components/NotFound";
-import { DataTable, PageHeader, Section, StatCard, StatusChip, type Column } from "@/components/ui";
+import { DataTable, PageHeader, Section, MetricStrip, StatusChip, type Column } from "@/components/ui";
 import { formatDate, formatDims, formatIDR, formatIDRCompact, formatQty } from "@/lib/format";
 import { categoryLabel, LOT_ORIGIN, LOT_STATUS } from "@/lib/labels";
 import { docRoute } from "@/lib/routes";
 import { useDb, useLookups } from "@/store/db-store";
 import { MovesTable } from "./MovesPage";
-import { LotAdjustDialog, OpeningStockDialog } from "./StockDialogs";
+import { LotAdjustDialog, OpeningStockDialog, TransferDialog } from "./StockDialogs";
 
 export default function ItemStockPage() {
   const { id } = useParams();
@@ -19,6 +19,7 @@ export default function ItemStockPage() {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [adjusting, setAdjusting] = useState<Lot | null>(null);
+  const [moving, setMoving] = useState<Lot | null>(null);
   const it = db.items.find((i) => i.id === id);
   const lots = useMemo(() => db.lots.filter((l) => l.itemId === id && l.qty > EPS).sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [db.lots, id]);
   const moves = useMemo(() => db.moves.filter((m) => m.itemId === id).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60), [db.moves, id]);
@@ -72,9 +73,16 @@ export default function ItemStockPage() {
       header: "",
       align: "end",
       cell: (l) => (
-        <Button size="sm" variant="ghost" onPress={() => setAdjusting(l)}>
-          Opname
-        </Button>
+        <span className="flex justify-end gap-1">
+          {l.status === "tersedia" && db.settings.locations.length > 1 && (
+            <Button size="sm" variant="ghost" onPress={() => setMoving(l)}>
+              Pindah
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onPress={() => setAdjusting(l)}>
+            Opname
+          </Button>
+        </span>
       ),
     },
   ];
@@ -96,15 +104,7 @@ export default function ItemStockPage() {
           </>
         }
       />
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Tersedia" value={formatQty(s.available, it.uom)} hint={s.remnant ? `termasuk sisa ${formatQty(s.remnant, it.uom)}` : undefined} />
-        <StatCard label="Nilai" value={formatIDRCompact(s.value)} />
-        <StatCard label="Harga rata-rata" value={formatIDR(s.avgUnitCost || it.standardCost)} hint={`Harga standar ${formatIDR(it.standardCost)}`} />
-        <StatCard
-          label={it.kind === "product" ? "Disewa / rusak" : "Dicadangkan"}
-          value={it.kind === "product" ? `${s.rented} / ${s.damaged}` : formatQty(s.reserved, it.uom)}
-        />
-      </div>
+      <MetricStrip className="mb-5" items={[{ label: "Tersedia", value: formatQty(s.available, it.uom), hint: s.remnant ? `termasuk sisa ${formatQty(s.remnant, it.uom)}` : undefined }, { label: "Nilai", value: formatIDRCompact(s.value) }, { label: "Harga rata-rata", value: formatIDR(s.avgUnitCost || it.standardCost), hint: `Harga standar ${formatIDR(it.standardCost)}` }, { label: it.kind === "product" ? "Disewa / rusak" : "Dicadangkan", value: it.kind === "product" ? `${s.rented} / ${s.damaged}` : formatQty(s.reserved, it.uom) }]} />
       <Section title="Lot stok" description="Setiap lot membawa harga pokoknya sendiri — inilah yang membuat HPP akurat." className="mb-6" bodyClassName="p-0">
         <DataTable label="Lot stok" columns={columns} rows={lots} dependencies={[woCode]} />
       </Section>
@@ -113,6 +113,7 @@ export default function ItemStockPage() {
       </Section>
       {adding && <OpeningStockDialog itemId={it.id} isOpen={adding} onOpenChange={setAdding} />}
       <LotAdjustDialog lot={adjusting} onClose={() => setAdjusting(null)} />
+      <TransferDialog lot={moving} onClose={() => setMoving(null)} />
     </>
   );
 }

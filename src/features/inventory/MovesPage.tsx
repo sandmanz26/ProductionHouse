@@ -77,7 +77,7 @@ export default function MovesPage() {
   );
   return (
     <>
-      <PageHeader title="Mutasi Stok" description="Jejak audit setiap perubahan stok — siapa (dokumen apa), kapan, berapa, dan nilainya. Tidak bisa diubah manual." />
+      <PageHeader title="Mutasi Stok" description="Jejak audit setiap perubahan stok. Tidak bisa diubah manual." />
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[20rem_16rem]">
         <ItemPicker value={itemId} onChange={setItemId} aria-label="Filter item" />
         <SelectInput

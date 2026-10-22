@@ -18,6 +18,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const { replace, resetDemo, clearAll, isDemo } = useDbStore();
   const [s, setS] = useState<Settings>(initial);
   const [locations, setLocations] = useState(initial.locations.join(", "));
+  const [stages, setStages] = useState(initial.defaultStages.join(", "));
   const fileRef = useRef<HTMLInputElement>(null);
   const set = <K extends keyof Settings>(key: K, v: Settings[K]) => setS({ ...s, [key]: v });
 
@@ -34,6 +35,10 @@ function SettingsForm({ initial }: { initial: Settings }) {
         updateSettings(d, {
           ...s,
           locations: locations
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean),
+          defaultStages: stages
             .split(",")
             .map((x) => x.trim())
             .filter(Boolean),
@@ -81,6 +86,9 @@ function SettingsForm({ initial }: { initial: Settings }) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <NumberInput label="Tarif tenaga kerja / jam" value={s.laborRatePerHour} onChange={(v) => set("laborRatePerHour", v)} money />
             <NumberInput label="Overhead / jam kerja" value={s.overheadPerLaborHour} onChange={(v) => set("overheadPerLaborHour", v)} money description="Listrik, penyusutan mesin, sewa workshop dibagi jam kerja." />
+          </div>
+          <div className="mt-3">
+            <TextInput label="Rute tahapan default" value={stages} onChange={setStages} description="Dipakai perintah kerja baru bila produk tidak punya rute sendiri. Pisahkan dengan koma." />
           </div>
           <p className="mt-3 text-xs text-muted">Contoh: 6 jam kerja → {formatIDR(6 * (s.laborRatePerHour + s.overheadPerLaborHour))} biaya konversi.</p>
         </Section>

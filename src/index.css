@@ -1,21 +1,44 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
-/* Brand: warm teak accent instead of the default blue. */
+/*
+ * Visual direction: a workshop tool, not a marketing dashboard.
+ * Small radii, hairline borders instead of shadows, IBM Plex for an engineered feel,
+ * monospace digits for anything you compare (codes, quantities, money).
+ */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
 :root,
 .light,
 [data-theme="light"] {
-  --accent: oklch(0.52 0.12 52);
+  --radius: 0.25rem;
+  --accent: oklch(0.5 0.115 50);
   --accent-foreground: oklch(0.99 0.01 80);
-  --focus: oklch(0.52 0.12 52);
-  --background: oklch(0.975 0.004 80);
+  --focus: oklch(0.5 0.115 50);
+  --background: oklch(0.972 0.005 85);
+  --surface-shadow: 0 0 0 1px oklch(0.89 0.008 85);
+  --overlay-shadow: 0 0 0 1px oklch(0.86 0.008 85), 0 12px 32px -12px oklch(0.2 0.02 60 / 0.25);
+  --field-border: oklch(0.88 0.008 85);
+  --field-border-width: 1px;
+  --ink-soft: oklch(0.45 0.01 70);
+  --rule: oklch(0.89 0.008 85);
 }
 
+/* Unlayered rules beat HeroUI's layered theme, so every token set above must be re-set here. */
 .dark,
 [data-theme="dark"] {
-  --accent: oklch(0.72 0.12 60);
+  --background: oklch(0.17 0.004 70);
+  --accent: oklch(0.74 0.11 62);
   --accent-foreground: oklch(0.2 0.02 60);
-  --focus: oklch(0.72 0.12 60);
+  --focus: oklch(0.74 0.11 62);
+  --surface-shadow: 0 0 0 1px oklch(0.32 0.005 70);
+  --overlay-shadow: 0 0 0 1px oklch(0.36 0.005 70), 0 16px 40px -12px oklch(0 0 0 / 0.6);
+  --field-border: oklch(0.34 0.005 70);
+  --ink-soft: oklch(0.72 0.01 70);
+  --rule: oklch(0.32 0.005 70);
 }
 
 html {
@@ -23,12 +46,29 @@ html {
 }
 
 body {
-  font-feature-settings: "cv11", "ss01";
+  font-family: var(--font-sans);
   background: var(--background);
+  font-size: 14px;
 }
 
+/* Digits that get compared column-wise. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase labels used for metric and section captions. */
+.eyebrow {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 @media print {

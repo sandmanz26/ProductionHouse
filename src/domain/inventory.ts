@@ -1,4 +1,4 @@
-import { assert, createLot, EPS, getItem, getLot, nextCode, recordMove, roundQty, takeFromLot } from "./core";
+import { assert, createLot, EPS, getItem, getLot, nextCode, recordMove, roundQty, splitLot, takeFromLot } from "./core";
 import type { Db, Dimensions, DocRef, ID } from "./types";
 
 export interface OpeningStockInput {
@@ -79,4 +79,18 @@ export function markLotUsable(db: Db, lotId: ID, note?: string) {
   lot.status = "tersedia";
   recordMove(db, { lot, qty: 0, type: "penyesuaian", ref: adjustmentRef(db), note: note || "Ditandai layak pakai" });
   return lot;
+}
+
+/** Moves part (or all) of a lot to another location, keeping its cost. */
+export function transferLot(db: Db, lotId: ID, qty: number, toLocation: string, note?: string) {
+  const lot = getLot(db, lotId);
+  assert(lot.status === "tersedia", `Lot ${lot.code} tidak bisa dipindah karena berstatus ${lot.status}.`);
+  assert(toLocation.trim(), "Pilih lokasi tujuan.");
+  assert(toLocation !== lot.location, "Lokasi tujuan sama dengan lokasi sekarang.");
+  assert(qty > EPS && qty <= lot.qty + EPS, `Qty pindah melebihi stok lot ${lot.code}.`);
+  const ref = adjustmentRef(db);
+  const moved = splitLot(db, lot.id, qty, "transfer", ref);
+  moved.location = toLocation;
+  recordMove(db, { lot: moved, qty: 0, type: "transfer", ref, note: note || `Pindah ke ${toLocation}` });
+  return moved;
 }

@@ -3,7 +3,7 @@ import { Armchair, Wrench } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { createRepairOrder, EPS, emptySummary, markLotUsable, sum, type Item, type StockSummary } from "@/domain";
-import { ConfirmButton, DataTable, EmptyBlock, PageHeader, Section, StatCard, type Column } from "@/components/ui";
+import { ConfirmButton, DataTable, EmptyBlock, PageHeader, Section, MetricStrip, type Column } from "@/components/ui";
 import { formatIDR, formatIDRCompact } from "@/lib/format";
 import { PRODUCT_CATEGORY } from "@/lib/labels";
 import { useDb, useLookups, useRun } from "@/store/db-store";
@@ -53,14 +53,9 @@ export default function ProductStockPage() {
     <>
       <PageHeader
         title="Stok Produk"
-        description="Produk jadi per status: siap jual/sewa, sedang disewa, atau rusak. HPP rata-rata dihitung dari lot hasil produksi yang sebenarnya."
+        description="Per status: siap, disewa, rusak. HPP dari lot produksi aktual."
       />
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Nilai produk" value={formatIDRCompact(sum(rows.map((r) => r.s.value)))} />
-        <StatCard label="Unit siap" value={sum(rows.map((r) => r.s.available))} tone="success" />
-        <StatCard label="Unit disewa" value={sum(rows.map((r) => r.s.rented))} tone="accent" onPress={() => navigate("/sewa")} />
-        <StatCard label="Unit rusak" value={sum(rows.map((r) => r.s.damaged))} tone={damaged.length ? "danger" : "default"} />
-      </div>
+      <MetricStrip className="mb-5" items={[{ label: "Nilai produk", value: formatIDRCompact(sum(rows.map((r) => r.s.value))) }, { label: "Unit siap", value: sum(rows.map((r) => r.s.available)), tone: "success" }, { label: "Unit disewa", value: sum(rows.map((r) => r.s.rented)), tone: "accent", onPress: () => navigate("/sewa") }, { label: "Unit rusak", value: sum(rows.map((r) => r.s.damaged)), tone: damaged.length ? "danger" : "default" }]} />
 
       {damaged.length > 0 && (
         <Section title="Unit rusak" description="Perbaiki lewat perintah kerja agar biaya perbaikan masuk ke HPP unit, atau tandai layak bila hanya perlu dibersihkan." className="mb-6" bodyClassName="p-0">

@@ -56,3 +56,12 @@ Field: Incoterm, pelabuhan muat/bongkar, negara tujuan, jenis kontainer, no. kon
 
 ## Penyimpanan
 Tanpa backend: `localStorage` (versi skema + migrasi), ekspor/impor cadangan JSON, reset ke data demo.
+
+## v2 — aturan tambahan
+
+- **Komponen**: material dengan BOM dapat menjadi output produksi. `requirements()` menandai kekurangan komponen sebagai `producible`; `createComponentOrders()` membuat perintah anak (`parentWoId`). Komponen tidak pernah muncul di saran pembelian.
+- **Tenaga kerja**: bila ada catatan kerja, `labor = Σ(jam × tarif) + Σ(unit × tarif borongan)`; jika tidak, `jam rencana × tarif`.
+- **Hasil bertahap**: lot diterima dengan HPP standar (`receiptId`). Saat penutupan, biaya total dialokasikan ke (hasil akhir + hasil bertahap) per item → HPP aktual per unit. Lot hasil bertahap yang masih ada direvaluasi (mutasi `revaluasi`, qty 0); `variance = qty sudah keluar × (aktual − sementara)`. Pekerjaan dengan hasil bertahap tidak bisa dibatalkan.
+- **QC reject**: output `grade: "reject"` masuk sebagai lot `rusak` dengan HPP yang sama.
+- **Pembayaran**: tidak boleh melebihi sisa tagihan; refund maksimal yang sudah dibayar (sewa: kelebihan deposit). Piutang = order yang sudah dikirim, atau sudah lewat tanggal bayar. Order hanya bisa "selesai" bila lunas.
+- **Retur penjualan**: maksimal qty terkirim − sudah diretur; barang kembali dengan HPP kirim; kredit = qty × harga order.

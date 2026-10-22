@@ -23,19 +23,19 @@ export function RequirementsTable({
       header: "Bahan",
       isRowHeader: true,
       cell: (r) => (
-        <div className="min-w-40">
+        <div className="min-w-36">
           <p className="font-medium">{item(r.itemId)?.name ?? "?"}</p>
           <p className="text-xs text-muted">{item(r.itemId)?.sku}</p>
         </div>
       ),
     },
-    { key: "req", header: "Kebutuhan", align: "end", cell: (r) => formatQty(r.required, item(r.itemId)?.uom) },
+    { key: "req", header: "Butuh", align: "end", cell: (r) => formatQty(r.required, item(r.itemId)?.uom) },
     ...(showIssued
       ? [{ key: "issued", header: "Diambil", align: "end" as const, cell: (r: Row) => formatQty(r.issued, item(r.itemId)?.uom) }]
       : []),
     {
       key: "free",
-      header: "Stok bebas",
+      header: "Stok",
       align: "end",
       cell: (r) => (
         <div>
@@ -54,15 +54,16 @@ export function RequirementsTable({
       header: "Status",
       cell: (r) =>
         r.remaining <= 0 ? (
-          <span className="inline-flex items-center gap-1 text-sm text-success">
-            <CheckCircle2 className="size-4" /> Lengkap
+          <span className="inline-flex items-center gap-1 text-[13px] whitespace-nowrap text-success">
+            <CheckCircle2 className="size-3.5" /> Lengkap
           </span>
         ) : r.shortage > 0 ? (
-          <span className="inline-flex items-center gap-1 text-sm font-medium text-danger">
-            <AlertTriangle className="size-4" /> Kurang {formatQty(r.shortage, item(r.itemId)?.uom)}
+          <span className="inline-flex items-center gap-1 text-[13px] font-medium whitespace-nowrap text-danger">
+            <AlertTriangle className="size-3.5" /> −{formatQty(r.shortage, item(r.itemId)?.uom)}
+            {r.producible && <span className="font-normal text-muted">· komponen</span>}
           </span>
         ) : (
-          <span className="text-sm text-muted">Siap diambil</span>
+          <span className="text-[13px] whitespace-nowrap text-muted">Siap</span>
         ),
     },
     ...(onIssue

@@ -69,9 +69,18 @@ export interface Item {
   trackRemnant?: boolean;
   /** Smallest leftover (in UoM) still considered usable; below that it is waste. */
   minRemnantQty?: number;
-  // ---- product-only fields ----
+  /**
+   * Bill of materials. Products always may have one; a material with a BOM is a semi-finished
+   * component or processed material (e.g. chair frame, kiln-dried timber) that can be produced.
+   */
   bom?: BomLine[];
+  /** Standard labour hours per unit (products and producible materials). */
   laborHours?: number;
+  /** Default production route (stage names) for this item. */
+  stages?: string[];
+  /** Unit used when buying, e.g. 1 roll = 50 m. Stock is always kept in `uom`. */
+  purchaseUnit?: { label: string; factor: number };
+  // ---- product-only fields ----
   salePrice?: number;
   rentalRatePerDay?: number;
   hsCode?: string;
@@ -103,6 +112,7 @@ export type LotOrigin =
   | "sisa_produksi"
   | "dekonstruksi"
   | "retur_sewa"
+  | "retur_penjualan"
   | "penyesuaian";
 
 export type DocType = "opening" | "purchase" | "workOrder" | "sale" | "rental" | "adjustment";
@@ -130,6 +140,8 @@ export interface Lot {
   rentalId?: ID;
   /** Soft reservation: lot was bought for a specific work order. */
   reservedForWo?: ID;
+  /** Set on lots received as partial output (provisional cost, revalued when the order closes). */
+  receiptId?: ID;
   createdAt: ISODateTime;
   note?: string;
 }
@@ -147,7 +159,10 @@ export type MoveType =
   | "rusak_sewa"
   | "hilang"
   | "penyesuaian"
-  | "limbah";
+  | "limbah"
+  | "transfer"
+  | "retur_penjualan"
+  | "revaluasi";
 
 export interface StockMove {
   id: ID;
@@ -166,6 +181,17 @@ export interface ExtraCost {
   id: ID;
   label: string;
   amount: number;
+}
+
+export type PaymentMethod = "transfer" | "tunai" | "giro" | "lc" | "lainnya";
+
+export interface Payment {
+  id: ID;
+  date: ISODate;
+  /** In the document currency. Negative = refund. */
+  amount: number;
+  method: PaymentMethod;
+  note?: string;
 }
 
 // ------------------------------------------------------------------ Purchasing
@@ -192,15 +218,52 @@ export interface Purchase {
   /** Purchase dedicated to a work order; received lots are reserved for it. */
   workOrderId?: ID;
   invoiceNo?: string;
+  /** Supplier payment due date (tempo). */
+  dueDate?: ISODate;
   note?: string;
   receivedAt?: ISODateTime;
   lotIds?: ID[];
+  payments: Payment[];
 }
 
 // ------------------------------------------------------------------ Production
 
 export type WorkOrderType = "produksi" | "konversi" | "dekonstruksi" | "perbaikan";
 export type WorkOrderStatus = "rencana" | "berjalan" | "selesai" | "batal";
+export type StageStatus = "menunggu" | "proses" | "selesai";
+export type OutputGrade = "baik" | "reject";
+
+export interface WoStage {
+  id: ID;
+  name: string;
+  status: StageStatus;
+  startedAt?: ISODateTime;
+  doneAt?: ISODateTime;
+}
+
+/** Labour booked against a work order: time-based (hours × rate) and/or piece-rate (borongan). */
+export interface LaborLog {
+  id: ID;
+  at: ISODateTime;
+  stageId?: ID;
+  worker: string;
+  hours: number;
+  rate: number;
+  pieces: number;
+  pieceRate: number;
+  note?: string;
+}
+
+/** Output received before the order is closed, at provisional (standard) cost. */
+export interface OutputReceipt {
+  id: ID;
+  at: ISODateTime;
+  itemId: ID;
+  qty: number;
+  grade: OutputGrade;
+  provisionalUnitCost: number;
+  lotId: ID;
+}
 
 export interface PlannedOutput {
   id: ID;
@@ -248,6 +311,8 @@ export interface OutputEntry {
   /** Manual allocation share in percent (0–100). When any output has it, all must. */
   sharePct?: number;
   dimensions?: Dimensions;
+  /** QC result. Rejected units enter stock as damaged, ready for a repair order. */
+  grade?: OutputGrade;
 }
 
 export interface CostLine {
@@ -290,6 +355,14 @@ export interface CostSummary {
   outputs: OutputCost[];
   /** Net consumed qty / issued qty across tracked materials (0–1). */
   yieldRatio: number;
+  /** True when labour came from logged hours/pieces instead of the plan. */
+  laborFromLogs: boolean;
+  /** Units rejected by QC (all grades counted in qty). */
+  rejectQty: number;
+  /** Actual − provisional cost on partial output still in stock (lots revalued). */
+  revalued: number;
+  /** Actual − provisional cost on partial output already consumed/sold (cost variance). */
+  variance: number;
 }
 
 export interface WorkOrder {
@@ -303,6 +376,8 @@ export interface WorkOrder {
   completedAt?: ISODateTime;
   dueDate?: ISODate;
   salesOrderId?: ID;
+  /** Set on component orders created for a parent order. */
+  parentWoId?: ID;
   plannedOutputs: PlannedOutput[];
   plannedInputs: PlannedInput[];
   issues: Issue[];
@@ -312,6 +387,9 @@ export interface WorkOrder {
   laborRate: number;
   overhead: number;
   extraCosts: ExtraCost[];
+  stages: WoStage[];
+  laborLogs: LaborLog[];
+  receipts: OutputReceipt[];
   cost?: CostSummary;
   createdLotIds?: ID[];
   note?: string;
@@ -331,6 +409,8 @@ export interface SalesLine {
   qty: number;
   /** Price per unit in the order currency. */
   unitPrice: number;
+  /** Custom specification (size, finish, fabric) for made-to-order lines. */
+  spec?: string;
 }
 
 export interface ExportInfo {
@@ -362,6 +442,19 @@ export interface Delivery {
   note?: string;
 }
 
+export interface SalesReturn {
+  id: ID;
+  at: ISODateTime;
+  itemId: ID;
+  qty: number;
+  condition: "baik" | "rusak";
+  unitCost: number;
+  /** Credit to the customer, in the order currency. */
+  credit: number;
+  lotId: ID;
+  note?: string;
+}
+
 export interface SalesOrder {
   id: ID;
   code: string;
@@ -378,6 +471,12 @@ export interface SalesOrder {
   shippingCharge: number;
   export?: ExportInfo;
   deliveries: Delivery[];
+  returns: SalesReturn[];
+  payments: Payment[];
+  /** Required down payment in percent of total (e.g. 30). */
+  dpPercent?: number;
+  /** When the remaining balance must be paid. */
+  paymentDueDate?: ISODate;
   note?: string;
 }
 
@@ -425,6 +524,9 @@ export interface Rental {
   lines: RentalLine[];
   deposit: number;
   discount: number;
+  /** Delivery, set-up, cleaning fees. */
+  extraCharges: ExtraCost[];
+  payments: Payment[];
   checkouts: RentalCheckout[];
   returns: RentalReturn[];
   /** Repair work orders spawned from damaged returns. */
@@ -451,6 +553,8 @@ export interface Settings {
   remnantAgingDays: number;
   /** Days before due date to start warning about rentals. */
   rentalReminderDays: number;
+  /** Default production route for new work orders. */
+  defaultStages: string[];
 }
 
 export type CounterKey = "lot" | "purchase" | "workOrder" | "sale" | "rental" | "adjustment" | "item" | "partner";

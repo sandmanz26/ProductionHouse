@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ID, ItemKind, PartnerRole } from "@/domain";
+import type { ID, Item, ItemKind, PartnerRole } from "@/domain";
 import { formatQty } from "@/lib/format";
 import { useDb, useLookups } from "@/store/db-store";
 import { SearchPicker } from "./fields";
@@ -10,6 +10,7 @@ export function ItemPicker({
   kind,
   label = kind === "product" ? "Produk" : kind === "material" ? "Material" : "Item",
   exclude,
+  filter,
   isRequired,
   className,
   "aria-label": ariaLabel,
@@ -19,6 +20,8 @@ export function ItemPicker({
   kind?: ItemKind;
   label?: string;
   exclude?: ID[];
+  /** Extra predicate, e.g. only producible items. */
+  filter?: (item: Item) => boolean;
   isRequired?: boolean;
   className?: string;
   "aria-label"?: string;
@@ -28,7 +31,7 @@ export function ItemPicker({
   const options = useMemo(
     () =>
       db.items
-        .filter((i) => (!kind || i.kind === kind) && (!i.archived || i.id === value) && !exclude?.includes(i.id))
+        .filter((i) => (!kind || i.kind === kind) && (!i.archived || i.id === value) && !exclude?.includes(i.id) && (!filter || filter(i)))
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((i) => {
           const s = stock.get(i.id);
@@ -38,7 +41,7 @@ export function ItemPicker({
             description: `${i.sku} · stok ${formatQty(s?.available ?? 0, i.uom)}${s?.remnant ? ` (sisa ${formatQty(s.remnant, i.uom)})` : ""}`,
           };
         }),
-    [db.items, kind, stock, value, exclude],
+    [db.items, kind, stock, value, exclude, filter],
   );
   return (
     <SearchPicker

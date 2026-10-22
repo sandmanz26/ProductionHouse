@@ -1,6 +1,6 @@
 import { Button } from "@heroui/react";
 import { useState } from "react";
-import { addOpeningStock, adjustLotQty, updateLotInfo, type ID, type Lot } from "@/domain";
+import { addOpeningStock, adjustLotQty, transferLot, updateLotInfo, type ID, type Lot } from "@/domain";
 import { NumberInput, SelectInput, SwitchInput, TextInput } from "@/components/fields";
 import { TaskModal } from "@/components/ui";
 import { formatQty, UOM_LABEL } from "@/lib/format";
@@ -115,6 +115,48 @@ function LotAdjustForm({ lot, onDone }: { lot: Lot; onDone: () => void }) {
           }}
         >
           Simpan
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Move part of a lot to another location (e.g. gudang → workshop). */
+export function TransferDialog({ lot, onClose }: { lot: Lot | null; onClose: () => void }) {
+  return (
+    <TaskModal isOpen={!!lot} onOpenChange={(o) => !o && onClose()} size="sm" title={`Pindah ${lot?.code ?? ""}`} description="Harga pokok ikut berpindah; stok total tidak berubah.">
+      {lot && <TransferForm lot={lot} onDone={onClose} />}
+    </TaskModal>
+  );
+}
+
+function TransferForm({ lot, onDone }: { lot: Lot; onDone: () => void }) {
+  const db = useDb();
+  const run = useRun();
+  const { item } = useLookups();
+  const it = item(lot.itemId);
+  const targets = db.settings.locations.filter((l) => l !== lot.location);
+  const [qty, setQty] = useState(lot.qty);
+  const [to, setTo] = useState(targets[0] ?? "");
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm">
+        Dari <b>{lot.location}</b> · tersedia {formatQty(lot.qty, it?.uom)}
+      </p>
+      <NumberInput label="Qty dipindah" value={qty} onChange={setQty} maxValue={lot.qty} suffix={it ? UOM_LABEL[it.uom] : undefined} />
+      <SelectInput label="Ke lokasi" value={to} onChange={setTo} options={targets.map((l) => ({ id: l, label: l }))} placeholder={targets.length ? "Pilih…" : "Tambah lokasi di Pengaturan"} />
+      <div className="flex justify-end gap-2">
+        <Button variant="tertiary" onPress={onDone}>
+          Batal
+        </Button>
+        <Button
+          isDisabled={!to || qty <= 0}
+          onPress={() => {
+            const ok = run((d) => transferLot(d, lot.id, qty, to), `${formatQty(qty, it?.uom)} dipindah ke ${to}`);
+            if (ok) onDone();
+          }}
+        >
+          Pindahkan
         </Button>
       </div>
     </div>

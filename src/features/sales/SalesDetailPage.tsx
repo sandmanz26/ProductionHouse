@@ -1,5 +1,5 @@
 import { Alert, Button, Link, Meter } from "@heroui/react";
-import { FileText, Hammer, PackageCheck, Pencil, Truck } from "lucide-react";
+import { FileText, Hammer, PackageCheck, Pencil, Truck, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
@@ -9,6 +9,9 @@ import {
   CONTAINER_LABEL,
   createWorkOrdersForShortage,
   deliveredQty,
+  dpStatus,
+  returnSale,
+  saleReturnedQty,
   deliverSalesOrder,
   exportWarnings,
   freeQtyFor,
@@ -23,9 +26,10 @@ import {
   type SalesLine,
   type SalesOrder,
 } from "@/domain";
-import { NumberInput } from "@/components/fields";
+import { NumberInput, SelectInput, TextInput } from "@/components/fields";
+import { PaymentsSection } from "@/components/PaymentsSection";
 import { RecordNotFound } from "@/components/NotFound";
-import { ConfirmButton, DataTable, KeyValue, PageHeader, Row, Section, StatusChip, TaskModal, type Column } from "@/components/ui";
+import { ConfirmButton, DataTable, KeyValue, PageHeader, Row, Section, StatusChip, Tag, TaskModal, type Column } from "@/components/ui";
 import { formatDate, formatDateTime, formatIDR, formatMoney, formatNumber, formatPct, formatQty } from "@/lib/format";
 import { SALES_CHANNEL, SALES_STATUS, WO_STATUS } from "@/lib/labels";
 import { useDb, useLookups, useRun } from "@/store/db-store";
@@ -39,6 +43,7 @@ export default function SalesDetailPage() {
   const navigate = useNavigate();
   const [delivering, setDelivering] = useState(false);
   const [editingExport, setEditingExport] = useState(false);
+  const [returning, setReturning] = useState(false);
   const so = db.sales.find((s) => s.id === id);
   if (!so) return <RecordNotFound what="Order" back="/penjualan" />;
 
@@ -51,7 +56,17 @@ export default function SalesDetailPage() {
   const open = so.status !== "batal" && so.status !== "selesai";
 
   const columns: Column<SalesLine>[] = [
-    { key: "item", header: "Produk", isRowHeader: true, cell: (l) => <span className="font-medium">{item(l.itemId)?.name ?? "?"}</span> },
+    {
+      key: "item",
+      header: "Barang",
+      isRowHeader: true,
+      cell: (l) => (
+        <div className="min-w-40">
+          <p className="font-medium">{item(l.itemId)?.name ?? "?"}</p>
+          {l.spec && <p className="text-xs text-muted">Spesifikasi: {l.spec}</p>}
+        </div>
+      ),
+    },
     { key: "qty", header: "Order", align: "end", cell: (l) => formatQty(l.qty, item(l.itemId)?.uom) },
     { key: "sent", header: "Terkirim", align: "end", cell: (l) => formatQty(deliveredQty(so, l.itemId), item(l.itemId)?.uom) },
     {
@@ -75,7 +90,7 @@ export default function SalesDetailPage() {
         title={`${so.code} · ${partnerName(so.customerId)}`}
         badge={
           <>
-            <StatusChip tone={so.channel === "ekspor" ? "accent" : "default"}>{SALES_CHANNEL[so.channel]}</StatusChip>
+            <Tag>{SALES_CHANNEL[so.channel]}</Tag>
             <StatusChip tone={SALES_STATUS[so.status].tone}>{SALES_STATUS[so.status].label}</StatusChip>
           </>
         }
@@ -107,6 +122,11 @@ export default function SalesDetailPage() {
             {canDeliver && (
               <Button onPress={() => setDelivering(true)}>
                 <Truck className="size-4" /> Kirim barang
+              </Button>
+            )}
+            {so.deliveries.length > 0 && so.status !== "batal" && (
+              <Button variant="secondary" onPress={() => setReturning(true)}>
+                <Undo2 className="size-4" /> Retur
               </Button>
             )}
             {so.status === "dikirim" && (
@@ -226,6 +246,22 @@ export default function SalesDetailPage() {
             />
           </Section>
           )}
+          {so.returns.length > 0 && (
+            <Section title="Retur" bodyClassName="p-0">
+              <DataTable
+                label="Retur"
+                rows={so.returns}
+                columns={[
+                  { key: "at", header: "Waktu", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => formatDateTime(r.at) },
+                  { key: "item", header: "Barang", cell: (r) => item(r.itemId)?.name ?? "?" },
+                  { key: "cond", header: "Kondisi", cell: (r) => <StatusChip tone={r.condition === "rusak" ? "danger" : "success"}>{r.condition === "rusak" ? "Cacat" : "Baik"}</StatusChip> },
+                  { key: "qty", header: "Qty", align: "end", cell: (r) => formatQty(r.qty, item(r.itemId)?.uom) },
+                  { key: "credit", header: "Kredit", align: "end", cell: (r) => formatMoney(r.credit, so.currency) },
+                  { key: "note", header: "Alasan", cell: (r) => <span className="text-muted">{r.note ?? "—"}</span> },
+                ]}
+              />
+            </Section>
+          )}
         </div>
 
         <div className="flex flex-col gap-6">
@@ -233,13 +269,31 @@ export default function SalesDetailPage() {
             <Row label="Subtotal" value={formatMoney(totals.subtotal, so.currency)} />
             {so.discount > 0 && <Row label="Diskon" value={`− ${formatMoney(so.discount, so.currency)}`} />}
             {so.shippingCharge > 0 && <Row label="Ongkir" value={formatMoney(so.shippingCharge, so.currency)} />}
+            {totals.returnCredit > 0 && <Row label="Retur" value={`− ${formatMoney(totals.returnCredit, so.currency)}`} />}
             <Row label="Total" value={formatMoney(totals.total, so.currency)} strong />
             {so.currency !== "IDR" && <Row label={`Kurs ${formatIDR(so.exchangeRate)}`} value={formatIDR(totals.totalIdr)} muted />}
-            <div className="my-2 border-t border-separator" />
+            <div className="my-2 border-t border-[var(--rule)]" />
             <Row label="HPP barang terkirim" value={formatIDR(totals.cogs)} />
             {totals.estimatedCogsOutstanding > 0 && <Row label="Estimasi HPP belum kirim" value={formatIDR(totals.estimatedCogsOutstanding)} muted />}
             <Row label="Margin kotor" value={`${formatIDR(totals.margin)} · ${formatPct(totals.marginPct)}`} strong tone={totals.margin < 0 ? "danger" : "success"} />
           </Section>
+          {so.status !== "batal" && (
+            <PaymentsSection
+              doc="sale"
+              id={so.id}
+              payments={so.payments}
+              extraNote={
+                so.dpPercent
+                  ? (() => {
+                      const dp = dpStatus(db, so);
+                      return `DP ${so.dpPercent}%: ${formatMoney(dp.required, so.currency)} — ${dp.met ? "sudah terpenuhi" : `kurang ${formatMoney(dp.required - dp.received, so.currency)}`}. Jatuh tempo pelunasan ${formatDate(so.paymentDueDate ?? so.dueDate)}.`;
+                    })()
+                  : so.paymentDueDate
+                    ? `Jatuh tempo pelunasan ${formatDate(so.paymentDueDate)}.`
+                    : undefined
+              }
+            />
+          )}
           {wos.length > 0 && (
             <Section title="Produksi untuk order ini">
               {wos.map((w) => (
@@ -254,6 +308,7 @@ export default function SalesDetailPage() {
       </div>
 
       <DeliverDialog so={so} isOpen={delivering} onOpenChange={setDelivering} />
+      <ReturnDialog so={so} isOpen={returning} onOpenChange={setReturning} />
       {so.export && <ExportEditDialog key={JSON.stringify(so.export)} soId={so.id} initial={so.export} isOpen={editingExport} onOpenChange={setEditingExport} />}
     </>
   );
@@ -286,7 +341,7 @@ function DeliverForm({ so, onDone }: { so: SalesOrder; onDone: () => void }) {
         const free = freeQtyFor(db, l.itemId);
         const it = item(l.itemId);
         return (
-          <div key={l.itemId} className="grid grid-cols-[1fr_8rem] items-center gap-3 rounded-2xl border border-separator p-3">
+          <div key={l.itemId} className="grid grid-cols-[1fr_8rem] items-center gap-3 rounded-md border border-[var(--rule)] p-3">
             <div>
               <p className="font-medium">{it?.name}</p>
               <p className="text-xs text-muted">
@@ -344,5 +399,68 @@ function ExportEditDialog({
     >
       <ExportFields value={value} onChange={setValue} />
     </TaskModal>
+  );
+}
+
+function ReturnDialog({ so, isOpen, onOpenChange }: { so: SalesOrder; isOpen: boolean; onOpenChange: (o: boolean) => void }) {
+  return (
+    <TaskModal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      size="md"
+      title={`Retur ${so.code}`}
+      description="Barang kembali ke gudang dengan HPP saat dikirim. Barang cacat masuk status rusak dan bisa dibuatkan perintah perbaikan. Pelanggan dikredit sesuai harga order."
+    >
+      {isOpen && <ReturnForm so={so} onDone={() => onOpenChange(false)} />}
+    </TaskModal>
+  );
+}
+
+function ReturnForm({ so, onDone }: { so: SalesOrder; onDone: () => void }) {
+  const run = useRun();
+  const { item } = useLookups();
+  const ids = [...new Set(so.deliveries.flatMap((d) => d.lines.map((l) => l.itemId)))];
+  const [rows, setRows] = useState(() => ids.map((itemId) => ({ itemId, qty: 0, condition: "baik" as "baik" | "rusak", note: "" })));
+  return (
+    <div className="flex flex-col gap-3">
+      {rows.map((r, i) => {
+        const max = deliveredQty(so, r.itemId) - saleReturnedQty(so, r.itemId);
+        const set = (patch: Partial<typeof r>) => setRows(rows.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+        return (
+          <div key={r.itemId} className="rounded-sm border border-[var(--rule)] p-3">
+            <p className="text-sm font-medium">
+              {item(r.itemId)?.name} <span className="font-normal text-muted">· bisa diretur {formatQty(max)}</span>
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-[7rem_9rem_1fr]">
+              <NumberInput aria-label="Qty retur" value={r.qty} onChange={(qty) => set({ qty })} maxValue={max} />
+              <SelectInput
+                aria-label="Kondisi"
+                value={r.condition}
+                onChange={(v) => set({ condition: v as "baik" | "rusak" })}
+                options={[
+                  { id: "baik", label: "Baik — bisa dijual lagi" },
+                  { id: "rusak", label: "Cacat — perlu perbaikan" },
+                ]}
+              />
+              <TextInput aria-label="Alasan" value={r.note} onChange={(note) => set({ note })} placeholder="Alasan retur" className="col-span-2 sm:col-span-1" />
+            </div>
+          </div>
+        );
+      })}
+      <div className="flex justify-end gap-2">
+        <Button variant="tertiary" onPress={onDone}>
+          Batal
+        </Button>
+        <Button
+          isDisabled={rows.every((r) => !r.qty)}
+          onPress={() => {
+            const ok = run((d) => returnSale(d, so.id, rows.filter((r) => r.qty > 0).map((r) => ({ ...r, note: r.note || undefined }))), "Retur tercatat");
+            if (ok) onDone();
+          }}
+        >
+          Simpan retur
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -6,10 +6,12 @@ import {
   createWorkOrder,
   EPS,
   getLot,
+  isProducible,
   requirements,
   sum,
   transact,
   type ID,
+  type Item,
   type WorkOrderInput,
   type WorkOrderType,
 } from "@/domain";
@@ -125,7 +127,6 @@ export default function WorkOrderNewPage() {
     if (wo) navigate(`/produksi/${wo.id}`, { replace: true });
   };
 
-  const outputKind = type === "dekonstruksi" ? "material" : "product";
 
   return (
     <>
@@ -149,11 +150,11 @@ export default function WorkOrderNewPage() {
                       if (t !== type) setSourceLotId(null);
                       setOutputs([newLine()]);
                     }}
-                    className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none ${
-                      active ? "border-accent bg-accent-soft/50" : "border-separator hover:border-accent/60"
+                    className={`flex items-start gap-3 rounded-md border p-4 text-left transition focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none ${
+                      active ? "border-accent bg-accent-soft/50" : "border-[var(--rule)] hover:border-accent/60"
                     }`}
                   >
-                    <div className={`grid size-9 shrink-0 place-items-center rounded-xl ${active ? "bg-accent text-accent-foreground" : "bg-default"}`}>
+                    <div className={`grid size-9 shrink-0 place-items-center rounded-sm ${active ? "bg-accent text-accent-foreground" : "bg-default"}`}>
                       <Icon className="size-4" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -195,8 +196,9 @@ export default function WorkOrderNewPage() {
 
               {type !== "perbaikan" && (
                 <LineEditor
-                  title={type === "dekonstruksi" ? "Perkiraan bahan yang didapat (bisa diubah saat selesai)" : "Produk yang dihasilkan"}
-                  kind={outputKind}
+                  title={type === "dekonstruksi" ? "Perkiraan bahan yang didapat (bisa diubah saat selesai)" : "Yang dihasilkan — produk, komponen, atau bahan olahan"}
+                  kind={type === "dekonstruksi" ? "material" : undefined}
+                  filter={type === "dekonstruksi" ? undefined : isProducible}
                   lines={outputs}
                   onChange={setOutputs}
                   addLabel={type === "dekonstruksi" ? "Tambah bahan" : "Tambah produk"}
@@ -249,13 +251,13 @@ export default function WorkOrderNewPage() {
                   <Row label="Bahan (standar)" value={formatIDR(preview.material)} />
                   <Row label={`Tenaga kerja · ${formatQty(preview.laborHours)} jam`} value={formatIDR(preview.labor)} />
                   <Row label="Overhead" value={formatIDR(preview.overhead)} />
-                  <div className="my-2 border-t border-separator" />
+                  <div className="my-2 border-t border-[var(--rule)]" />
                   <Row label="Total estimasi" value={formatIDR(preview.material + preview.labor + preview.overhead)} strong />
                   {outputUnits > 0 && (
                     <Row label="Per unit hasil" value={formatIDR((preview.material + preview.labor + preview.overhead) / outputUnits)} muted />
                   )}
                   {preview.reqs.some((r) => r.freeRemnant > 0 && r.required > 0) && (
-                    <p className="mt-3 flex items-start gap-2 rounded-xl bg-success-soft p-3 text-xs text-success-soft-foreground">
+                    <p className="mt-3 flex items-start gap-2 rounded-sm bg-success-soft p-3 text-xs text-success-soft-foreground">
                       <Recycle className="mt-0.5 size-4 shrink-0" />
                       Ada sisa material yang cocok — akan disarankan saat pengambilan bahan sehingga HPP lebih rendah.
                     </p>
@@ -281,13 +283,15 @@ export default function WorkOrderNewPage() {
 function LineEditor({
   title,
   kind,
+  filter,
   lines,
   onChange,
   addLabel,
   allowEmpty,
 }: {
   title: string;
-  kind: "material" | "product";
+  kind?: "material" | "product";
+  filter?: (item: Item) => boolean;
   lines: LineState[];
   onChange: (lines: LineState[]) => void;
   addLabel: string;
@@ -301,7 +305,7 @@ function LineEditor({
       <div className="flex flex-col gap-2">
         {lines.map((l) => (
           <div key={l.key} className="grid grid-cols-[1fr_7.5rem_auto] items-end gap-2">
-            <ItemPicker kind={kind} value={l.itemId} onChange={(id) => update(l.key, { itemId: id })} aria-label={kind === "product" ? "Produk" : "Material"} />
+            <ItemPicker kind={kind} filter={filter} value={l.itemId} onChange={(id) => update(l.key, { itemId: id })} aria-label={kind === "material" ? "Material" : "Barang"} />
             <NumberInput aria-label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix={l.itemId ? UOM_LABEL[item(l.itemId)?.uom ?? "pcs"] : undefined} />
             <Button
               isIconOnly

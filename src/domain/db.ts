@@ -1,7 +1,7 @@
 import { DomainError } from "./core";
 import type { CounterKey, Db, Settings } from "./types";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const defaultSettings = (): Settings => ({
   companyName: "Production House Furnitur",
@@ -16,6 +16,7 @@ export const defaultSettings = (): Settings => ({
   exchangeRates: { USD: 16_250, EUR: 17_600, SGD: 12_400, AUD: 10_600, JPY: 108 },
   remnantAgingDays: 90,
   rentalReminderDays: 2,
+  defaultStages: ["Potong", "Rakit", "Amplas", "Finishing", "QC", "Packing"],
 });
 
 const COUNTERS: CounterKey[] = ["lot", "purchase", "workOrder", "sale", "rental", "adjustment", "item", "partner"];
@@ -65,7 +66,17 @@ export function migrate(raw: unknown): Db {
     counters: { ...base.counters, ...(data.counters ?? {}) },
   };
   for (const key of COLLECTIONS) (db[key] as unknown[]) = (data[key] as unknown[] | undefined) ?? [];
+  normalizeRecords(db);
   return db;
+}
+
+/** Fills fields added in later schema versions so older data keeps working (v1 → v2). */
+function normalizeRecords(db: Db) {
+  db.workOrders = db.workOrders.map((w) => ({ ...w, stages: w.stages ?? [], laborLogs: w.laborLogs ?? [], receipts: w.receipts ?? [] }));
+  db.sales = db.sales.map((s) => ({ ...s, payments: s.payments ?? [], returns: s.returns ?? [] }));
+  db.purchases = db.purchases.map((p) => ({ ...p, payments: p.payments ?? [] }));
+  db.rentals = db.rentals.map((r) => ({ ...r, payments: r.payments ?? [], extraCharges: r.extraCharges ?? [] }));
+  if (!db.settings.defaultStages?.length) db.settings.defaultStages = defaultSettings().defaultStages;
 }
 
 export function parseBackup(json: string): Db {

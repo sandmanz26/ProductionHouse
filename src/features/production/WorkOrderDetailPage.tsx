@@ -1,10 +1,12 @@
 import { Button, Link } from "@heroui/react";
-import { CheckCircle2, PackageCheck, Play, Plus, Recycle, ShoppingCart, Trash2, Undo2 } from "lucide-react";
+import { CheckCircle2, GitBranch, PackageCheck, PackagePlus, Play, Plus, Recycle, ShoppingCart, Trash2, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   cancelWorkOrder,
+  createComponentOrders,
   isOpenWo,
+  laborCostOf,
   newId,
   requirements,
   startWorkOrder,
@@ -18,13 +20,15 @@ import {
 } from "@/domain";
 import { NumberInput, TextInput } from "@/components/fields";
 import { RecordNotFound } from "@/components/NotFound";
-import { ConfirmButton, DataTable, EmptyBlock, KeyValue, PageHeader, Row, Section, StatusChip, type Column } from "@/components/ui";
+import { Code, ConfirmButton, DataTable, EmptyBlock, KeyValue, PageHeader, Row, Section, StatusChip, Tag, type Column } from "@/components/ui";
 import { formatDate, formatDateTime, formatDims, formatIDR, formatPct, formatQty } from "@/lib/format";
-import { LOT_ORIGIN, PURCHASE_STATUS, WO_STATUS, WO_TYPE } from "@/lib/labels";
+import { LOT_ORIGIN, OUTPUT_GRADE, PURCHASE_STATUS, WO_STATUS, WO_TYPE } from "@/lib/labels";
 import { useDb, useLookups, useRun } from "@/store/db-store";
 import { CompleteDialog } from "./CompleteDialog";
 import { CostBreakdown } from "./CostBreakdown";
 import { IssueDialog, type IssueRequest } from "./IssueDialog";
+import { ReceiveDialog } from "./ReceiveDialog";
+import { LaborPanel, StagesPanel } from "./StagesPanel";
 import { RequirementsTable } from "./shared";
 
 export default function WorkOrderDetailPage() {
@@ -36,6 +40,7 @@ export default function WorkOrderDetailPage() {
   const wo = db.workOrders.find((w) => w.id === id);
   const [issueReq, setIssueReq] = useState<IssueRequest | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [receiving, setReceiving] = useState(false);
 
   const reqs = useMemo(() => (wo ? requirements(db, wo) : []), [db, wo]);
   const lotsById = useMemo(() => new Map(db.lots.map((l) => [l.id, l])), [db.lots]);
@@ -47,6 +52,9 @@ export default function WorkOrderDetailPage() {
   const purchases = db.purchases.filter((p) => p.workOrderId === wo.id);
   const so = wo.salesOrderId ? db.sales.find((s) => s.id === wo.salesOrderId) : undefined;
   const issuedValue = sum(wo.issues.map((i) => i.qty * i.unitCost));
+  const componentShort = reqs.filter((r) => r.producible && r.shortage - r.inComponentOrders > 0);
+  const children = db.workOrders.filter((w) => w.parentWoId === wo.id);
+  const parent = wo.parentWoId ? db.workOrders.find((w) => w.id === wo.parentWoId) : undefined;
 
   const issueColumns: Column<Issue>[] = [
     {
@@ -101,7 +109,7 @@ export default function WorkOrderDetailPage() {
         title={wo.title}
         badge={
           <>
-            <StatusChip tone={WO_TYPE[wo.type].tone}>{WO_TYPE[wo.type].label}</StatusChip>
+            <Tag>{WO_TYPE[wo.type].label}</Tag>
             <StatusChip tone={WO_STATUS[wo.status].tone}>{WO_STATUS[wo.status].label}</StatusChip>
           </>
         }
@@ -127,6 +135,11 @@ export default function WorkOrderDetailPage() {
               <Button variant="secondary" onPress={() => setIssueReq({ itemId: null, qty: 1 })}>
                 <Plus className="size-4" /> Ambil bahan
               </Button>
+              {wo.type !== "dekonstruksi" && wo.plannedOutputs.length > 0 && (
+                <Button variant="secondary" onPress={() => setReceiving(true)}>
+                  <PackagePlus className="size-4" /> Terima sebagian
+                </Button>
+              )}
               <Button onPress={() => setCompleting(true)} isDisabled={wo.issues.length === 0}>
                 <PackageCheck className="size-4" /> Selesaikan
               </Button>
@@ -142,11 +155,22 @@ export default function WorkOrderDetailPage() {
               title="Kebutuhan bahan"
               description="Dari BOM produk dan bahan tambahan. Klik Ambil untuk mengeluarkan bahan dari gudang."
               actions={
-                shortages.length > 0 && (
-                  <Button size="sm" onPress={() => navigate(`/pembelian/baru?wo=${wo.id}`)}>
-                    <ShoppingCart className="size-4" /> Beli kekurangan
-                  </Button>
-                )
+                <>
+                  {componentShort.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => run((d) => createComponentOrders(d, wo.id), (w) => `${w.length} perintah komponen dibuat`)}
+                    >
+                      <GitBranch className="size-4" /> Produksi komponen
+                    </Button>
+                  )}
+                  {shortages.some((r) => !r.producible) && (
+                    <Button size="sm" onPress={() => navigate(`/pembelian/baru?wo=${wo.id}`)}>
+                      <ShoppingCart className="size-4" /> Beli kekurangan
+                    </Button>
+                  )}
+                </>
               }
               bodyClassName="p-0"
             >
@@ -155,6 +179,28 @@ export default function WorkOrderDetailPage() {
               ) : (
                 <EmptyBlock title="Tidak ada kebutuhan standar" description="Ambil bahan secara bebas lewat tombol Ambil bahan." />
               )}
+            </Section>
+          )}
+
+          <StagesPanel wo={wo} />
+
+          {wo.receipts.length > 0 && (
+            <Section
+              title="Hasil sebagian"
+              description={wo.status === "selesai" ? "Sudah direvaluasi ke HPP aktual." : "Masuk gudang dengan HPP sementara; disesuaikan saat pekerjaan ditutup."}
+              bodyClassName="p-0"
+            >
+              <DataTable
+                label="Hasil sebagian"
+                rows={wo.receipts}
+                columns={[
+                  { key: "at", header: "Waktu", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => formatDateTime(r.at) },
+                  { key: "item", header: "Barang", cell: (r) => item(r.itemId)?.name ?? "?" },
+                  { key: "qty", header: "Qty", align: "end", cell: (r) => formatQty(r.qty, item(r.itemId)?.uom) },
+                  { key: "grade", header: "QC", cell: (r) => <StatusChip tone={r.grade === "reject" ? "danger" : "success"}>{OUTPUT_GRADE[r.grade]}</StatusChip> },
+                  { key: "cost", header: "HPP sementara", align: "end", cell: (r) => formatIDR(r.provisionalUnitCost) },
+                ]}
+              />
             </Section>
           )}
 
@@ -230,6 +276,26 @@ export default function WorkOrderDetailPage() {
             open && <CostEditor key={`${wo.id}-${wo.laborHours}-${wo.laborRate}-${wo.overhead}-${JSON.stringify(wo.extraCosts)}`} wo={wo} issuedValue={issuedValue} />
           )}
 
+          {open && <LaborPanel wo={wo} />}
+          {!open && wo.laborLogs.length > 0 && <LaborPanel wo={wo} />}
+
+          {(children.length > 0 || parent) && (
+            <Section title="Struktur pekerjaan">
+              {parent && <Row label="Bagian dari" value={<Link href={`/produksi/${parent.id}`}><Code>{parent.code}</Code></Link>} />}
+              {children.map((c) => (
+                <Row
+                  key={c.id}
+                  label={
+                    <Link href={`/produksi/${c.id}`}>
+                      <Code>{c.code}</Code> <span className="text-sm">{c.title}</span>
+                    </Link>
+                  }
+                  value={<StatusChip tone={WO_STATUS[c.status].tone}>{WO_STATUS[c.status].label}</StatusChip>}
+                />
+              ))}
+            </Section>
+          )}
+
           <Section title="Rencana hasil">
             {wo.plannedOutputs.length === 0 ? (
               <p className="text-sm text-muted">Ditentukan saat selesai.</p>
@@ -238,7 +304,7 @@ export default function WorkOrderDetailPage() {
             )}
             {wo.plannedInputs.length > 0 && (
               <>
-                <p className="mt-3 mb-1 text-xs font-semibold text-muted uppercase">Barang asal / tambahan</p>
+                <p className="eyebrow mt-3 mb-1">Barang asal / tambahan</p>
                 {wo.plannedInputs.map((i) => (
                   <Row
                     key={i.id}
@@ -293,6 +359,7 @@ export default function WorkOrderDetailPage() {
 
       <IssueDialog wo={wo} request={issueReq} onClose={() => setIssueReq(null)} />
       <CompleteDialog wo={wo} isOpen={completing} onOpenChange={setCompleting} />
+      <ReceiveDialog wo={wo} isOpen={receiving} onOpenChange={setReceiving} />
     </>
   );
 }
@@ -312,10 +379,14 @@ const run = useRun();
     <Section title="Biaya berjalan" description="Bisa diubah sampai pekerjaan selesai.">
       <div className="flex flex-col gap-3">
         <Row label="Bahan diambil" value={formatIDR(issuedValue)} />
-        <div className="grid grid-cols-2 gap-2">
-          <NumberInput label="Jam kerja" value={laborHours} onChange={setLaborHours} suffix="jam" />
-          <NumberInput label="Tarif/jam" value={laborRate} onChange={setLaborRate} money />
-        </div>
+        {wo.laborLogs.length ? (
+          <Row label="Tenaga kerja (dari catatan kerja)" value={formatIDR(laborCostOf(wo).amount)} />
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="Rencana jam kerja" value={laborHours} onChange={setLaborHours} suffix="jam" />
+            <NumberInput label="Tarif/jam" value={laborRate} onChange={setLaborRate} money />
+          </div>
+        )}
         <NumberInput label="Overhead" value={overhead} onChange={setOverhead} money />
         <div>
           <p className="mb-1 text-sm font-medium">Biaya lain (jasa luar, transport)</p>
@@ -332,8 +403,12 @@ const run = useRun();
             <Plus className="size-4" /> Biaya lain
           </Button>
         </div>
-        <div className="border-t border-separator pt-2">
-          <Row label="Estimasi total saat ini" value={formatIDR(issuedValue + laborHours * laborRate + overhead + sum(extras.map((e) => e.amount)))} strong />
+        <div className="border-t border-[var(--rule)] pt-2">
+          <Row
+            label="Estimasi total saat ini"
+            value={formatIDR(issuedValue + (wo.laborLogs.length ? laborCostOf(wo).amount : laborHours * laborRate) + overhead + sum(extras.map((e) => e.amount)))}
+            strong
+          />
         </div>
         <Button
           variant="secondary"

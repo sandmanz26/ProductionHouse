@@ -1,5 +1,5 @@
-import { assert, createLot, EPS, getItem, newId, nextCode, nowIso, recordMove, roundMoney, sum } from "./core";
-import type { Db, Dimensions, DocRef, ExtraCost, ID, ISODate, Purchase, PurchaseLine } from "./types";
+import { assert, createLot, EPS, getItem, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, sum } from "./core";
+import type { Db, Dimensions, DocRef, ExtraCost, ID, ISODate, Item, Purchase, PurchaseLine } from "./types";
 
 export interface PurchaseInput {
   supplierId?: ID;
@@ -8,7 +8,28 @@ export interface PurchaseInput {
   extraCosts?: { label: string; amount: number }[];
   workOrderId?: ID;
   invoiceNo?: string;
+  dueDate?: ISODate;
   note?: string;
+}
+
+/**
+ * Timber volume ("kubikasi") from piece size: pieces × thickness (cm) × width (cm) × length (m)
+ * / 10,000 = m³. Rounded to 4 decimals like a supplier's tally sheet.
+ */
+export function cubicMeters(pieces: number, thicknessCm: number, widthCm: number, lengthM: number): number {
+  if ([pieces, thicknessCm, widthCm, lengthM].some((n) => !(n > 0))) return 0;
+  return roundQty((pieces * thicknessCm * widthCm * lengthM) / 10_000);
+}
+
+/** Converts a quantity in the purchase unit (e.g. 2 roll) to the stock unit (e.g. 100 m). */
+export function toStockQty(item: Pick<Item, "purchaseUnit">, purchaseQty: number): number {
+  return roundQty(purchaseQty * (item.purchaseUnit?.factor ?? 1));
+}
+
+/** Converts a price per purchase unit to a price per stock unit. */
+export function toStockPrice(item: Pick<Item, "purchaseUnit">, pricePerPurchaseUnit: number): number {
+  const f = item.purchaseUnit?.factor ?? 1;
+  return roundMoney(pricePerPurchaseUnit / f);
 }
 
 export const purchaseRef = (p: Purchase): DocRef => ({ type: "purchase", id: p.id, code: p.code });
@@ -73,7 +94,9 @@ export function createPurchase(db: Db, input: PurchaseInput): Purchase {
     extraCosts: normalizeExtra(input.extraCosts),
     workOrderId: input.workOrderId,
     invoiceNo: input.invoiceNo,
+    dueDate: input.dueDate,
     note: input.note,
+    payments: [],
   };
   db.purchases.push(p);
   return p;
@@ -90,6 +113,7 @@ export function updatePurchase(db: Db, id: ID, input: PurchaseInput): Purchase {
     extraCosts: normalizeExtra(input.extraCosts),
     workOrderId: input.workOrderId,
     invoiceNo: input.invoiceNo,
+    dueDate: input.dueDate,
     note: input.note,
   });
   return p;
@@ -143,6 +167,7 @@ export function receivePurchase(db: Db, id: ID, opts: { location?: string; at?: 
 export function cancelPurchase(db: Db, id: ID): Purchase {
   const p = getPurchase(db, id);
   assert(p.status === "draft", "Pembelian yang sudah diterima tidak dapat dibatalkan.");
+  assert(p.payments.length === 0, "Pembelian sudah dibayar — hapus pembayaran terlebih dahulu.");
   p.status = "batal";
   return p;
 }

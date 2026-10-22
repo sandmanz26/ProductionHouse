@@ -66,6 +66,11 @@ function ItemForm({ existing }: { existing?: Item }) {
     existing?.packing ?? { length: 0, width: 0, height: 0, cartonsPerUnit: 1, grossWeightKg: 0, netWeightKg: 0 },
   );
   const [note, setNote] = useState(existing?.note ?? "");
+  const [producible, setProducible] = useState(isProduct || (existing?.bom?.length ?? 0) > 0);
+  const [stagesText, setStagesText] = useState(existing?.stages?.join(", ") ?? "");
+  const [puLabel, setPuLabel] = useState(existing?.purchaseUnit?.label ?? "");
+  const [puFactor, setPuFactor] = useState(existing?.purchaseUnit?.factor ?? 0);
+  const hasBom = isProduct || producible;
 
   const bomLines = bom.filter((b) => b.materialId).map((b) => ({ materialId: b.materialId!, qty: b.qty }));
   const input: ItemInput = {
@@ -78,8 +83,10 @@ function ItemForm({ existing }: { existing?: Item }) {
     reorderPoint: reorderPoint || undefined,
     trackRemnant: isProduct ? undefined : trackRemnant,
     minRemnantQty: !isProduct && trackRemnant ? minRemnantQty || undefined : undefined,
-    bom: isProduct ? bomLines : undefined,
-    laborHours: isProduct ? laborHours : undefined,
+    bom: hasBom ? bomLines : undefined,
+    laborHours: hasBom ? laborHours : undefined,
+    stages: hasBom && stagesText.trim() ? stagesText.split(",").map((x) => x.trim()).filter(Boolean) : undefined,
+    purchaseUnit: !isProduct && puLabel.trim() && puFactor > 0 ? { label: puLabel.trim(), factor: puFactor } : undefined,
     salePrice: isProduct ? salePrice || undefined : undefined,
     rentalRatePerDay: isProduct ? rentalRate || undefined : undefined,
     hsCode: isProduct ? hsCode || undefined : undefined,
@@ -87,13 +94,13 @@ function ItemForm({ existing }: { existing?: Item }) {
     note: note || undefined,
     archived: existing?.archived,
   };
-  const stdCost = isProduct ? standardProductCost(db, { ...input, id: existing?.id ?? "", sku } as Item) : 0;
+  const stdCost = hasBom ? standardProductCost(db, { ...input, id: existing?.id ?? "", sku } as Item) : 0;
   const materialCost = sum(bomLines.map((b) => (item(b.materialId)?.standardCost ?? 0) * b.qty));
   const cbm = (packing.length * packing.width * packing.height * packing.cartonsPerUnit) / 1_000_000;
 
   const save = () => {
     // Products keep their BOM-based standard cost in sync on every save.
-    const data = isProduct ? { ...input, standardCost: stdCost } : input;
+    const data = isProduct || (producible && !standardCost) ? { ...input, standardCost: stdCost } : input;
     const r = run((d) => (existing ? updateItem(d, existing.id, data) : createItem(d, data)), (x) => `${x.name} disimpan`);
     if (r) navigate(`/master/item?jenis=${kind}`, { replace: true });
   };
@@ -173,12 +180,22 @@ function ItemForm({ existing }: { existing?: Item }) {
                     <NumberInput label="Ukuran sisa minimum" value={minRemnantQty} onChange={setMinRemnantQty} suffix={UOM_LABEL[uom]} description="Di bawah ini sebaiknya dianggap limbah." />
                   )}
                 </div>
+                <TextInput label="Satuan beli dari pemasok" value={puLabel} onChange={setPuLabel} placeholder="mis. roll, dus, ikat" description="Kosongkan bila sama dengan satuan stok." />
+                <NumberInput label={`Isi per satuan beli (${UOM_LABEL[uom]})`} value={puFactor} onChange={setPuFactor} isDisabled={!puLabel.trim()} description={puLabel.trim() && puFactor ? `1 ${puLabel} = ${puFactor} ${UOM_LABEL[uom]}` : undefined} />
+                <div className="sm:col-span-2">
+                  <SwitchInput
+                    isSelected={producible}
+                    onChange={setProducible}
+                    label="Diproduksi sendiri"
+                    description="Komponen setengah jadi (rangka, dudukan) atau bahan olahan (kayu KD). Punya resep bahan dan bisa dibuat lewat perintah kerja."
+                  />
+                </div>
               </div>
             </Section>
           )}
 
-          {isProduct && (
-            <Section title="Resep bahan (BOM)" description="Kebutuhan bahan untuk 1 unit. Dipakai untuk cek kebutuhan, saran pembelian, dan HPP standar.">
+          {hasBom && (
+            <Section title="Resep bahan (BOM)" description={`Kebutuhan bahan untuk 1 ${UOM_LABEL[uom]}. Boleh berisi komponen yang juga diproduksi sendiri.`}>
               <div className="flex flex-col gap-2">
                 {bom.map((b) => {
                   const m = item(b.materialId ?? undefined);
@@ -196,6 +213,16 @@ function ItemForm({ existing }: { existing?: Item }) {
                   <Button size="sm" variant="tertiary" onPress={() => setBom([...bom, { key: k(), materialId: null, qty: 1 }])}>
                     <Plus className="size-4" /> Tambah bahan
                   </Button>
+                </div>
+                <div className="mt-2 grid grid-cols-1 gap-3 border-t border-[var(--rule)] pt-3 sm:grid-cols-[1fr_12rem]">
+                  <TextInput
+                    label="Rute tahapan"
+                    value={stagesText}
+                    onChange={setStagesText}
+                    placeholder={db.settings.defaultStages.join(", ")}
+                    description="Pisahkan dengan koma. Kosong = rute default di Pengaturan."
+                  />
+                  {!isProduct && <NumberInput label="Jam kerja standar" value={laborHours} onChange={setLaborHours} suffix="jam" />}
                 </div>
               </div>
             </Section>
@@ -235,17 +262,18 @@ function ItemForm({ existing }: { existing?: Item }) {
         <div className="xl:sticky xl:top-20 xl:self-start">
           <Card>
             <Card.Header>
-              <Card.Title className="text-base">{isProduct ? "HPP standar" : "Ringkasan"}</Card.Title>
-              {isProduct && <Card.Description>Estimasi dari BOM × harga standar + jam × (tarif + overhead).</Card.Description>}
+              <Card.Title className="text-base">{hasBom ? "HPP standar" : "Ringkasan"}</Card.Title>
+              {hasBom && <Card.Description>Estimasi dari BOM × harga standar + jam × (tarif + overhead).</Card.Description>}
             </Card.Header>
             <Card.Content>
-              {isProduct ? (
+              {hasBom ? (
                 <>
                   <Row label="Bahan" value={formatIDR(materialCost)} />
                   <Row label="Tenaga kerja + overhead" value={formatIDR(stdCost - materialCost)} />
-                  <div className="my-2 border-t border-separator" />
+                  <div className="my-2 border-t border-[var(--rule)]" />
                   <Row label="HPP standar / unit" value={formatIDR(stdCost)} strong />
-                  {salePrice > 0 && (
+                  {!isProduct && standardCost > 0 && <Row label="Harga standar tercatat" value={formatIDR(standardCost)} muted />}
+                  {isProduct && salePrice > 0 && (
                     <Row
                       label="Margin standar"
                       value={`${Math.round(((salePrice - stdCost) / salePrice) * 100)}%`}

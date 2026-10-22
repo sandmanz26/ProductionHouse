@@ -56,6 +56,9 @@ function RentalForm({ existingId }: { existingId?: ID }) {
   );
   const [deposit, setDeposit] = useState(existing?.deposit ?? 0);
   const [discount, setDiscount] = useState(existing?.discount ?? 0);
+  const [charges, setCharges] = useState<{ key: string; label: string; amount: number }[]>(
+    existing?.extraCharges?.map((c) => ({ key: k(), label: c.label, amount: c.amount })) ?? [],
+  );
   const [note, setNote] = useState(existing?.note ?? "");
 
   const validDates = !!startDate && !!endDate && endDate >= startDate;
@@ -69,6 +72,7 @@ function RentalForm({ existingId }: { existingId?: ID }) {
     lines: lines.filter((l) => l.itemId).map((l) => ({ itemId: l.itemId!, qty: l.qty, ratePerDay: kind === "pinjam" ? 0 : l.ratePerDay })),
     deposit,
     discount,
+    extraCharges: charges.map((c) => ({ label: c.label, amount: c.amount })),
     note: note || undefined,
   };
   const base = sum(input.lines.map((l) => l.qty * l.ratePerDay * days));
@@ -164,6 +168,23 @@ function RentalForm({ existingId }: { existingId?: ID }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <NumberInput label="Deposit / jaminan" value={deposit} onChange={setDeposit} money />
               {kind === "sewa" && <NumberInput label="Diskon" value={discount} onChange={setDiscount} money />}
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <p className="text-sm font-medium">Biaya tambahan</p>
+                {charges.map((c) => (
+                  <div key={c.key} className="grid grid-cols-[1fr_9rem_auto] items-end gap-2">
+                    <TextInput aria-label="Keterangan" value={c.label} onChange={(label) => setCharges(charges.map((x) => (x.key === c.key ? { ...x, label } : x)))} placeholder="mis. antar-jemput, setting, cleaning" />
+                    <NumberInput aria-label="Jumlah" value={c.amount} onChange={(amount) => setCharges(charges.map((x) => (x.key === c.key ? { ...x, amount } : x)))} money />
+                    <Button isIconOnly variant="ghost" aria-label="Hapus biaya" onPress={() => setCharges(charges.filter((x) => x.key !== c.key))}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+                <div>
+                  <Button size="sm" variant="tertiary" onPress={() => setCharges([...charges, { key: k(), label: "Antar-jemput & setting", amount: 0 }])}>
+                    <Plus className="size-4" /> Biaya antar / setting
+                  </Button>
+                </div>
+              </div>
               <TextAreaInput className="sm:col-span-2" label="Catatan" value={note} onChange={setNote} rows={2} placeholder="Alamat lokasi, PIC lapangan, syarat khusus…" />
             </div>
           </Section>
@@ -179,14 +200,15 @@ function RentalForm({ existingId }: { existingId?: ID }) {
               {kind === "sewa" && (
                 <>
                   <Row label="Biaya sewa" value={formatIDR(base)} />
+                  {sum(charges.map((c) => c.amount)) > 0 && <Row label="Biaya tambahan" value={formatIDR(sum(charges.map((c) => c.amount)))} />}
                   {discount > 0 && <Row label="Diskon" value={`− ${formatIDR(discount)}`} />}
-                  <div className="my-2 border-t border-separator" />
-                  <Row label="Total" value={formatIDR(Math.max(0, base - discount))} strong />
+                  <div className="my-2 border-t border-[var(--rule)]" />
+                  <Row label="Total" value={formatIDR(Math.max(0, base + sum(charges.map((c) => c.amount)) - discount))} strong />
                 </>
               )}
               <Row label="Deposit" value={formatIDR(deposit)} muted />
               {overbooked.length > 0 && (
-                <p className="mt-3 rounded-xl bg-danger-soft p-3 text-xs text-danger-soft-foreground">
+                <p className="mt-3 rounded-sm bg-danger-soft p-3 text-xs text-danger-soft-foreground">
                   Unit tidak cukup di tanggal ini. Booking tetap bisa disimpan (mis. unit sedang diproduksi), tetapi serah unit akan ditolak bila stok belum ada.
                 </p>
               )}

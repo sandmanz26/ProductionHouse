@@ -1,5 +1,5 @@
-import { assert, EPS, freeQtyFor, getItem, getLot, newId, nextCode, nowIso, roundMoney, roundQty, suggestLots, sum, takeFromLot } from "./core";
-import { createWorkOrder } from "./production";
+import { assert, createLot, EPS, freeQtyFor, getItem, getLot, newId, nextCode, nowIso, recordMove, roundMoney, roundQty, suggestLots, sum, takeFromLot } from "./core";
+import { createWorkOrder, isProducible } from "./production";
 import type {
   ContainerType,
   Currency,
@@ -41,8 +41,10 @@ export interface SalesInput {
   dueDate?: ISODate;
   currency: Currency;
   exchangeRate: number;
-  lines: { itemId: ID; qty: number; unitPrice: number }[];
+  lines: { itemId: ID; qty: number; unitPrice: number; spec?: string }[];
   discount?: number;
+  dpPercent?: number;
+  paymentDueDate?: ISODate;
   shippingCharge?: number;
   export?: ExportInfo;
   note?: string;
@@ -64,6 +66,9 @@ function validate(db: Db, input: SalesInput) {
     assert(l.unitPrice >= 0, `Harga ${item.name} tidak boleh negatif.`);
   }
   assert((input.discount ?? 0) >= 0 && (input.shippingCharge ?? 0) >= 0, "Diskon/ongkir tidak boleh negatif.");
+  assert((input.dpPercent ?? 0) >= 0 && (input.dpPercent ?? 0) <= 100, "DP harus antara 0–100%.");
+  const subtotal = sum(input.lines.map((l) => l.qty * l.unitPrice));
+  assert((input.discount ?? 0) <= subtotal + (input.shippingCharge ?? 0), "Diskon melebihi nilai order.");
   if (input.channel === "ekspor") assert(input.export, "Lengkapi data ekspor.");
 }
 
@@ -79,11 +84,15 @@ export function createSalesOrder(db: Db, input: SalesInput): SalesOrder {
     status: "draft",
     currency: input.currency,
     exchangeRate: input.exchangeRate,
-    lines: input.lines.map((l) => ({ id: newId(), ...l })),
+    lines: input.lines.map((l) => ({ id: newId(), ...l, spec: l.spec?.trim() || undefined })),
     discount: input.discount ?? 0,
     shippingCharge: input.shippingCharge ?? 0,
     export: input.channel === "ekspor" ? input.export : undefined,
     deliveries: [],
+    returns: [],
+    payments: [],
+    dpPercent: input.dpPercent || undefined,
+    paymentDueDate: input.paymentDueDate,
     note: input.note,
   };
   db.sales.push(so);
@@ -101,10 +110,12 @@ export function updateSalesOrder(db: Db, id: ID, input: SalesInput): SalesOrder 
     dueDate: input.dueDate,
     currency: input.currency,
     exchangeRate: input.exchangeRate,
-    lines: input.lines.map((l) => ({ id: newId(), ...l })),
+    lines: input.lines.map((l) => ({ id: newId(), ...l, spec: l.spec?.trim() || undefined })),
     discount: input.discount ?? 0,
     shippingCharge: input.shippingCharge ?? 0,
     export: input.channel === "ekspor" ? input.export : undefined,
+    dpPercent: input.dpPercent || undefined,
+    paymentDueDate: input.paymentDueDate,
     note: input.note,
   });
   return so;
@@ -183,6 +194,9 @@ export function deliverSalesOrder(
 export function completeSalesOrder(db: Db, id: ID): SalesOrder {
   const so = getSalesOrder(db, id);
   assert(so.status === "dikirim", "Order harus terkirim penuh sebelum diselesaikan.");
+  const paid = sum(so.payments.map((p) => p.amount));
+  const balance = salesTotals(db, so).total - paid;
+  assert(balance <= 0.5, `Masih ada sisa tagihan ${roundMoney(balance)} ${so.currency} — catat pelunasan dulu.`);
   so.status = "selesai";
   return so;
 }
@@ -190,6 +204,7 @@ export function completeSalesOrder(db: Db, id: ID): SalesOrder {
 export function cancelSalesOrder(db: Db, id: ID): SalesOrder {
   const so = getSalesOrder(db, id);
   assert(so.deliveries.length === 0, "Order yang sudah ada pengiriman tidak dapat dibatalkan.");
+  assert(so.payments.length === 0, "Order sudah ada pembayaran — kembalikan/hapus pembayaran dulu.");
   assert(so.status !== "batal", "Order sudah dibatalkan.");
   so.status = "batal";
   return so;
@@ -197,6 +212,8 @@ export function cancelSalesOrder(db: Db, id: ID): SalesOrder {
 
 export interface SalesTotals {
   subtotal: number;
+  /** Credit notes for returned goods (order currency). */
+  returnCredit: number;
   total: number;
   totalIdr: number;
   /** Revenue of delivered goods in IDR (pro-rata of discount/shipping excluded). */
@@ -210,7 +227,8 @@ export interface SalesTotals {
 
 export function salesTotals(db: Pick<Db, "items" | "lots">, so: SalesOrder): SalesTotals {
   const subtotal = sum(so.lines.map((l) => l.qty * l.unitPrice));
-  const total = subtotal - so.discount + so.shippingCharge;
+  const returnCredit = sum(so.returns.map((r) => r.credit));
+  const total = subtotal - so.discount + so.shippingCharge - returnCredit;
   const priceOf = (itemId: ID) => {
     const ls = so.lines.filter((l) => l.itemId === itemId);
     const q = sum(ls.map((l) => l.qty));
@@ -218,7 +236,7 @@ export function salesTotals(db: Pick<Db, "items" | "lots">, so: SalesOrder): Sal
   };
   const delivered = so.deliveries.flatMap((d) => d.lines);
   const deliveredRevenueIdr = sum(delivered.map((l) => l.qty * priceOf(l.itemId))) * so.exchangeRate;
-  const cogs = sum(delivered.map((l) => l.qty * l.unitCost));
+  const cogs = sum(delivered.map((l) => l.qty * l.unitCost)) - sum(so.returns.map((r) => r.qty * r.unitCost));
   const estimatedCogsOutstanding = sum(
     outstandingLines(so).map((l) => {
       const lots = db.lots.filter((x) => x.itemId === l.itemId && x.qty > EPS);
@@ -229,15 +247,17 @@ export function salesTotals(db: Pick<Db, "items" | "lots">, so: SalesOrder): Sal
   );
   const totalIdr = total * so.exchangeRate;
   const fullCogs = cogs + estimatedCogsOutstanding;
-  const margin = subtotal * so.exchangeRate - fullCogs;
+  const netSales = subtotal - returnCredit;
+  const margin = netSales * so.exchangeRate - fullCogs;
   return {
     subtotal: roundMoney(subtotal),
+    returnCredit: roundMoney(returnCredit),
     total: roundMoney(total),
     totalIdr: roundMoney(totalIdr),
     deliveredRevenueIdr: roundMoney(deliveredRevenueIdr),
     cogs: roundMoney(cogs),
     margin: roundMoney(margin),
-    marginPct: subtotal > EPS ? margin / (subtotal * so.exchangeRate) : 0,
+    marginPct: netSales > EPS ? margin / (netSales * so.exchangeRate) : 0,
     estimatedCogsOutstanding: roundMoney(estimatedCogsOutstanding),
   };
 }
@@ -317,6 +337,7 @@ export function productionShortages(db: Db, so: SalesOrder) {
         .flatMap((w) => w.plannedOutputs.filter((o) => o.itemId === itemId).map((o) => o.qty)),
     );
   return outstandingLines(so)
+    .filter((l) => isProducible(getItem(db, l.itemId)))
     .map((l) => {
       const free = freeQtyFor(db, l.itemId);
       const inProduction = openWoQty(l.itemId);
@@ -330,13 +351,74 @@ export function createWorkOrdersForShortage(db: Db, soId: ID): WorkOrder[] {
   assert(so.status !== "batal" && so.status !== "selesai", "Order sudah ditutup.");
   const shortages = productionShortages(db, so);
   assert(shortages.length > 0, "Stok cukup — tidak perlu produksi tambahan.");
-  return shortages.map((s) =>
-    createWorkOrder(db, {
+  return shortages.map((s) => {
+    const specs = so.lines.filter((l) => l.itemId === s.itemId && l.spec).map((l) => l.spec);
+    return createWorkOrder(db, {
       type: "produksi",
       title: `${getItem(db, s.itemId).name} untuk ${so.code}`,
       plannedOutputs: [{ itemId: s.itemId, qty: s.shortage }],
       salesOrderId: so.id,
       dueDate: so.dueDate,
-    }),
-  );
+      note: specs.length ? `Spesifikasi pesanan: ${specs.join("; ")}` : undefined,
+    });
+  });
+}
+
+export function saleReturnedQty(so: SalesOrder, itemId: ID): number {
+  return roundQty(sum(so.returns.filter((r) => r.itemId === itemId).map((r) => r.qty)));
+}
+
+/**
+ * Customer return (retur penjualan). Goods come back at their original delivery cost — good
+ * units as available stock, defective units as damaged (ready for a repair order) — and the
+ * customer is credited at the order price.
+ */
+export function returnSale(
+  db: Db,
+  soId: ID,
+  entries: { itemId: ID; qty: number; condition: "baik" | "rusak"; note?: string }[],
+  opts: { at?: string; location?: string } = {},
+): SalesOrder {
+  const so = getSalesOrder(db, soId);
+  assert(so.deliveries.length > 0, "Belum ada barang terkirim untuk diretur.");
+  const valid = entries.filter((e) => e.qty > EPS);
+  assert(valid.length > 0, "Isi qty retur.");
+  const at = opts.at ?? nowIso();
+  const ref = soRef(so);
+  for (const e of valid) {
+    const item = getItem(db, e.itemId);
+    const delivered = deliveredQty(so, e.itemId);
+    // Earlier entries of this call are already pushed to so.returns.
+    const already = saleReturnedQty(so, e.itemId);
+    assert(e.qty <= delivered - already + EPS, `Retur ${item.name} melebihi yang terkirim (${roundQty(delivered - already)} tersisa).`);
+    const lines = so.deliveries.flatMap((d) => d.lines.filter((l) => l.itemId === e.itemId));
+    const unitCost = roundMoney(sum(lines.map((l) => l.qty * l.unitCost)) / sum(lines.map((l) => l.qty)));
+    const ordered = so.lines.filter((l) => l.itemId === e.itemId);
+    const price = sum(ordered.map((l) => l.qty * l.unitPrice)) / sum(ordered.map((l) => l.qty));
+    const lot = createLot(db, {
+      itemId: e.itemId,
+      qty: e.qty,
+      unitCost,
+      origin: "retur_penjualan",
+      originRef: ref,
+      isRemnant: false,
+      location: opts.location || db.settings.defaultLocation,
+      status: e.condition === "rusak" ? "rusak" : "tersedia",
+      createdAt: at,
+      note: e.note,
+    });
+    recordMove(db, { lot, qty: lot.qty, type: "retur_penjualan", ref, at, note: e.note });
+    so.returns.push({
+      id: newId(),
+      at,
+      itemId: e.itemId,
+      qty: roundQty(e.qty),
+      condition: e.condition,
+      unitCost,
+      credit: roundMoney(e.qty * price),
+      lotId: lot.id,
+      note: e.note,
+    });
+  }
+  return so;
 }
