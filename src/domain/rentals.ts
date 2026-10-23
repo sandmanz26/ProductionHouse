@@ -26,7 +26,7 @@ export const rentalRef = (r: Rental): DocRef => ({ type: "rental", id: r.id, cod
 
 export function getRental(db: Db, id: ID): Rental {
   const r = db.rentals.find((x) => x.id === id);
-  assert(r, "Data sewa tidak ditemukan.");
+  assert(r, "Rental not found — it may have been deleted.");
   return r;
 }
 
@@ -104,26 +104,26 @@ function normalizeCharges(extra: RentalInput["extraCharges"]) {
   return (extra ?? [])
     .filter((c) => c.label.trim() || c.amount)
     .map((c) => {
-      assertAmount(c.amount, "Biaya tambahan");
-      return { id: newId(), label: c.label.trim() || "Biaya lain", amount: c.amount };
+      assertAmount(c.amount, "Extra charge");
+      return { id: newId(), label: c.label.trim() || "Other charge", amount: c.amount };
     });
 }
 
 function validate(db: Db, input: RentalInput, keep?: ReadonlySet<ID>) {
-  assert(input.project?.trim(), "Isi nama acara/proyek.");
-  assertDate(input.startDate, "Tanggal mulai");
-  assertDate(input.endDate, "Tanggal selesai");
+  assert(input.project?.trim(), "Enter the event or project name.");
+  assertDate(input.startDate, "Start date");
+  assertDate(input.endDate, "End date");
   assertPartnerRole(db, input.customerId, "customer");
-  assert(input.endDate >= input.startDate, "Tanggal selesai tidak boleh sebelum tanggal mulai.");
-  assert(input.lines.length > 0, "Tambahkan minimal satu produk.");
+  assert(input.endDate >= input.startDate, "End date cannot be before the start date.");
+  assert(input.lines.length > 0, "Add at least one product.");
   for (const l of input.lines) {
     const item = getUsableItem(db, l.itemId, keep);
-    assert(item.kind === "product", `${item.name} bukan produk.`);
-    assert(l.qty > EPS && Number.isInteger(l.qty), `Qty ${item.name} harus bilangan bulat > 0.`);
-    assertAmount(l.ratePerDay, `Tarif ${item.name}`);
+    assert(item.kind === "product", `${item.name} is not a product — only products can be rented.`);
+    assert(l.qty > EPS && Number.isInteger(l.qty), `Qty of ${item.name} must be a whole number above 0.`);
+    assertAmount(l.ratePerDay, `Rate for ${item.name}`);
   }
   assertAmount(input.deposit ?? 0, "Deposit");
-  assertAmount(input.discount ?? 0, "Diskon");
+  assertAmount(input.discount ?? 0, "Discount");
 }
 
 export function createRental(db: Db, input: RentalInput): Rental {
@@ -152,7 +152,7 @@ export function createRental(db: Db, input: RentalInput): Rental {
 
 export function updateRental(db: Db, id: ID, input: RentalInput): Rental {
   const r = getRental(db, id);
-  assert(r.status === "dipesan", "Hanya booking yang belum diserahkan yang bisa diubah.");
+  assert(r.status === "dipesan", "Only bookings not yet handed over can be edited.");
   validate(db, input, new Set(r.lines.map((l) => l.itemId)));
   const draft: Rental = {
     ...r,
@@ -166,7 +166,7 @@ export function updateRental(db: Db, id: ID, input: RentalInput): Rental {
   const paidSoFar = sum(r.payments.map((p) => p.amount));
   assert(
     rentalCharges(draft, input.startDate).total + 0.01 >= paidSoFar,
-    "Total baru lebih kecil dari yang sudah dibayar — catat refund dulu.",
+    "The new total is less than what was already paid — record a refund first.",
   );
   Object.assign(r, {
     kind: input.kind,
@@ -186,9 +186,9 @@ export function updateRental(db: Db, id: ID, input: RentalInput): Rental {
 /** Extend the return date of an active rental. */
 export function extendRental(db: Db, id: ID, endDate: ISODate): Rental {
   const r = getRental(db, id);
-  assert(r.status === "dipesan" || r.status === "berjalan", "Sewa sudah ditutup.");
-  assertDate(endDate, "Tanggal selesai");
-  assert(endDate >= r.startDate, "Tanggal selesai tidak boleh sebelum tanggal mulai.");
+  assert(r.status === "dipesan" || r.status === "berjalan", "This rental is already closed.");
+  assertDate(endDate, "End date");
+  assert(endDate >= r.startDate, "End date cannot be before the start date.");
   r.endDate = endDate;
   return r;
 }
@@ -196,7 +196,7 @@ export function extendRental(db: Db, id: ID, endDate: ISODate): Rental {
 /** Hands units to the customer. Lots are split so rented units are tracked individually. */
 export function checkoutRental(db: Db, id: ID, picks?: { itemId: ID; lotId: ID; qty: number }[], at = nowIso()): Rental {
   const r = getRental(db, id);
-  assert(r.status === "dipesan", "Unit sudah diserahkan atau sewa ditutup.");
+  assert(r.status === "dipesan", "Units are already handed over, or the rental is closed.");
   const ref = rentalRef(r);
   let chosen = picks;
   if (!chosen) {
@@ -204,22 +204,22 @@ export function checkoutRental(db: Db, id: ID, picks?: { itemId: ID; lotId: ID; 
     for (const line of r.lines) {
       const item = getItem(db, line.itemId);
       const s = suggestLots(db, line.itemId, line.qty, { useRemnants: false });
-      assert(s.shortage <= EPS, `Stok ${item.name} tersedia kurang ${s.shortage} unit untuk diserahkan.`);
+      assert(s.shortage <= EPS, `Available ${item.name} is ${s.shortage} units short for hand-over.`);
       chosen.push(...s.picks.map((p) => ({ itemId: line.itemId, lotId: p.lotId, qty: p.qty })));
     }
   }
   for (const line of r.lines) {
     const total = sum(chosen.filter((c) => c.itemId === line.itemId).map((c) => c.qty));
-    assert(Math.abs(total - line.qty) < EPS, `Qty serah ${getItem(db, line.itemId).name} harus ${line.qty}.`);
+    assert(Math.abs(total - line.qty) < EPS, `Hand-over qty of ${getItem(db, line.itemId).name} must be ${line.qty}.`);
   }
   for (const c of chosen) {
     const lot = getLot(db, c.lotId);
-    assert(lot.itemId === c.itemId, "Lot tidak sesuai dengan produk.");
-    assert(lot.status === "tersedia" && !lot.reservedForWo, `Lot ${lot.code} tidak tersedia untuk disewa.`);
+    assert(lot.itemId === c.itemId, "Lot does not match the product — pick a lot of this item.");
+    assert(lot.status === "tersedia" && !lot.reservedForWo, `Lot ${lot.code} is not available to rent — pick a free, unreserved lot.`);
     const part = splitLot(db, lot.id, c.qty, "keluar_sewa", ref, at);
     part.status = "disewa";
     part.rentalId = r.id;
-    recordMove(db, { lot: part, qty: 0, type: "keluar_sewa", ref, at, note: `Diserahkan ke ${r.project}` });
+    recordMove(db, { lot: part, qty: 0, type: "keluar_sewa", ref, at, note: `Handed over to ${r.project}` });
     r.checkouts.push({ id: newId(), lotId: part.id, itemId: c.itemId, qty: c.qty, at });
   }
   r.status = "berjalan";
@@ -236,20 +236,20 @@ export interface ReturnInput {
 
 export function returnRental(db: Db, id: ID, entries: ReturnInput[], at = nowIso()): Rental {
   const r = getRental(db, id);
-  assert(r.status === "berjalan", "Sewa ini tidak sedang berjalan.");
+  assert(r.status === "berjalan", "This rental is not in progress.");
   const valid = entries.filter((e) => e.qty > EPS);
-  assert(valid.length > 0, "Isi qty yang dikembalikan.");
+  assert(valid.length > 0, "Enter the qty taken back.");
   const ref = rentalRef(r);
   for (const e of valid) {
     const co = r.checkouts.find((c) => c.id === e.checkoutId);
-    assert(co, "Data serah unit tidak ditemukan.");
+    assert(co, "Hand-over record not found.");
     const item = getItem(db, co.itemId);
     const outstanding = roundQty(co.qty - returnedQty(r, co.id));
-    assert(e.qty <= outstanding + EPS, `Qty kembali ${item.name} melebihi yang masih di luar (${outstanding}).`);
-    assertAmount(e.fee ?? 0, "Biaya ganti/perbaikan");
+    assert(e.qty <= outstanding + EPS, `Take-back qty of ${item.name} is more than is still out (${outstanding}).`);
+    assertAmount(e.fee ?? 0, "Replacement/repair fee");
     const lot = getLot(db, co.lotId);
     if (e.condition === "hilang") {
-      takeFromLot(db, lot.id, e.qty, "hilang", ref, { at, allowStatus: ["disewa"], note: e.note || "Hilang saat disewa" });
+      takeFromLot(db, lot.id, e.qty, "hilang", ref, { at, allowStatus: ["disewa"], note: e.note || "Lost while on rent" });
     } else {
       const part = splitLot(db, lot.id, e.qty, e.condition === "baik" ? "kembali_sewa" : "rusak_sewa", ref, at);
       part.status = e.condition === "baik" ? "tersedia" : "rusak";
@@ -260,7 +260,7 @@ export function returnRental(db: Db, id: ID, entries: ReturnInput[], at = nowIso
         type: e.condition === "baik" ? "kembali_sewa" : "rusak_sewa",
         ref,
         at,
-        note: e.note || (e.condition === "baik" ? "Kembali kondisi baik" : "Kembali rusak"),
+        note: e.note || (e.condition === "baik" ? "Returned in good condition" : "Returned damaged"),
       });
     }
     r.returns.push({
@@ -280,8 +280,8 @@ export function returnRental(db: Db, id: ID, entries: ReturnInput[], at = nowIso
 
 export function cancelRental(db: Db, id: ID): Rental {
   const r = getRental(db, id);
-  assert(r.status === "dipesan", "Hanya booking yang belum diserahkan yang bisa dibatalkan.");
-  assert(r.payments.length === 0, "Booking sudah ada pembayaran — kembalikan/hapus pembayaran dulu.");
+  assert(r.status === "dipesan", "Only bookings not yet handed over can be cancelled.");
+  assert(r.payments.length === 0, "This booking has payments — refund or delete them first.");
   r.status = "batal";
   return r;
 }
@@ -300,8 +300,8 @@ export function createRepairsFromRental(db: Db, id: ID): WorkOrder[] {
       .flatMap((w) => w.plannedInputs.map((i) => i.lotId)),
   );
   const todo = [...new Set(candidates)].filter((lotId) => !already.has(lotId));
-  assert(todo.length > 0, "Tidak ada unit rusak yang perlu dibuatkan perintah perbaikan.");
-  const wos = todo.map((lotId) => createRepairOrder(db, lotId, `Perbaikan ${getItem(db, getLot(db, lotId).itemId).name} — ${r.code}`));
+  assert(todo.length > 0, "No damaged units need a repair order.");
+  const wos = todo.map((lotId) => createRepairOrder(db, lotId, `Repair ${getItem(db, getLot(db, lotId).itemId).name} — ${r.code}`));
   r.repairWoIds = [...(r.repairWoIds ?? []), ...wos.map((w) => w.id)];
   return wos;
 }

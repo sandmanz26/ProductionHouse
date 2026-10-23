@@ -1,124 +1,129 @@
-# Peta proses, resep, dan gabung
+# Process maps, recipes, and merge
 
-## Peta proses — empat sudut pandang, satu bahasa gambar
+## Process maps — four viewpoints, one visual language
 
-Semua peta memakai diagram yang sama: kolom simpul dihubungkan aliran yang **lebarnya rupiah**.
-Ukurannya rupiah, bukan qty, karena aliran dari kayu (m³) menjadi kursi (pcs) hanya bisa
-dijumlahkan dalam uang. Warna menunjukkan isi aliran:
+All maps use the same diagram: columns of nodes joined by flows whose **width is rupiah**.
+The measure is rupiah, not qty, because a flow from wood (m³) to chairs (pcs) can only be
+added up in money. Colour shows what a flow carries:
 
-| Warna | Arti |
+| Colour | Meaning |
 |---|---|
-| Jati (cokelat) | Bahan |
-| Biru | Produk (termasuk yang terjual) |
-| Hijau | Sisa material — potongan yang kembali ke gudang dengan harganya |
-| Ungu | Tenaga kerja & overhead |
-| Abu-abu | Proses, stok, dalam proses |
-| Abu-abu bergaris | Limbah & rugi |
+| Teak (brown) | Materials |
+| Blue | Products (including those sold) |
+| Green | Offcuts — pieces that go back to the warehouse with their cost |
+| Purple | Labour & overhead |
+| Grey | Processes, stock, work in progress |
+| Hatched grey | Waste & losses |
 
-Palet divalidasi untuk buta warna (protan/deutan/tritan) dan kontras di mode terang maupun
-gelap. Setiap peta punya **tampilan tabel** (tombol "Tabel"), tooltip saat diarahkan, dan simpul
-yang bisa diklik untuk membuka datanya. Aliran bergaris putus-putus adalah perkiraan (harga standar).
+The palette is validated for colour blindness (protan/deutan/tritan) and for contrast in both
+light and dark mode. Every map has a **table view** (the "Table" button), tooltips on hover, and
+nodes you can click to open their data. Dashed flows are estimates (standard cost).
 
-| Peta | Di mana | Isinya |
+| Map | Where | What it shows |
 |---|---|---|
-| **Peta proses pekerjaan** | Detail perintah kerja | Bahan per lot (sisa terpisah) + tenaga kerja → pekerjaan → hasil, sisa, kembali utuh, limbah dijual, rugi bongkar → **nasib hasilnya** (terjual ke siapa, disewa, di gudang, diolah lagi). Rencana tanpa bahan diambil digambar pada harga standar. |
-| **Peta resep** | Detail & form resep, form perintah kerja | Bahan + jam kerja per batch → resep → hasil + perkiraan sisa, pada harga standar. Bisa dikalikan batch. |
-| **Telusur lot** | Klik kode lot di halaman stok | Dua langkah ke belakang (pembelian/pekerjaan → bahan-bahannya) dan dua langkah ke depan (pekerjaan → produk → penjualan). Lot hasil pecah atau gabung ditelusuri ke induknya. Jejak ini yang dibutuhkan untuk SVLK dan uji tuntas EUDR. |
-| **Peta alur** | Menu Analisa → Peta alur | Seluruh bengkel per periode: pembelian, saldo awal, sisa & olahan → gudang bahan → produksi (+ tenaga kerja) → produk jadi, sisa, limbah, dalam proses → **nasib produk yang dibuat pada periode itu**, ditelusuri lot demi lot. |
+| **Job process map** | Work order detail | Materials per lot (offcuts shown separately) + labour → job → output, offcuts, returned whole, waste sold, dismantling loss → **where the output went** (sold to whom, on rent, in the warehouse, processed again). A plan with no materials issued yet is drawn at standard cost. |
+| **Recipe map** | Recipe detail & form, work order form | Materials + labour hours per batch → recipe → output + expected offcuts, at standard cost. Can be multiplied by batches. |
+| **Lot trace** | Click a lot code on a stock page | Two steps back (purchase/job → its materials) and two steps forward (job → product → sale). Lots created by a split or merge are traced to their parent. This trail is what SVLK and EUDR due diligence need. |
+| **Flow map** | Menu Analysis → Flow map | The whole workshop per period: purchases, opening stock, offcuts & processed materials → materials warehouse → production (+ labour) → finished products, offcuts, waste, work in progress → **where the products made in that period went**, traced lot by lot. |
 
-Setiap peta **menjaga nilai**: yang masuk ke simpul proses sama dengan yang keluar (diuji di
-`src/domain/process.test.ts`). Selisih produksi muncul terang-terangan sebagai "Dalam proses".
+Every map **conserves value**: what goes into a process node equals what comes out (tested in
+`src/domain/process.test.ts`). Any production difference shows up openly as "Work in progress".
 
-## Resep proses
+## Recipes
 
-BOM menjawab satu pertanyaan: *produk ini butuh bahan apa?* Resep menjawab yang lebih luas:
+A BOM answers one question: *what materials does this product need?* A recipe answers a wider one:
 
-- **Banyak hasil**: satu papan → daun meja + kaki + potongan laci, dengan porsi biaya tetap (%)
-  atau dibagi menurut nilai jual.
-- **Banyak cara** membuat barang yang sama (mis. kursi dari jati baru vs dari kayu bongkaran).
-- **Semua jenis proses**: produksi, konversi, gabung, dekonstruksi.
-- **Batch**: jumlah ditulis per batch; perintah kerja mengalikannya (bahan, hasil, jam kerja).
-- **Perkiraan sisa & limbah**: sisa layak (% nilai bahan) dikreditkan pada biaya standar.
-  Limbah (% qty) dipakai untuk perencanaan.
-- **Tahapan & catatan** untuk tukang ikut ke perintah kerja.
+- **Multiple outputs**: one board → table top + legs + drawer pieces, with fixed cost shares (%)
+  or split by sales value.
+- **Several ways** to make the same item (e.g. a chair from new teak vs from reclaimed wood).
+- **Every process type**: production, conversion, merge, dismantling.
+- **Batches**: quantities are written per batch; the work order multiplies them (materials,
+  output, labour hours).
+- **Expected offcuts & waste**: usable offcuts (% of material value) are credited in the standard
+  cost. Waste (% of qty) is used for planning.
+- **Stages & notes** for the craftsmen carry over to the work order.
 
-Perintah kerja dari resep memakai bahan resep, **bukan** BOM produk, supaya tidak dihitung dua
-kali. Porsi biaya tetap dari resep terbawa ke form penyelesaian. Material yang dihasilkan resep
-(produksi/konversi/gabung) dianggap bisa diproduksi. "Produksi komponen" lalu membuat perintah
-kerja dari resepnya dalam batch utuh (butuh 3 panel, 2 per batch → 2 batch). Resep dekonstruksi
-tidak membuat bahan dianggap bisa diproduksi: kayu bongkaran adalah hasil sampingan, bukan
-sesuatu yang direncanakan.
+A work order from a recipe uses the recipe's materials, **not** the product BOM, so nothing is
+counted twice. Fixed cost shares from the recipe carry over to the completion form. A material
+produced by a recipe (production/conversion/merge) counts as producible. "Produce components" then
+creates work orders from its recipe in whole batches (need 3 panels, 2 per batch → 2 batches). A
+dismantling recipe does not make a material producible: reclaimed wood is a by-product, not
+something you plan for.
 
-**Riwayat pemakaian** membandingkan setiap pekerjaan selesai dengan resepnya: hasil vs rencana,
-pemakaian bahan vs standar (100% = sesuai resep), sisa yang kembali, dan HPP aktual vs standar.
-Inilah tanda kapan resep perlu diperbarui.
+**Usage history** compares every completed job with its recipe: output vs plan, material usage
+vs standard (100% = as per recipe), offcuts returned, and actual cost vs standard cost. This is
+the signal that a recipe needs updating.
 
-Resep yang sudah dipakai tidak bisa dihapus, hanya diarsipkan, agar riwayatnya tetap terbaca.
+A recipe that has been used cannot be deleted, only archived, so its history stays readable.
 
-## Gabung
+## Merge
 
-### Perintah kerja jenis Gabung
-Beberapa barang dari stok menjadi **satu jenis** barang:
-- **Set**: 1 meja + 6 kursi + kardus → 1 Set Makan. HPP set = HPP lot meja & kursi yang diambil
-  + tenaga kerja.
-- **Panel dari potongan**: potongan sisa jati + lem → panel sambung (*finger-joint*). Sisa
-  material dipakai lebih dulu, jadi potongan kecil berubah menjadi barang bernilai.
+### Merge work orders
+Several items from stock become **one kind** of item:
+- **Set**: 1 table + 6 chairs + carton → 1 dining set. Set cost = the cost of the table & chair
+  lots issued + labour.
+- **Panel from offcuts**: teak offcuts + glue → a finger-jointed panel. Offcuts are used first, so
+  small pieces turn into a valuable item.
 
-Aturan: tepat satu jenis hasil; minimal dua jenis barang atau dua unit; barang hasil tidak boleh
-menjadi bahannya sendiri. Hasil gabung tidak harus berupa produk (panel adalah material).
+Rules: exactly one output item; at least two different items or two units; the output item may
+not be one of its own materials. The output of a merge does not have to be a product (a panel is
+a material).
 
-### Gabung lot (gudang)
-Di halaman stok barang → **Gabung lot**: satukan beberapa lot barang yang sama, mis. potongan sisa
-seukuran yang diikat jadi satu. Hasilnya:
-- qty dijumlah, harga pokok **rata-rata tertimbang** (nilai tidak berubah);
-- tanggal masuk = lot **tertua**, jadi tetap di depan antrean FIFO;
-- `mergedFrom` menyimpan lot asal untuk penelusuran; setiap lot asal mendapat mutasi "Gabung lot".
+### Merge lots (warehouse)
+On an item's stock page → **Merge lots**: combine several lots of the same item, e.g. offcuts of
+the same size bundled together. The result:
+- qty is summed, unit cost is the **weighted average** (value does not change);
+- the receipt date = the **oldest** lot, so it stays at the front of the FIFO queue;
+- `mergedFrom` keeps the source lots for tracing; each source lot gets a "Merge lots" movement.
 
-Ditolak: barang berbeda, sisa dicampur stok biasa, cadangan pekerjaan yang berbeda, lot yang
-sedang disewa/rusak, lokasi yang tidak dikenal, atau kurang dari dua lot.
+Rejected: different items, offcuts mixed with regular stock, reservations for different jobs,
+lots that are on rent or damaged, unknown locations, or fewer than two lots.
 
-## Jalur produksi (per barang)
+## Production routes (per item)
 
-Menu **Operasional → Jalur produksi**, atau tombol **Jalur produksi** di halaman stok atau data
-master barang. Pilih satu barang, lalu terlihat semua cara mendapatkannya, bertingkat sampai ke
-bahan dasar.
+Menu **Operations → Production routes**, or the **Production routes** button on an item's stock
+page or master data page. Pick an item to see every way to get it, level by level down to base
+materials.
 
-### Jenis jalur
+### Route types
 
-| Tanda | Jalur | Sumber datanya |
+| Tag | Route | Data source |
 |---|---|---|
-| **BUAT** | BOM standar | BOM barang itu (produk, atau komponen dengan BOM) |
-| **RESEP** | Setiap resep yang menghasilkan barang itu | Menu Resep proses. Satu barang boleh punya banyak resep (kayu baru vs kayu reclaimed) |
-| **BELI** | Beli dari pemasok | Riwayat pembelian (pemasok, berapa kali, harga pokok terakhir termasuk ongkir). Bahan mentah yang tidak bisa dibuat selalu punya jalur ini |
-| **BONGKAR** | Hasil bongkar | Resep atau pekerjaan dekonstruksi yang menghasilkan barang itu. Ditandai sebagai **hasil sampingan** (garis putus-putus) dan tidak pernah dihitung "termurah" |
-| **PERNAH** | Konversi / gabung yang pernah dilakukan tanpa resep | Pekerjaan selesai, dikelompokkan menurut bahan yang masuk. Bahan per unit dihitung dari pemakaian nyata |
+| **MAKE** | Standard BOM | The item's BOM (a product, or a component with a BOM) |
+| **RECIPE** | Each recipe that produces the item | Menu Recipes. One item may have many recipes (new wood vs reclaimed wood) |
+| **BUY** | Buy from a supplier | Purchase history (supplier, how many times, latest unit cost including freight). Raw materials that cannot be made always have this route |
+| **DISMANTLE** | Dismantling output | A dismantling recipe or job that yields the item. Marked as a **by-product** (dashed line) and never counted as "cheapest" |
+| **PAST** | Conversions / merges done in the past without a recipe | Completed jobs, grouped by the materials that went in. Materials per unit are worked out from actual usage |
 
-Contoh di data demo: **Kursi Makan Jati Sekar** bisa dibuat dari jati baru (BOM / resep standar)
-atau dari **jati reclaimed**. Jati reclaimed diolah dari **kayu bongkaran**, dan kayu bongkaran
-dibeli dari pengepul atau didapat dari membongkar meja makan atau kursi rusak. **Rangka Kursi
-Bar** dibuat sendiri (BOM) sekaligus dibeli dari subkon UD Rangka Kudus.
+Example in the demo data: the **Sekar Teak Dining Chair** can be made from new teak
+(**Teak Grade A (kiln-dried)**, via the BOM / standard recipe) or from **Reclaimed Teak (processed)**.
+Reclaimed Teak (processed) is made from **Reclaimed Teak (raw)**, which is bought from the
+Jepara Reclaimed Timber Collector or recovered by dismantling a broken dining table or chair. The
+**Bar Stool Frame (component)** is both made in-house (BOM) and bought from the subcontractor
+UD Rangka Kudus.
 
-### Peta
-- Kiri ke kanan: bahan dasar → jalur → barang yang dipilih (selalu di tepi kanan; peta otomatis
-  bergeser ke sana).
-- Bahan yang sama dipakai banyak jalur hanya muncul **sekali**.
-- **Siklus** (kursi → bongkar kursi → kayu bongkaran → … → kursi) dihentikan dengan penanda ↺,
-  bukan diulang tanpa akhir.
-- Bahan yang hanya dibeli tidak diberi kotak jalur sendiri; pemasoknya tertulis di kartunya.
-- **Kedalaman** 1–4 tingkat. Kartu dengan tulisan "jalur lebih jauh" bisa diklik untuk dipetakan.
-- **Bahan pembantu** (hardware, finishing, kemasan) disembunyikan secara bawaan. Jumlahnya
-  tertulis di kotak jalur ("+3 pembantu").
-- Arahkan kursor ke kartu atau jalur untuk menyorot rantainya. Qty per unit muncul di garis. Klik
-  barang untuk memusatkan peta ke barang itu, klik jalur resep untuk membuka resepnya. Tersedia
-  juga tampilan tabel.
+### Map
+- Left to right: base materials → routes → the selected item (always at the right edge; the map
+  scrolls there automatically).
+- A material used by several routes appears only **once**.
+- **Cycles** (chair → dismantle chair → reclaimed wood → … → chair) are stopped with a ↺ marker
+  instead of repeating forever.
+- Materials that are only bought do not get their own route box; the supplier is written on
+  their card.
+- **Depth** 1–4 levels. Cards marked "further routes" can be clicked to map them.
+- **Auxiliary materials** (hardware, finishing, packaging) are hidden by default. Their count is
+  shown in the route box ("+3 auxiliary").
+- Hover over a card or route to highlight its chain. Qty per unit appears on the line. Click an
+  item to centre the map on it; click a recipe route to open the recipe. A table view is also
+  available.
 
-### Perbandingan jalur
-HPP standar per unit tiap jalur (harga bahan & tarif saat ini; pembelian = harga pokok terakhir),
-mana yang **termurah**, selisih jalur lain, berapa kali dipakai, berapa unit diperoleh, dan
-berapa yang sedang berjalan. Tombol **Buat / Beli** membuka perintah kerja atau pembelian yang
-sudah terisi.
+### Route comparison
+Standard unit cost per route (current material costs & rates; purchase = latest unit cost),
+which one is **cheapest**, how much more the other routes cost, how many times each was used,
+how many units it produced, and how many are in progress. The **Make / Buy** button opens a
+pre-filled work order or purchase.
 
-### Riwayat nyata
-Diagram aliran nilai untuk barang itu: dari mana saja stoknya pernah datang (per jalur / resep /
-pemasok), dan ke mana perginya (terjual ke pelanggan mana, **menjadi produk apa**, disewa, di
-gudang). Pertanyaan "kayu ini jadi apa saja?" terjawab di sini.
+### Actual history
+A value-flow diagram for the item: everywhere its stock has come from (per route / recipe /
+supplier), and where it went (sold to which customer, **which product it became**, on rent, in
+the warehouse). The question "what has this wood turned into?" is answered here.

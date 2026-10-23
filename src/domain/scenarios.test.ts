@@ -134,11 +134,11 @@ function stockChairs(ctx: ReturnType<typeof shop>, n: number) {
 
 // ------------------------------------------------------------------ S1 multi-level BOM
 
-describe("S1 · komponen setengah jadi (BOM bertingkat)", () => {
+describe("S1 · semi-finished components (multi-level BOM)", () => {
   it("accepts a material with a BOM as production output, rejects plain materials", () => {
     const { db, frame, screw } = shop();
     expect(() => createWorkOrder(db, { type: "produksi", title: "Rangka", plannedOutputs: [{ itemId: frame.id, qty: 4 }] })).not.toThrow();
-    expect(() => createWorkOrder(db, { type: "produksi", title: "Sekrup", plannedOutputs: [{ itemId: screw.id, qty: 4 }] })).toThrow(/tidak bisa diproduksi/);
+    expect(() => createWorkOrder(db, { type: "produksi", title: "Sekrup", plannedOutputs: [{ itemId: screw.id, qty: 4 }] })).toThrow(/cannot be produced/);
   });
 
   it("flags producible component shortages and creates child orders once", () => {
@@ -154,7 +154,7 @@ describe("S1 · komponen setengah jadi (BOM bertingkat)", () => {
     expect(child!.parentWoId).toBe(parent.id);
     expect(child!.plannedOutputs[0]).toMatchObject({ itemId: frame.id, qty: 4 });
     expect(requirements(db, parent).find((r) => r.itemId === frame.id)!.inComponentOrders).toBe(4);
-    expect(() => createComponentOrders(db, parent.id)).toThrow(/Tidak ada komponen/);
+    expect(() => createComponentOrders(db, parent.id)).toThrow(/No components need/);
     expect(insights(db).some((i) => i.id === `wo-comp-${parent.id}`)).toBe(false);
   });
 
@@ -180,7 +180,7 @@ describe("S1 · komponen setengah jadi (BOM bertingkat)", () => {
 
 // ------------------------------------------------------------------ S2 material processing
 
-describe("S2 · olah bahan: kayu basah dikeringkan (KD) dan menyusut", () => {
+describe("S2 · processed material: green timber kiln-dried (KD) and shrinking", () => {
   it("carries the full input cost into the smaller dried volume and reports yield", () => {
     const { db, teak, wetTeak } = shop();
     teak.bom = [{ materialId: wetTeak.id, qty: 1.1 }];
@@ -203,13 +203,13 @@ describe("S2 · olah bahan: kayu basah dikeringkan (KD) dan menyusut", () => {
 
 // ------------------------------------------------------------------ S3 stages
 
-describe("S3 · tahapan produksi & papan WIP", () => {
+describe("S3 · production stages & WIP board", () => {
   it("uses the product's route, tracks progress and closes all stages on completion", () => {
     const ctx = shop();
     const { db, chair } = ctx;
     const wo = createWorkOrder(db, { type: "produksi", title: "Kursi", plannedOutputs: [{ itemId: chair.id, qty: 1 }] });
     expect(wo.stages.map((s) => s.name)).toEqual(["Rakit", "Jok", "QC"]);
-    expect(stageBoard(db).find((c) => c.name === "Antre")!.workOrders).toHaveLength(1);
+    expect(stageBoard(db).find((c) => c.name === "Queued")!.workOrders).toHaveLength(1);
 
     setStageStatus(db, wo.id, wo.stages[0]!.id, "selesai");
     expect(wo.status).toBe("berjalan");
@@ -227,7 +227,7 @@ describe("S3 · tahapan produksi & papan WIP", () => {
       plannedOutputs: [{ itemId: chair.id, qty: 1 }],
       plannedInputs: [{ itemId: chair.id, qty: 1 }],
     });
-    expect(repair.stages.map((s) => s.name)).toEqual(["Perbaikan", "QC"]);
+    expect(repair.stages.map((s) => s.name)).toEqual(["Repair", "QC"]);
     const custom = createWorkOrder(db, { type: "produksi", title: "x", plannedOutputs: [{ itemId: chair.id, qty: 1 }], stages: ["A", " ", "B"] });
     expect(custom.stages.map((s) => s.name)).toEqual(["A", "B"]);
   });
@@ -235,7 +235,7 @@ describe("S3 · tahapan produksi & papan WIP", () => {
 
 // ------------------------------------------------------------------ S4 labour
 
-describe("S4 · tenaga kerja harian & borongan per unit", () => {
+describe("S4 · daily labour & piece rate", () => {
   it("prices labour from logs (hours × rate + pieces × piece rate) instead of the plan", () => {
     const ctx = shop();
     const { db, chair, frame, fabric } = ctx;
@@ -258,17 +258,17 @@ describe("S4 · tenaga kerja harian & borongan per unit", () => {
   it("validates labour entries", () => {
     const { db, chair } = shop();
     const wo = createWorkOrder(db, { type: "produksi", title: "Kursi", plannedOutputs: [{ itemId: chair.id, qty: 1 }] });
-    expect(() => addLaborLog(db, wo.id, { worker: " ", hours: 1 })).toThrow(/nama pekerja/);
-    expect(() => addLaborLog(db, wo.id, { worker: "A" })).toThrow(/jam kerja atau jumlah unit/);
-    expect(() => addLaborLog(db, wo.id, { worker: "A", pieces: 3 })).toThrow(/tarif borongan/);
-    expect(() => addLaborLog(db, wo.id, { worker: "A", hours: -1 })).toThrow(/negatif/);
-    expect(() => addLaborLog(db, wo.id, { worker: "A", hours: 1, stageId: "nope" })).toThrow(/Tahap/);
+    expect(() => addLaborLog(db, wo.id, { worker: " ", hours: 1 })).toThrow(/worker or team name/);
+    expect(() => addLaborLog(db, wo.id, { worker: "A" })).toThrow(/labour hours or a piece count/);
+    expect(() => addLaborLog(db, wo.id, { worker: "A", pieces: 3 })).toThrow(/piece rate per unit/);
+    expect(() => addLaborLog(db, wo.id, { worker: "A", hours: -1 })).toThrow(/cannot be negative/);
+    expect(() => addLaborLog(db, wo.id, { worker: "A", hours: 1, stageId: "nope" })).toThrow(/Stage not found/);
   });
 });
 
 // ------------------------------------------------------------------ S5 partial output
 
-describe("S5 · hasil bertahap: kirim sebagian sebelum pekerjaan selesai", () => {
+describe("S5 · partial output: ship part before the job is done", () => {
   function partialSetup() {
     const ctx = shop();
     const { db, chair, frame, fabric } = ctx;
@@ -290,7 +290,7 @@ describe("S5 · hasil bertahap: kirim sebagian sebelum pekerjaan selesai", () =>
     deliverSalesOrder(db, so.id, [{ itemId: chair.id, qty: 8 }]);
     expect(salesTotals(db, so).cogs).toBe(8 * 900_000);
 
-    expect(() => transact(db, (d) => cancelWorkOrder(d, wo.id))).toThrow(/hasil yang diterima/);
+    expect(() => transact(db, (d) => cancelWorkOrder(d, wo.id))).toThrow(/already been received/);
     completeWorkOrder(db, wo.id, { outputs: [{ itemId: chair.id, qty: 12 }], returns: [] });
     const actual = 500_000 + 0.5 * 90_000; // 545,000
     expect(wo.cost!.outputs).toHaveLength(1);
@@ -309,9 +309,9 @@ describe("S5 · hasil bertahap: kirim sebagian sebelum pekerjaan selesai", () =>
   it("can close with everything received earlier, and guards invalid receipts", () => {
     const { db, chair, frame, wo } = partialSetup();
     receiveOutput(db, wo.id, { itemId: chair.id, qty: 24 });
-    expect(() => receiveOutput(db, wo.id, { itemId: frame.id, qty: 1 })).toThrow(/bukan hasil yang direncanakan/);
-    expect(() => receiveOutput(db, wo.id, { itemId: chair.id, qty: 0 })).toThrow(/lebih dari 0/);
-    expect(() => computeCost(db, wo, { outputs: [{ itemId: chair.id, qty: 1, sharePct: 100 }], returns: [] })).toThrow(/Porsi biaya manual/);
+    expect(() => receiveOutput(db, wo.id, { itemId: frame.id, qty: 1 })).toThrow(/not a planned output/);
+    expect(() => receiveOutput(db, wo.id, { itemId: chair.id, qty: 0 })).toThrow(/more than 0/);
+    expect(() => computeCost(db, wo, { outputs: [{ itemId: chair.id, qty: 1, sharePct: 100 }], returns: [] })).toThrow(/Manual cost shares/);
     completeWorkOrder(db, wo.id, { outputs: [], returns: [] });
     expect(wo.status).toBe("selesai");
     expect(wo.cost!.variance).toBe(0);
@@ -364,7 +364,7 @@ describe("S6 · QC reject & rework", () => {
 
 // ------------------------------------------------------------------ S7 purchasing units
 
-describe("S7 · kubikasi kayu & satuan beli", () => {
+describe("S7 · timber volume & purchase units", () => {
   it("computes timber volume from piece size", () => {
     expect(cubicMeters(10, 5, 20, 3)).toBe(0.3);
     expect(cubicMeters(1, 2.5, 15, 2)).toBe(0.0075);
@@ -386,7 +386,7 @@ describe("S7 · kubikasi kayu & satuan beli", () => {
 
 // ------------------------------------------------------------------ S8 money
 
-describe("S8 · DP, pelunasan, piutang & utang", () => {
+describe("S8 · down payment, final payment, receivables & payables", () => {
   function orderOf(ctx: ReturnType<typeof shop>, qty: number, dpPercent?: number) {
     const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db),
       channel: "ekspor",
@@ -409,9 +409,9 @@ describe("S8 · DP, pelunasan, piutang & utang", () => {
     expect(insights(ctx.db, "2026-09-02").some((i) => i.id === `dp-${so.id}`)).toBe(true);
     addPayment(ctx.db, "sale", so.id, { date: "2026-09-02", amount: 450 });
     expect(dpStatus(ctx.db, so).met).toBe(true);
-    expect(() => transact(ctx.db, (d) => addPayment(d, "sale", so.id, { date: "2026-09-03", amount: 1_051 }))).toThrow(/melebihi sisa/);
+    expect(() => transact(ctx.db, (d) => addPayment(d, "sale", so.id, { date: "2026-09-03", amount: 1_051 }))).toThrow(/more than the balance/);
     expect(() => transact(ctx.db, (d) => addPayment(d, "sale", so.id, { date: "2026-09-03", amount: -451 }))).toThrow(/Refund/);
-    expect(() => transact(ctx.db, (d) => cancelSalesOrder(d, so.id))).toThrow(/pembayaran/);
+    expect(() => transact(ctx.db, (d) => cancelSalesOrder(d, so.id))).toThrow(/has payments/);
     expect(billedAmount(ctx.db, "sale", so.id).balance).toBe(1_050);
   });
 
@@ -473,7 +473,7 @@ describe("S8 · DP, pelunasan, piutang & utang", () => {
 
 // ------------------------------------------------------------------ S9–S10 sales
 
-describe("S9–S10 · pesanan custom & jual material", () => {
+describe("S9–S10 · custom orders & selling material", () => {
   it("carries custom specs into the production order", () => {
     const ctx = shop();
     const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db),
@@ -504,7 +504,7 @@ describe("S9–S10 · pesanan custom & jual material", () => {
 
 // ------------------------------------------------------------------ S11 returns
 
-describe("S11 · retur penjualan", () => {
+describe("S11 · sales returns", () => {
   it("returns good and defective units at delivery cost and credits the customer", () => {
     const ctx = shop();
     stockChairs(ctx, 5);
@@ -523,31 +523,31 @@ describe("S11 · retur penjualan", () => {
     expect(t.total).toBe(4_000_000);
     expect(t.cogs).toBe(2 * 545_000);
     expect(billedAmount(db, "sale", so.id).balance).toBe(4_000_000);
-    expect(() => transact(db, (d) => returnSale(d, so.id, [{ itemId: chair.id, qty: 3, condition: "baik" }]))).toThrow(/melebihi/);
+    expect(() => transact(db, (d) => returnSale(d, so.id, [{ itemId: chair.id, qty: 3, condition: "baik" }]))).toThrow(/more than/);
     expectLedgerConsistent(db);
   });
 
   it("refuses returns before delivery", () => {
     const ctx = shop();
     const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: ctx.chair.id, qty: 1, unitPrice: 1 }] });
-    expect(() => returnSale(ctx.db, so.id, [{ itemId: ctx.chair.id, qty: 1, condition: "baik" }])).toThrow(/Belum ada barang/);
+    expect(() => returnSale(ctx.db, so.id, [{ itemId: ctx.chair.id, qty: 1, condition: "baik" }])).toThrow(/Nothing has shipped yet/);
   });
 });
 
 // ------------------------------------------------------------------ S12 transfer
 
-describe("S12 · transfer antar lokasi", () => {
+describe("S12 · transfers between locations", () => {
   it("splits a lot to another location keeping its cost", () => {
     const { db, fabric } = shop();
-    const lot = addOpeningStock(db, { itemId: fabric.id, qty: 50, unitCost: 90_000, location: "Gudang Utama" });
+    const lot = addOpeningStock(db, { itemId: fabric.id, qty: 50, unitCost: 90_000, location: "Main warehouse" });
     const moved = transferLot(db, lot.id, 20, "Workshop");
     expect(moved.location).toBe("Workshop");
     expect(moved.qty).toBe(20);
     expect(moved.unitCost).toBe(90_000);
     expect(lot.qty).toBe(30);
     expect(stockOf(db, fabric.id).available).toBe(50);
-    expect(() => transferLot(db, lot.id, 1, "Gudang Utama")).toThrow(/sama/);
-    expect(() => transferLot(db, lot.id, 31, "Showroom")).toThrow(/melebihi/);
+    expect(() => transferLot(db, lot.id, 1, "Main warehouse")).toThrow(/same as the current/);
+    expect(() => transferLot(db, lot.id, 31, "Showroom")).toThrow(/more than/);
     const all = transferLot(db, lot.id, 30, "Showroom");
     expect(all.id).toBe(lot.id);
     expect(all.location).toBe("Showroom");
@@ -560,13 +560,13 @@ describe("S12 · transfer antar lokasi", () => {
     const r = createRental(ctx.db, { kind: "pinjam", project: "Foto", startDate: "2026-10-01", endDate: "2026-10-01", lines: [{ itemId: ctx.chair.id, qty: 2, ratePerDay: 0 }] });
     checkoutRental(ctx.db, r.id);
     const rented = ctx.db.lots.find((l) => l.status === "disewa")!;
-    expect(() => transferLot(ctx.db, rented.id, 1, "Showroom")).toThrow(/berstatus disewa/);
+    expect(() => transferLot(ctx.db, rented.id, 1, "Showroom")).toThrow(/on rent/);
   });
 });
 
 // ------------------------------------------------------------------ S13 rental utilisation
 
-describe("S13 · utilisasi unit sewa", () => {
+describe("S13 · rental unit utilisation", () => {
   it("measures unit-days out against units owned", () => {
     const ctx = shop();
     stockChairs(ctx, 4);
@@ -585,7 +585,7 @@ describe("S13 · utilisasi unit sewa", () => {
 
 // ------------------------------------------------------------------ S14 migration
 
-describe("S14 · data lama (skema v1) tetap terbaca", () => {
+describe("S14 · old data (schema v1) still loads", () => {
   it("fills new fields when loading v1 data", () => {
     const v1 = {
       schemaVersion: 1,
@@ -638,20 +638,20 @@ describe("guards on money & documents", () => {
       d.purchases.find((x) => x.id === p.id)!.payments = [];
       d.purchases.find((x) => x.id === p.id)!.status = "batal";
       return addPayment(d, "purchase", p.id, { date: "2026-10-02", amount: 10 });
-    })).toThrow(/dibatalkan/);
+    })).toThrow(/cancelled/);
     const r = createRental(db, { kind: "sewa", project: "x", startDate: "2026-10-01", endDate: "2026-10-01", lines: [{ itemId: chair.id, qty: 1, ratePerDay: 100 }] });
     addPayment(db, "rental", r.id, { date: "2026-10-01", amount: 100 });
-    expect(() => transact(db, (d) => addPayment(d, "rental", r.id, { date: "2026-10-01", amount: 1 }))).toThrow(/melebihi/);
-    expect(() => addPayment(db, "rental", r.id, { date: "2026-10-01", amount: 0 })).toThrow(/tidak boleh 0/);
-    expect(() => addPayment(db, "rental", r.id, { date: "", amount: 1 })).toThrow(/Tanggal/);
+    expect(() => transact(db, (d) => addPayment(d, "rental", r.id, { date: "2026-10-01", amount: 1 }))).toThrow(/more than/);
+    expect(() => addPayment(db, "rental", r.id, { date: "2026-10-01", amount: 0 })).toThrow(/cannot be 0/);
+    expect(() => addPayment(db, "rental", r.id, { date: "", amount: 1 })).toThrow(/date is required/i);
   });
 
   it("rejects invalid sales terms", () => {
     const { db, chair } = shop();
     const base = { channel: "supply" as const, date: "2026-10-01", currency: "IDR" as const, exchangeRate: 1, lines: [{ itemId: chair.id, qty: 1, unitPrice: 100 }] };
-    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, dpPercent: 120 })).toThrow(/DP/);
-    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, discount: 500 })).toThrow(/Diskon melebihi/);
-    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, currency: "USD", exchangeRate: 0 })).toThrow(/Kurs/);
+    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, dpPercent: 120 })).toThrow(/Down payment/);
+    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, discount: 500 })).toThrow(/Discount is more than/);
+    expect(() => createSalesOrder(db, { customerId: buyerOf(db), ...base, currency: "USD", exchangeRate: 0 })).toThrow(/Exchange rate/);
   });
 
   it("refuses to use a work order's own partial output as its input", () => {
@@ -662,7 +662,7 @@ describe("guards on money & documents", () => {
     const wo = createWorkOrder(db, { type: "konversi", title: "x", plannedOutputs: [{ itemId: chair.id, qty: 2 }], plannedInputs: [{ itemId: frame.id, qty: 2 }] });
     issueAll(db, wo);
     const rec = receiveOutput(db, wo.id, { itemId: chair.id, qty: 1 });
-    expect(() => issueMaterials(db, wo.id, [{ lotId: rec.lotId, qty: 1 }])).toThrow(/bahannya sendiri/);
+    expect(() => issueMaterials(db, wo.id, [{ lotId: rec.lotId, qty: 1 }])).toThrow(/its own/);
   });
 });
 
@@ -687,7 +687,7 @@ describe("planning & closing rules", () => {
     const so = createSalesOrder(ctx.db, { customerId: buyerOf(ctx.db), channel: "supply", date: "2026-10-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: ctx.chair.id, qty: 1, unitPrice: 1_000 }] });
     confirmSalesOrder(ctx.db, so.id);
     deliverSalesOrder(ctx.db, so.id, [{ itemId: ctx.chair.id, qty: 1 }]);
-    expect(() => transact(ctx.db, (d) => completeSalesOrder(d, so.id))).toThrow(/sisa tagihan/);
+    expect(() => transact(ctx.db, (d) => completeSalesOrder(d, so.id))).toThrow(/still unpaid/);
     addPayment(ctx.db, "sale", so.id, { date: "2026-10-02", amount: 1_000 });
     completeSalesOrder(ctx.db, so.id);
     expect(so.status).toBe("selesai");

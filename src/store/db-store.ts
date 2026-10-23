@@ -34,8 +34,8 @@ const safeStorage: StateStorage = {
       localStorage.setItem(name, value);
     } catch (err) {
       console.error(err);
-      toast.danger("Penyimpanan perangkat penuh atau diblokir", {
-        description: "Perubahan terakhir belum tersimpan permanen. Ekspor cadangan di Pengaturan.",
+      toast.danger("Device storage is full or blocked", {
+        description: "Your latest changes are not saved permanently. Export a backup in Settings.",
       });
     }
   },
@@ -87,7 +87,7 @@ export const useDbStore = create<DbState>()(
             toast.danger(err.message);
           } else {
             console.error(err);
-            toast.danger("Terjadi kesalahan tak terduga", {
+            toast.danger("Something unexpected went wrong", {
               description: err instanceof Error ? err.message : String(err),
             });
           }
@@ -120,7 +120,7 @@ export const useDbStore = create<DbState>()(
           // Data saved before the welcome screen existed belongs to someone already working.
           return { ...current, db: migrate(p.db), isDemo: !!p.isDemo, onboarded: p.onboarded ?? true };
         } catch (err) {
-          console.error("Data tersimpan tidak valid, memakai data demo.", err);
+          console.error("Saved data is invalid, using the demo data.", err);
           return current;
         }
       },

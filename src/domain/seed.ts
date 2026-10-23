@@ -1,6 +1,6 @@
 /**
  * Demo dataset built exclusively through domain operations, so every number (lots, remnants,
- * HPP, ledger) is internally consistent. Dates are relative to "today" to keep the demo fresh.
+ * job cost, ledger) is internally consistent. Dates are relative to "today" to keep the demo fresh.
  */
 import { addPayment } from "./finance";
 import { addOpeningStock, transferLot } from "./inventory";
@@ -54,30 +54,30 @@ export function buildDemoDb(): Db {
     extra: Partial<Parameters<typeof createItem>[1]> = {},
   ) => createItem(db, { sku, name, kind: "material", category, uom, standardCost, ...extra });
 
-  const jati = m("KY-JATI-A", "Kayu Jati Grade A (kering oven)", "kayu_solid", "m3", 14_500_000, {
+  const jati = m("KY-JATI-A", "Teak Grade A (kiln-dried)", "kayu_solid", "m3", 14_500_000, {
     trackRemnant: true,
     minRemnantQty: 0.004,
     reorderPoint: 0.5,
   });
-  const mahoni = m("KY-MHN", "Kayu Mahoni", "kayu_solid", "m3", 7_800_000, { trackRemnant: true, minRemnantQty: 0.004, reorderPoint: 0.4 });
+  const mahoni = m("KY-MHN", "Mahogany", "kayu_solid", "m3", 7_800_000, { trackRemnant: true, minRemnantQty: 0.004, reorderPoint: 0.4 });
   const ply = m("PN-PLY18", "Plywood 18mm 122×244", "panel", "lembar", 285_000, { trackRemnant: true, minRemnantQty: 0.1, reorderPoint: 6 });
   const mdf = m("PN-MDF12", "MDF 12mm 122×244", "panel", "lembar", 168_000, { trackRemnant: true, minRemnantQty: 0.1, reorderPoint: 4 });
-  const linen = m("KN-LINEN", "Kain Linen Natural (lebar 140)", "kain", "m", 92_000, { trackRemnant: true, minRemnantQty: 0.3, reorderPoint: 15 });
-  const busa = m("BS-D30", "Busa D30 tebal 5cm", "busa", "lembar", 185_000, { trackRemnant: true, minRemnantQty: 0.15, reorderPoint: 4 });
-  const rotan = m("RT-SINT", "Rotan Sintetis", "rotan", "kg", 68_000, { reorderPoint: 10 });
-  const hollow = m("LG-HL44", "Besi Hollow 4×4", "logam", "batang", 98_000, { trackRemnant: true, minRemnantQty: 0.2, reorderPoint: 6 });
-  const engsel = m("HW-ENGSEL", "Engsel Sendok Slow Motion", "hardware", "pcs", 9_500, { reorderPoint: 20 });
-  const sekrup = m("HW-SKR440", "Sekrup Kayu 4×40", "hardware", "pcs", 160, { reorderPoint: 500 });
-  const melamine = m("FN-MLM", "Melamine Clear Doff", "finishing", "liter", 96_000, { reorderPoint: 5 });
-  const thinner = m("FN-THN", "Thinner Super", "finishing", "liter", 29_000, { reorderPoint: 5 });
-  const kardus = m("KM-KRD5", "Kardus 5 Lapis + Sudut", "kemasan", "pcs", 38_000, { reorderPoint: 10 });
-  const lem = m("FN-LEM-PVAC", "Lem Kayu PVAc D3", "finishing", "liter", 45_000, { reorderPoint: 3 });
+  const linen = m("KN-LINEN", "Natural Linen Fabric (140 wide)", "kain", "m", 92_000, { trackRemnant: true, minRemnantQty: 0.3, reorderPoint: 15 });
+  const busa = m("BS-D30", "Foam D30 5 cm", "busa", "lembar", 185_000, { trackRemnant: true, minRemnantQty: 0.15, reorderPoint: 4 });
+  const rotan = m("RT-SINT", "Synthetic Rattan", "rotan", "kg", 68_000, { reorderPoint: 10 });
+  const hollow = m("LG-HL44", "Steel Box Section 4×4", "logam", "batang", 98_000, { trackRemnant: true, minRemnantQty: 0.2, reorderPoint: 6 });
+  const engsel = m("HW-ENGSEL", "Soft-close Concealed Hinge", "hardware", "pcs", 9_500, { reorderPoint: 20 });
+  const sekrup = m("HW-SKR440", "Wood Screw 4×40", "hardware", "pcs", 160, { reorderPoint: 500 });
+  const melamine = m("FN-MLM", "Melamine Clear Matte", "finishing", "liter", 96_000, { reorderPoint: 5 });
+  const thinner = m("FN-THN", "Thinner", "finishing", "liter", 29_000, { reorderPoint: 5 });
+  const kardus = m("KM-KRD5", "5-ply Carton + Corners", "kemasan", "pcs", 38_000, { reorderPoint: 10 });
+  const lem = m("FN-LEM-PVAC", "PVAc D3 Wood Glue", "finishing", "liter", 45_000, { reorderPoint: 3 });
   // Reclaimed timber: bought from collectors or recovered by dismantling, then processed.
-  const bongkaran = m("KY-JATI-BKR", "Kayu Jati Bongkaran (mentah)", "kayu_solid", "m3", 5_200_000, { trackRemnant: true, minRemnantQty: 0.004 });
-  const reclaimed = m("KY-JATI-RCL", "Kayu Jati Reclaimed (olahan)", "kayu_solid", "m3", 0, {
+  const bongkaran = m("KY-JATI-BKR", "Reclaimed Teak (raw)", "kayu_solid", "m3", 5_200_000, { trackRemnant: true, minRemnantQty: 0.004 });
+  const reclaimed = m("KY-JATI-RCL", "Reclaimed Teak (processed)", "kayu_solid", "m3", 0, {
     trackRemnant: true,
     minRemnantQty: 0.004,
-    note: "Bongkaran yang sudah dicabut pakunya, diserut, dan dioven ulang.",
+    note: "Reclaimed timber with the nails pulled, planed and kiln-dried again.",
   });
 
   // ---------------------------------------------------------------- Products
@@ -88,7 +88,7 @@ export function buildDemoDb(): Db {
     extra: Partial<Parameters<typeof createItem>[1]>,
   ) => createItem(db, { sku, name, kind: "product", category, uom: "pcs", standardCost: 0, ...extra });
 
-  const kursi = p("KRS-SEKAR", "Kursi Makan Jati Sekar", "kursi", {
+  const kursi = p("KRS-SEKAR", "Sekar Teak Dining Chair", "kursi", {
     bom: [
       { materialId: jati.id, qty: 0.032 },
       { materialId: linen.id, qty: 0.6 },
@@ -98,13 +98,13 @@ export function buildDemoDb(): Db {
       { materialId: thinner.id, qty: 0.1 },
     ],
     laborHours: 6,
-    stages: ["Potong", "Rakit", "Amplas", "Jok", "Finishing", "QC", "Packing"],
+    stages: ["Cutting", "Assembly", "Sanding", "Upholstery", "Finishing", "QC", "Packing"],
     salePrice: 1_950_000,
     rentalRatePerDay: 75_000,
     hsCode: "9401.61",
     packing: { length: 52, width: 56, height: 96, cartonsPerUnit: 1, grossWeightKg: 9.5, netWeightKg: 7.8 },
   });
-  const meja = p("MJ-MKN180", "Meja Makan Jati 180", "meja", {
+  const meja = p("MJ-MKN180", "Teak Dining Table 180", "meja", {
     bom: [
       { materialId: jati.id, qty: 0.11 },
       { materialId: sekrup.id, qty: 24 },
@@ -118,7 +118,7 @@ export function buildDemoDb(): Db {
     hsCode: "9403.60",
     packing: { length: 188, width: 98, height: 18, cartonsPerUnit: 2, grossWeightKg: 56, netWeightKg: 49 },
   });
-  const lemari = p("LM-2P-MHN", "Lemari 2 Pintu Mahoni", "lemari", {
+  const lemari = p("LM-2P-MHN", "Mahogany 2-Door Wardrobe", "lemari", {
     bom: [
       { materialId: mahoni.id, qty: 0.08 },
       { materialId: ply.id, qty: 2.5 },
@@ -133,7 +133,7 @@ export function buildDemoDb(): Db {
     hsCode: "9403.50",
     packing: { length: 100, width: 60, height: 190, cartonsPerUnit: 1, grossWeightKg: 72, netWeightKg: 63 },
   });
-  const sofa = p("SF-RTN3", "Sofa Rotan 3 Dudukan", "sofa", {
+  const sofa = p("SF-RTN3", "Rattan Sofa 3-Seater", "sofa", {
     bom: [
       { materialId: rotan.id, qty: 6 },
       { materialId: hollow.id, qty: 3 },
@@ -142,13 +142,13 @@ export function buildDemoDb(): Db {
       { materialId: sekrup.id, qty: 30 },
     ],
     laborHours: 16,
-    stages: ["Rangka besi", "Anyam rotan", "Jok", "QC", "Packing"],
+    stages: ["Steel frame", "Rattan weaving", "Upholstery", "QC", "Packing"],
     salePrice: 8_200_000,
     rentalRatePerDay: 350_000,
     hsCode: "9401.71",
     packing: { length: 200, width: 85, height: 80, cartonsPerUnit: 1, grossWeightKg: 38, netWeightKg: 32 },
   });
-  const mejaKerja = p("MJ-KRJ-RCL", "Meja Kerja Jati Reclaimed", "meja", {
+  const mejaKerja = p("MJ-KRJ-RCL", "Reclaimed Teak Desk", "meja", {
     bom: [
       { materialId: jati.id, qty: 0.045 },
       { materialId: melamine.id, qty: 0.3 },
@@ -160,7 +160,7 @@ export function buildDemoDb(): Db {
     hsCode: "9403.30",
     packing: { length: 125, width: 65, height: 15, cartonsPerUnit: 1, grossWeightKg: 28, netWeightKg: 24 },
   });
-  const bangku = p("BK-DKR", "Bangku Dekor Kayu Sisa", "dekorasi", {
+  const bangku = p("BK-DKR", "Offcut Wood Accent Bench", "dekorasi", {
     bom: [
       { materialId: jati.id, qty: 0.01 },
       { materialId: melamine.id, qty: 0.08 },
@@ -170,21 +170,21 @@ export function buildDemoDb(): Db {
     salePrice: 750_000,
     rentalRatePerDay: 35_000,
     hsCode: "9403.60",
-    note: "Didesain untuk menghabiskan sisa potongan jati.",
+    note: "Designed to use up teak offcuts.",
   });
 
   // Semi-finished component: produced in-house, then used in the bar stool's BOM.
-  const rangka = m("KMP-RGK-BAR", "Rangka Kursi Bar (komponen)", "kayu_solid", "pcs", 0, {
+  const rangka = m("KMP-RGK-BAR", "Bar Stool Frame (component)", "kayu_solid", "pcs", 0, {
     bom: [
       { materialId: jati.id, qty: 0.022 },
       { materialId: sekrup.id, qty: 10 },
     ],
     laborHours: 2.5,
-    stages: ["Potong", "Rakit"],
-    note: "Komponen setengah jadi — dibuat dulu, lalu dirakit menjadi Kursi Bar.",
+    stages: ["Cutting", "Assembly"],
+    note: "Semi-finished component — made first, then assembled into the Teak Bar Stool.",
   });
   rangka.standardCost = standardProductCost(db, rangka);
-  const kursiBar = p("KRS-BAR", "Kursi Bar Jati", "kursi", {
+  const kursiBar = p("KRS-BAR", "Teak Bar Stool", "kursi", {
     bom: [
       { materialId: rangka.id, qty: 1 },
       { materialId: linen.id, qty: 0.4 },
@@ -192,7 +192,7 @@ export function buildDemoDb(): Db {
       { materialId: melamine.id, qty: 0.12 },
     ],
     laborHours: 3,
-    stages: ["Rakit", "Jok", "Finishing", "QC"],
+    stages: ["Assembly", "Upholstery", "Finishing", "QC"],
     salePrice: 2_350_000,
     rentalRatePerDay: 90_000,
     hsCode: "9401.61",
@@ -201,21 +201,21 @@ export function buildDemoDb(): Db {
   linen.purchaseUnit = { label: "roll (50 m)", factor: 50 };
 
   // Made by merging: a dining set, and a panel glued up from teak offcuts.
-  const setMakan = p("SET-MKN-SEKAR", "Set Makan Sekar (meja + 6 kursi)", "meja", {
+  const setMakan = p("SET-MKN-SEKAR", "Sekar Dining Set (table + 6 chairs)", "meja", {
     salePrice: 17_500_000,
     rentalRatePerDay: 450_000,
     hsCode: "9403.60",
-    note: "Dirakit dari Meja Makan Jati 180 dan 6 Kursi Sekar lewat resep gabung.",
+    note: "Assembled from a Teak Dining Table 180 and 6 Sekar chairs with a merge recipe.",
   });
-  const panelSambung = m("PN-JATI-SMB", "Panel Jati Sambung 120×40", "kayu_solid", "lembar", 0, {
-    note: "Panel finger-joint dari potongan sisa jati — dipakai untuk daun meja kecil dan rak.",
+  const panelSambung = m("PN-JATI-SMB", "Finger-jointed Teak Panel 120×40", "kayu_solid", "lembar", 0, {
+    note: "Finger-jointed panel from teak offcuts — used for small table tops and shelves.",
   });
 
   for (const prod of db.items.filter((i) => i.kind === "product")) prod.standardCost = standardProductCost(db, prod);
 
   // ---------------------------------------------------------------- Recipes
   const rKursi = createRecipe(db, {
-    name: "Kursi Makan Sekar — standar",
+    name: "Sekar Dining Chair — standard",
     type: "produksi",
     inputs: (kursi.bom ?? []).map((b) => ({ itemId: b.materialId, qty: b.qty })),
     outputs: [{ itemId: kursi.id, qty: 1 }],
@@ -223,10 +223,10 @@ export function buildDemoDb(): Db {
     expectedRemnantPct: 6,
     expectedWastePct: 4,
     stages: kursi.stages,
-    note: "Rangka dari papan 5 cm; sisa papan ≥ 30 cm disimpan sebagai sisa.",
+    note: "Frame from 5 cm boards; board offcuts of 30 cm or more are kept as offcuts.",
   });
   const rSet = createRecipe(db, {
-    name: "Set Makan Sekar (meja + 6 kursi)",
+    name: "Sekar Dining Set (table + 6 chairs)",
     type: "gabung",
     inputs: [
       { itemId: meja.id, qty: 1 },
@@ -235,25 +235,25 @@ export function buildDemoDb(): Db {
     ],
     outputs: [{ itemId: setMakan.id, qty: 1 }],
     laborHours: 2,
-    stages: ["Pasang & setel warna", "QC set", "Packing"],
-    note: "Pilih kursi dengan warna finishing paling dekat dengan meja.",
+    stages: ["Fit & colour match", "Set QC", "Packing"],
+    note: "Pick the chairs whose finish colour is closest to the table.",
   });
   setMakan.standardCost = recipeCost(db, rSet).outputs[0]!.unitCost;
   const rPanel = createRecipe(db, {
-    name: "Panel jati sambung dari sisa",
+    name: "Finger-jointed teak panel from offcuts",
     type: "gabung",
     inputs: [
-      { itemId: jati.id, qty: 0.03, note: "pakai lot sisa" },
+      { itemId: jati.id, qty: 0.03, note: "use offcut lots" },
       { itemId: lem.id, qty: 0.2 },
     ],
     outputs: [{ itemId: panelSambung.id, qty: 1 }],
     laborHours: 1.5,
     expectedWastePct: 12,
-    stages: ["Serut & potong", "Finger-joint & lem", "Press", "Amplas"],
+    stages: ["Plane & cut", "Finger-joint & glue", "Press", "Sanding"],
   });
   panelSambung.standardCost = recipeCost(db, rPanel).outputs[0]!.unitCost;
   createRecipe(db, {
-    name: "Bongkar Meja Makan 180",
+    name: "Dismantle Dining Table 180",
     type: "dekonstruksi",
     inputs: [{ itemId: meja.id, qty: 1 }],
     outputs: [
@@ -262,30 +262,30 @@ export function buildDemoDb(): Db {
     ],
     laborHours: 3,
     expectedWastePct: 20,
-    stages: ["Bongkar", "Cabut paku & sekrup", "Sortir papan"],
+    stages: ["Dismantle", "Pull nails & screws", "Sort boards"],
   });
   createRecipe(db, {
-    name: "Bongkar kursi rusak",
+    name: "Dismantle damaged chair",
     type: "dekonstruksi",
     inputs: [{ itemId: kursi.id, qty: 1 }],
     outputs: [{ itemId: bongkaran.id, qty: 0.018 }],
     laborHours: 1,
     expectedWastePct: 35,
-    stages: ["Bongkar", "Sortir papan"],
-    note: "Untuk kursi yang rangkanya patah dan tidak layak diperbaiki.",
+    stages: ["Dismantle", "Sort boards"],
+    note: "For chairs with a broken frame that are not worth repairing.",
   });
   const rOlah = createRecipe(db, {
-    name: "Olah kayu bongkaran",
+    name: "Process reclaimed timber",
     type: "produksi",
     inputs: [{ itemId: bongkaran.id, qty: 1.25 }],
     outputs: [{ itemId: reclaimed.id, qty: 1 }],
     laborHours: 10,
     expectedWastePct: 20,
-    stages: ["Cabut paku", "Serut & ketam", "Potong ulang", "Oven ulang"],
+    stages: ["Pull nails", "Plane & thickness", "Re-cut", "Re-kiln"],
   });
   reclaimed.standardCost = recipeCost(db, rOlah).outputs[0]!.unitCost;
   const rKursiReclaimed = createRecipe(db, {
-    name: "Kursi Sekar — kayu reclaimed",
+    name: "Sekar Chair — reclaimed teak",
     type: "produksi",
     inputs: [
       { itemId: reclaimed.id, qty: 0.035 },
@@ -299,7 +299,7 @@ export function buildDemoDb(): Db {
     laborHours: 7,
     expectedRemnantPct: 4,
     stages: kursi.stages,
-    note: "Serat lebih berkarakter — untuk koleksi 'Jejak Kayu'. Butuh sedikit lebih banyak kayu karena cacat paku.",
+    note: "More characterful grain — for the 'Jejak Kayu' collection. Needs a little more timber because of nail defects.",
   });
 
   // ---------------------------------------------------------------- Partners
@@ -310,9 +310,9 @@ export function buildDemoDb(): Db {
   const supTekstil = sup("Tekstil Mandiri Bandung", { phone: "022-7301-889", address: "Bandung" });
   sup("Rotan Cirebon Jaya", { phone: "0231-882-117", address: "Cirebon" });
   const supRangka = sup("UD Rangka Kudus", { phone: "0291-430-118", address: "Kudus" });
-  const supBekas = sup("Pengepul Kayu Bekas Jepara", { phone: "0813-2551-0901", address: "Jepara" });
+  const supBekas = sup("Jepara Reclaimed Timber Collector", { phone: "0813-2551-0901", address: "Jepara" });
   const griya = cus("PT Griya Interior Nusantara", { contact: "Ibu Maya", phone: "021-5550-7788", address: "Jakarta Selatan", country: "Indonesia" });
-  const nordic = cus("Nordic Living B.V.", { contact: "Jesper Holm", email: "buying@nordicliving.example", address: "Keizersgracht 120, Amsterdam", country: "Belanda" });
+  const nordic = cus("Nordic Living B.V.", { contact: "Jesper Holm", email: "buying@nordicliving.example", address: "Keizersgracht 120, Amsterdam", country: "Netherlands" });
   const kopi = cus("Kopi Senja Group", { contact: "Pak Arif", phone: "0813-1100-2299", address: "Semarang", country: "Indonesia" });
   const lensa = cus("Lensa Sinema Production", { contact: "Mbak Dita", phone: "0857-7712-3030", address: "Jakarta Barat", country: "Indonesia" });
   const arunika = cus("Hotel Arunika Ubud", { contact: "Made Wira", phone: "0361-975-123", address: "Ubud, Bali", country: "Indonesia" });
@@ -342,11 +342,11 @@ export function buildDemoDb(): Db {
     supplierId: supJati.id,
     date: dateAgo(45),
     lines: [{ itemId: jati.id, qty: 1.2, unitPrice: 14_200_000 }],
-    extraCosts: [{ label: "Ongkir truk Jepara", amount: 450_000 }],
+    extraCosts: [{ label: "Truck freight from Jepara", amount: 450_000 }],
     invoiceNo: "JM/IX/0912",
   });
   receivePurchase(db, po1.id, { at: at(45) });
-  addPayment(db, "purchase", po1.id, { date: dateAgo(30), amount: 17_490_000, method: "transfer", note: "Lunas" });
+  addPayment(db, "purchase", po1.id, { date: dateAgo(30), amount: 17_490_000, method: "transfer", note: "Paid in full" });
   const po2 = createPurchase(db, {
     supplierId: supBangunan.id,
     date: dateAgo(40),
@@ -354,7 +354,7 @@ export function buildDemoDb(): Db {
       { itemId: melamine.id, qty: 20, unitPrice: 94_000 },
       { itemId: ply.id, qty: 10, unitPrice: 285_000 },
     ],
-    extraCosts: [{ label: "Bongkar muat", amount: 75_000 }],
+    extraCosts: [{ label: "Unloading", amount: 75_000 }],
   });
   po2.dueDate = addDays(today(), 2);
   receivePurchase(db, po2.id, { at: at(40) });
@@ -362,11 +362,11 @@ export function buildDemoDb(): Db {
     supplierId: supTekstil.id,
     date: dateAgo(30),
     lines: [{ itemId: linen.id, qty: 50, unitPrice: 92_000 }],
-    extraCosts: [{ label: "Ekspedisi", amount: 120_000 }],
+    extraCosts: [{ label: "Courier", amount: 120_000 }],
   });
   po3.dueDate = addDays(today(), 15);
   receivePurchase(db, po3.id, { at: at(30) });
-  addPayment(db, "purchase", po3.id, { date: dateAgo(30), amount: 2_000_000, method: "transfer", note: "DP" });
+  addPayment(db, "purchase", po3.id, { date: dateAgo(30), amount: 2_000_000, method: "transfer", note: "Down payment" });
 
   const complete = (wo: WorkOrder, daysAgo: number, input: Parameters<typeof completeWorkOrder>[2]) =>
     completeWorkOrder(db, wo.id, input, { at: at(daysAgo, 16) });
@@ -382,14 +382,14 @@ export function buildDemoDb(): Db {
   };
 
   // WO 1: dining chairs from the standard recipe — teak & fabric offcuts come back as remnants
-  const wo1 = createWorkOrderFromRecipe(db, rKursi.id, { batches: 12, title: "Kursi Makan Sekar batch Oktober" });
+  const wo1 = createWorkOrderFromRecipe(db, rKursi.id, { batches: 12, title: "Sekar dining chairs — October batch" });
   wo1.createdAt = at(28);
   issueBom(wo1, 27, { [jati.id]: 0.05, [linen.id]: 1.5 });
   complete(wo1, 20, {
     outputs: [{ itemId: kursi.id, qty: 12 }],
     returns: [
-      { itemId: jati.id, kind: "sisa", qty: 0.028, dimensions: { length: 1200, width: 180, thickness: 50 }, note: "Papan sisa rangka" },
-      { itemId: jati.id, kind: "limbah", qty: 0.012, salvageValue: 35_000, note: "Serbuk & serutan dijual" },
+      { itemId: jati.id, kind: "sisa", qty: 0.028, dimensions: { length: 1200, width: 180, thickness: 50 }, note: "Frame board offcut" },
+      { itemId: jati.id, kind: "limbah", qty: 0.012, salvageValue: 35_000, note: "Sawdust & shavings sold" },
       { itemId: linen.id, kind: "sisa", qty: 1.4, dimensions: { length: 1400, width: 1400 } },
     ],
   });
@@ -397,7 +397,7 @@ export function buildDemoDb(): Db {
   // WO 2: wardrobes — plywood offcuts
   const wo2 = createWorkOrder(db, {
     type: "produksi",
-    title: "Lemari 2 Pintu untuk Hotel Arunika",
+    title: "2-door wardrobes for Hotel Arunika",
     plannedOutputs: [{ itemId: lemari.id, qty: 4 }],
   });
   wo2.createdAt = at(25);
@@ -415,7 +415,7 @@ export function buildDemoDb(): Db {
   // WO 3: dining tables + sofas (multi-output, allocated by relative sales value)
   const wo3 = createWorkOrder(db, {
     type: "produksi",
-    title: "Meja Makan & Sofa Rotan — stok showroom",
+    title: "Dining tables & rattan sofas — showroom stock",
     plannedOutputs: [
       { itemId: meja.id, qty: 3 },
       { itemId: sofa.id, qty: 2 },
@@ -435,7 +435,7 @@ export function buildDemoDb(): Db {
   const mejaLot = db.lots.find((l) => l.itemId === meja.id && l.qty > 0)!;
   const wo4 = createWorkOrder(db, {
     type: "konversi",
-    title: "Konversi Meja Makan → Meja Kerja (pesanan Kopi Senja)",
+    title: "Convert dining table → desk (Kopi Senja order)",
     plannedOutputs: [{ itemId: mejaKerja.id, qty: 1 }],
     plannedInputs: [
       { itemId: meja.id, qty: 1, lotId: mejaLot.id },
@@ -458,7 +458,7 @@ export function buildDemoDb(): Db {
   // WO 5 (running): more chairs for export — uses remnants first
   const wo5 = createWorkOrder(db, {
     type: "produksi",
-    title: "Kursi Sekar untuk Nordic Living",
+    title: "Sekar chairs for Nordic Living",
     plannedOutputs: [{ itemId: kursi.id, qty: 24 }],
     dueDate: addDays(today(), 10),
   });
@@ -466,15 +466,15 @@ export function buildDemoDb(): Db {
   // Export-grade chairs need full-length boards, so remnants are skipped here.
   issueMaterials(db, wo5.id, suggestIssue(db, wo5, jati.id, 0.3, false).picks, at(3));
   const [sPotong, sRakit] = wo5.stages;
-  addLaborLog(db, wo5.id, { stageId: sPotong!.id, worker: "Tim Pak Darto", hours: 16, at: at(3, 15) });
+  addLaborLog(db, wo5.id, { stageId: sPotong!.id, worker: "Pak Darto's team", hours: 16, at: at(3, 15) });
   setStageStatus(db, wo5.id, sPotong!.id, "selesai", at(2, 16));
-  addLaborLog(db, wo5.id, { stageId: sRakit!.id, worker: "Mas Joko (borongan)", pieces: 12, pieceRate: 45_000, at: at(1, 16) });
+  addLaborLog(db, wo5.id, { stageId: sRakit!.id, worker: "Mas Joko (piece rate)", pieces: 12, pieceRate: 45_000, at: at(1, 16) });
   receiveOutput(db, wo5.id, { itemId: kursi.id, qty: 6, at: at(1, 17) });
 
   // WO 6 (planned): decorative benches from teak offcuts
   const wo6 = createWorkOrder(db, {
     type: "produksi",
-    title: "Bangku Dekor dari sisa jati",
+    title: "Accent benches from teak offcuts",
     plannedOutputs: [{ itemId: bangku.id, qty: 4 }],
     dueDate: addDays(today(), 14),
   });
@@ -483,14 +483,14 @@ export function buildDemoDb(): Db {
   // WO 7 (planned): bar stools need frames — a component that can be produced in-house
   const wo7 = createWorkOrder(db, {
     type: "produksi",
-    title: "Kursi Bar untuk Hotel Arunika",
+    title: "Bar stools for Hotel Arunika",
     plannedOutputs: [{ itemId: kursiBar.id, qty: 6 }],
     dueDate: addDays(today(), 18),
   });
   wo7.createdAt = at(0);
 
   // WO 8 (planned): a dining set assembled by merging stock, for a showroom partner
-  const wo8 = createWorkOrderFromRecipe(db, rSet.id, { batches: 1, title: "Set Makan Sekar untuk showroom Griya", dueDate: addDays(today(), 12) });
+  const wo8 = createWorkOrderFromRecipe(db, rSet.id, { batches: 1, title: "Sekar dining set for the Griya showroom", dueDate: addDays(today(), 12) });
   wo8.createdAt = at(0);
 
   // Dedicated purchase for WO5 (draft, waiting)
@@ -498,12 +498,12 @@ export function buildDemoDb(): Db {
     supplierId: supJati.id,
     date: today(),
     lines: [{ itemId: jati.id, qty: 0.5, unitPrice: 14_600_000 }],
-    extraCosts: [{ label: "Ongkir", amount: 250_000 }],
+    extraCosts: [{ label: "Freight", amount: 250_000 }],
     workOrderId: wo5.id,
-    note: "Tambahan jati untuk order Nordic Living",
+    note: "Extra teak for the Nordic Living order",
   });
 
-  // An old offcut found during stock opname — flagged as ageing.
+  // An old offcut found during a stock count — flagged as ageing.
   const oldRemnant = addOpeningStock(db, {
     itemId: mdf.id,
     qty: 0.35,
@@ -511,7 +511,7 @@ export function buildDemoDb(): Db {
     isRemnant: true,
     dimensions: { length: 1220, width: 850, thickness: 12 },
     location: "Workshop",
-    note: "Potongan dari proyek kitchen set lama",
+    note: "Offcut from an old kitchen set project",
   });
   oldRemnant.createdAt = at(120);
   db.moves[db.moves.length - 1]!.at = at(120);
@@ -528,9 +528,9 @@ export function buildDemoDb(): Db {
     shippingCharge: 1_500_000,
   });
   confirmSalesOrder(db, so1.id);
-  addPayment(db, "sale", so1.id, { date: dateAgo(25), amount: 11_250_000, method: "transfer", note: "DP 50%" });
+  addPayment(db, "sale", so1.id, { date: dateAgo(25), amount: 11_250_000, method: "transfer", note: "Down payment 50%" });
   deliverSalesOrder(db, so1.id, [{ itemId: lemari.id, qty: 4 }], { at: at(13) });
-  addPayment(db, "sale", so1.id, { date: dateAgo(10), amount: 11_250_000, method: "transfer", note: "Pelunasan" });
+  addPayment(db, "sale", so1.id, { date: dateAgo(10), amount: 11_250_000, method: "transfer", note: "Final payment" });
 
   const so2 = createSalesOrder(db, {
     channel: "ekspor",
@@ -547,7 +547,7 @@ export function buildDemoDb(): Db {
       incoterm: "FOB",
       portOfLoading: "Tanjung Emas, Semarang",
       portOfDischarge: "Rotterdam",
-      destinationCountry: "Belanda",
+      destinationCountry: "Netherlands",
       containerType: "20GP",
       etd: addDays(today(), 25),
       vLegalNo: "",
@@ -558,7 +558,7 @@ export function buildDemoDb(): Db {
   wo5.salesOrderId = so2.id;
   so2.dpPercent = 30;
   so2.paymentDueDate = addDays(today(), 20);
-  addPayment(db, "sale", so2.id, { date: dateAgo(5), amount: 1_224, method: "transfer", note: "DP 30% (T/T)" });
+  addPayment(db, "sale", so2.id, { date: dateAgo(5), amount: 1_224, method: "transfer", note: "Down payment 30% (T/T)" });
 
   const so3 = createSalesOrder(db, {
     channel: "supply",
@@ -574,8 +574,8 @@ export function buildDemoDb(): Db {
   confirmSalesOrder(db, so3.id);
   so3.paymentDueDate = dateAgo(1);
   deliverSalesOrder(db, so3.id, [{ itemId: mejaKerja.id, qty: 1 }, { itemId: kursi.id, qty: 4 }], { at: at(4) });
-  returnSale(db, so3.id, [{ itemId: kursi.id, qty: 1, condition: "rusak", note: "Kaki goyang saat diterima" }], { at: at(3) });
-  addPayment(db, "sale", so3.id, { date: dateAgo(4), amount: 5_000_000, method: "tunai", note: "Bayar sebagian" });
+  returnSale(db, so3.id, [{ itemId: kursi.id, qty: 1, condition: "rusak", note: "Wobbly leg on arrival" }], { at: at(3) });
+  addPayment(db, "sale", so3.id, { date: dateAgo(4), amount: 5_000_000, method: "tunai", note: "Part payment" });
 
   createSalesOrder(db, {
     channel: "supply",
@@ -584,14 +584,14 @@ export function buildDemoDb(): Db {
     currency: "IDR",
     exchangeRate: 1,
     lines: [{ itemId: sofa.id, qty: 1, unitPrice: 8_000_000 }],
-    note: "Menunggu konfirmasi desain kain",
+    note: "Waiting for fabric design approval",
   });
 
   // ---------------------------------------------------------------- Rentals
   const r1 = createRental(db, {
     kind: "sewa",
     customerId: lensa.id,
-    project: "Film 'Rumah Nenek' — set ruang makan",
+    project: "Film 'Rumah Nenek' — dining room set",
     startDate: dateAgo(9),
     endDate: dateAgo(2),
     lines: [
@@ -599,7 +599,7 @@ export function buildDemoDb(): Db {
       { itemId: sofa.id, qty: 1, ratePerDay: 350_000 },
     ],
     deposit: 2_000_000,
-    extraCharges: [{ label: "Antar-jemput & setting", amount: 350_000 }],
+    extraCharges: [{ label: "Delivery, pickup & set-up", amount: 350_000 }],
   });
   checkoutRental(db, r1.id, undefined, at(9));
 
@@ -619,7 +619,7 @@ export function buildDemoDb(): Db {
     r2.id,
     [
       { checkoutId: co.id, qty: 1, condition: "baik" },
-      { checkoutId: co.id, qty: 1, condition: "rusak", fee: 250_000, note: "Kaki retak, kain sobek" },
+      { checkoutId: co.id, qty: 1, condition: "rusak", fee: 250_000, note: "Cracked leg, torn fabric" },
     ],
     at(12, 17),
   );
@@ -627,14 +627,14 @@ export function buildDemoDb(): Db {
   createRental(db, {
     kind: "pinjam",
     customerId: griya.id,
-    project: "Pemotretan katalog Griya Interior",
+    project: "Griya Interior catalogue shoot",
     startDate: addDays(today(), 3),
     endDate: addDays(today(), 5),
     lines: [{ itemId: meja.id, qty: 1, ratePerDay: 0 }],
   });
 
   const plyLot = db.lots.find((l) => l.itemId === ply.id && l.status === "tersedia" && !l.isRemnant && l.qty >= 2);
-  if (plyLot) transferLot(db, plyLot.id, 2, "Workshop", "Untuk kitchen set minggu depan");
+  if (plyLot) transferLot(db, plyLot.id, 2, "Workshop", "For next week's kitchen set");
 
   // ---------------------------------------------------------------- Other routes to the same things
   // Reclaimed teak: bought from a collector, processed, then made into chairs.
@@ -642,15 +642,15 @@ export function buildDemoDb(): Db {
     supplierId: supBekas.id,
     date: dateAgo(16),
     lines: [{ itemId: bongkaran.id, qty: 0.6, unitPrice: 5_000_000 }],
-    extraCosts: [{ label: "Angkut pikap", amount: 150_000 }],
-    note: "Bongkaran rumah joglo, Kudus",
+    extraCosts: [{ label: "Pickup truck haulage", amount: 150_000 }],
+    note: "Salvaged from a joglo house, Kudus",
   });
   receivePurchase(db, poBekas.id, { at: at(16) });
-  const woOlah = createWorkOrderFromRecipe(db, rOlah.id, { batches: 0.4, title: "Olah bongkaran joglo" });
+  const woOlah = createWorkOrderFromRecipe(db, rOlah.id, { batches: 0.4, title: "Process joglo reclaimed timber" });
   woOlah.createdAt = at(15);
   issueMaterials(db, woOlah.id, suggestIssue(db, woOlah, bongkaran.id, 0.5).picks, at(15));
   complete(woOlah, 12, { outputs: [{ itemId: reclaimed.id, qty: 0.4 }], returns: [{ itemId: bongkaran.id, kind: "limbah", qty: 0.1 }] });
-  const woReclaimed = createWorkOrderFromRecipe(db, rKursiReclaimed.id, { batches: 4, title: "Kursi Sekar 'Jejak Kayu' — sampel" });
+  const woReclaimed = createWorkOrderFromRecipe(db, rKursiReclaimed.id, { batches: 4, title: "Sekar chairs 'Jejak Kayu' — samples" });
   woReclaimed.createdAt = at(11);
   for (const l of rKursiReclaimed.inputs) issueMaterials(db, woReclaimed.id, suggestIssue(db, woReclaimed, l.itemId, l.qty * 4).picks, at(11));
   complete(woReclaimed, 7, { outputs: [{ itemId: kursi.id, qty: 4 }], returns: [] });
@@ -660,7 +660,7 @@ export function buildDemoDb(): Db {
     supplierId: supRangka.id,
     date: dateAgo(3),
     lines: [{ itemId: rangka.id, qty: 4, unitPrice: 420_000 }],
-    note: "Subkon rangka — kapasitas potong penuh minggu ini",
+    note: "Frame subcontract — cutting capacity is full this week",
   });
   receivePurchase(db, poRangka.id, { at: at(3) });
 

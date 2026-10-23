@@ -8,18 +8,18 @@ import { useDbStore } from "@/store/db-store";
 const PROOF = [
   {
     n: "01",
-    title: "Sisa dihitung, bukan dibuang",
-    body: "Potongan layak pakai masuk gudang dengan harganya sendiri dan disarankan lebih dulu di pekerjaan berikutnya.",
+    title: "Offcuts are counted, not binned",
+    body: "Usable offcuts go into stock at their own price and are suggested first on the next work order.",
   },
   {
     n: "02",
-    title: "Satu buku untuk ekspor, supply, dan sewa",
-    body: "Proforma & packing list, DP dan pelunasan, serah-terima unit sewa sampai denda telat.",
+    title: "One ledger for export, supply and rental",
+    body: "Proforma & packing list, down payment and final payment, rental hand-over and take-back down to the late fee.",
   },
   {
     n: "03",
-    title: "Data tinggal di perangkat ini",
-    body: "Tanpa server, tanpa akun. Cadangkan ke satu file kapan saja.",
+    title: "Data stays on this device",
+    body: "No server, no account. Back up to a single file at any time.",
   },
 ];
 
@@ -36,10 +36,10 @@ export function WelcomePage() {
   const options: { id: Choice; title: string; body: string }[] = [
     {
       id: "demo",
-      title: "Bengkel contoh",
-      body: "Sekar Kayu, Jepara — kursi jati dalam produksi, sisa papan di gudang, kontainer ke Belanda, dan kursi yang sedang disewa untuk syuting film.",
+      title: "Sample workshop",
+      body: "Sekar Kayu, Jepara — teak chairs in production, offcut boards in stock, a container to the Netherlands, and chairs out on rent for a film shoot.",
     },
-    { id: "fresh", title: "Bengkel saya", body: "Buku kosong. Isi nama usaha, lalu tambah material dan produk Anda sendiri." },
+    { id: "fresh", title: "My workshop", body: "An empty workbook. Enter your business name, then add your own materials and products." },
   ];
 
   const canStart = choice === "demo" || company.trim().length > 1;
@@ -73,11 +73,11 @@ export function WelcomePage() {
 
       <section className="flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-16">
         <div className="mx-auto w-full max-w-md">
-          <p className="eyebrow">Mulai</p>
-          <h2 className="mt-1 font-display text-[26px] leading-tight font-semibold tracking-[-0.015em]">Buka buku kerja</h2>
-          <p className="mt-1.5 text-[13px] text-muted">Pilih salah satu. Anda bisa pindah kapan saja dari Pengaturan.</p>
+          <p className="eyebrow">Start</p>
+          <h2 className="mt-1 font-display text-[26px] leading-tight font-semibold tracking-[-0.015em]">Open a workbook</h2>
+          <p className="mt-1.5 text-[13px] text-muted">Pick one. You can switch at any time from Settings.</p>
 
-          <div role="radiogroup" aria-label="Pilih buku kerja" className="mt-6 flex flex-col gap-2">
+          <div role="radiogroup" aria-label="Choose a workbook" className="mt-6 flex flex-col gap-2">
             {options.map((o) => {
               const active = choice === o.id;
               return (
@@ -106,15 +106,15 @@ export function WelcomePage() {
 
           {choice === "fresh" && (
             <div className="mt-4">
-              <TextInput label="Nama usaha" value={company} onChange={setCompany} placeholder="mis. CV Tunas Jati" isRequired autoFocus />
+              <TextInput label="Business name" value={company} onChange={setCompany} placeholder="e.g. CV Tunas Jati" isRequired autoFocus />
             </div>
           )}
 
           <Button className="mt-6 w-full" size="lg" isDisabled={!canStart} onPress={start}>
-            {choice === "demo" ? "Masuk ke bengkel contoh" : "Buka buku kerja baru"}
+            {choice === "demo" ? "Enter the sample workshop" : "Open a new workbook"}
           </Button>
           <p className="mt-4 text-xs text-muted">
-            {BRAND.name} {BRAND.version} · bekerja tanpa internet setelah dibuka · data tidak dikirim ke mana pun
+            {BRAND.name} {BRAND.version} · works offline once opened · data is not sent anywhere
           </p>
         </div>
       </section>

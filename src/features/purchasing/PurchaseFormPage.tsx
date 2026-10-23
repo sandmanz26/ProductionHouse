@@ -78,8 +78,8 @@ export default function PurchaseFormPage() {
   const { id } = useParams();
   const db = useDb();
   const existing = id ? db.purchases.find((p) => p.id === id) : undefined;
-  if (id && !existing) return <RecordNotFound what="Pembelian" back="/pembelian" />;
-  if (existing && existing.status !== "draft") return <RecordNotFound what="Pembelian draft" back={`/pembelian/${existing.id}`} />;
+  if (id && !existing) return <RecordNotFound what="Purchase" back="/purchases" />;
+  if (existing && existing.status !== "draft") return <RecordNotFound what="Draft purchase" back={`/purchases/${existing.id}`} />;
   return <PurchaseForm key={id ?? "new"} existingId={existing?.id} />;
 }
 
@@ -110,15 +110,15 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
           width: l.dimensions?.width ?? 0,
           thickness: l.dimensions?.thickness ?? 0,
         }))
-      : initialLines(db, params.get("wo"), params.get("dari") === "saran", params.get("barang")),
+      : initialLines(db, params.get("wo"), params.get("from") === "suggestions", params.get("item")),
   );
   const [extras, setExtras] = useState<Extra[]>(() =>
-    existing?.extraCosts.length ? existing.extraCosts.map((c) => ({ key: k(), label: c.label, amount: c.amount })) : [{ key: k(), label: "Ongkos kirim", amount: 0 }],
+    existing?.extraCosts.length ? existing.extraCosts.map((c) => ({ key: k(), label: c.label, amount: c.amount })) : [{ key: k(), label: "Freight", amount: 0 }],
   );
 
   const woOptions = useMemo(
     () => [
-      { id: "", label: "Stok umum (tidak dicadangkan)" },
+      { id: "", label: "General stock (not reserved)" },
       ...db.workOrders.filter(isOpenWo).map((w) => ({ id: w.id, label: `${w.code} · ${w.title}` })),
     ],
     [db.workOrders],
@@ -158,9 +158,9 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
         if (receive) receivePurchase(d, p.id);
         return p;
       },
-      (p) => (receive ? `${p.code} diterima — stok bertambah` : `${p.code} disimpan`),
+      (p) => (receive ? `${p.code} received — stock added` : `${p.code} saved`),
     );
-    if (result) navigate(`/pembelian/${result.id}`, { replace: true });
+    if (result) navigate(`/purchases/${result.id}`, { replace: true });
   };
 
   const update = (key: string, patch: Partial<Line>) => setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -168,29 +168,29 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
   return (
     <>
       <PageHeader
-        title={existing ? `Ubah ${existing.code}` : "Pembelian baru"}
-        description="Isi barang yang dibeli. Biaya tambahan (ongkir, bongkar muat) dibagi ke barang sesuai nilainya sehingga HPP akurat."
-        back={existing ? `/pembelian/${existing.id}` : "/pembelian"}
+        title={existing ? `Edit ${existing.code}` : "New purchase"}
+        description="Enter the items bought. Extra costs (freight, loading) are split across the items by value, so job cost stays accurate."
+        back={existing ? `/purchases/${existing.id}` : "/purchases"}
       />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
-          <Section title="Informasi">
+          <Section title="Details">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <PartnerPicker role="supplier" value={supplierId} onChange={setSupplierId} />
-              <DateInput label="Tanggal" value={date} onChange={setDate} isRequired />
-              <TextInput label="No. nota / faktur" value={invoiceNo} onChange={setInvoiceNo} />
-              <DateInput label="Jatuh tempo bayar" value={dueDate} onChange={setDueDate} description="Kosongkan bila bayar tunai." />
+              <DateInput label="Date" value={date} onChange={setDate} isRequired />
+              <TextInput label="Receipt / invoice no." value={invoiceNo} onChange={setInvoiceNo} />
+              <DateInput label="Payment due date" value={dueDate} onChange={setDueDate} description="Leave empty for cash payment." />
               <SelectInput
-                label="Dibeli untuk"
+                label="Bought for"
                 value={workOrderId}
                 onChange={setWorkOrderId}
                 options={woOptions}
-                description="Jika untuk perintah kerja tertentu, barang dicadangkan untuknya. Sisa otomatis dilepas saat pekerjaan selesai."
+                description="If bought for a specific work order, the items are reserved for it. Anything left is released automatically when the job is done."
               />
             </div>
           </Section>
 
-          <Section title="Barang">
+          <Section title="Items">
             <div className="flex flex-col gap-3">
               {lines.map((l) => {
                 const it = item(l.itemId ?? undefined);
@@ -199,15 +199,15 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
                     <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_8rem_10rem_auto]">
                       <ItemPicker kind="material" value={l.itemId} onChange={(itemId) => update(l.key, { itemId, unitPrice: l.unitPrice || item(itemId ?? undefined)?.standardCost || 0 })} label="Material" />
                       <NumberInput label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix={it ? UOM_LABEL[it.uom] : undefined} />
-                      <NumberInput label="Harga satuan" value={l.unitPrice} onChange={(unitPrice) => update(l.key, { unitPrice })} money />
+                      <NumberInput label="Unit price" value={l.unitPrice} onChange={(unitPrice) => update(l.key, { unitPrice })} money />
                       <div className="flex gap-1">
-                        <Button isIconOnly variant={helperFor === l.key ? "secondary" : "ghost"} aria-label="Hitung qty (kubikasi / satuan beli)" onPress={() => setHelperFor(helperFor === l.key ? null : l.key)}>
+                        <Button isIconOnly variant={helperFor === l.key ? "secondary" : "ghost"} aria-label="Calculate quantity (timber volume / purchase unit)" onPress={() => setHelperFor(helperFor === l.key ? null : l.key)}>
                           <Calculator className="size-4" />
                         </Button>
-                        <Button isIconOnly variant={l.withDims ? "secondary" : "ghost"} aria-label="Ukuran" onPress={() => update(l.key, { withDims: !l.withDims })}>
+                        <Button isIconOnly variant={l.withDims ? "secondary" : "ghost"} aria-label="Dimensions" onPress={() => update(l.key, { withDims: !l.withDims })}>
                           <Ruler className="size-4" />
                         </Button>
-                        <Button isIconOnly variant="ghost" aria-label="Hapus baris" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
+                        <Button isIconOnly variant="ghost" aria-label="Remove line" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
                           <Trash2 className="size-4" />
                         </Button>
                       </div>
@@ -224,17 +224,17 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
                     )}
                     {l.withDims && (
                       <div className="mt-2 grid grid-cols-3 gap-2 sm:w-96">
-                        <NumberInput label="Panjang (mm)" value={l.length} onChange={(length) => update(l.key, { length })} maximumFractionDigits={0} />
-                        <NumberInput label="Lebar (mm)" value={l.width} onChange={(width) => update(l.key, { width })} maximumFractionDigits={0} />
-                        <NumberInput label="Tebal (mm)" value={l.thickness} onChange={(thickness) => update(l.key, { thickness })} maximumFractionDigits={0} />
+                        <NumberInput label="Length (mm)" value={l.length} onChange={(length) => update(l.key, { length })} maximumFractionDigits={0} />
+                        <NumberInput label="Width (mm)" value={l.width} onChange={(width) => update(l.key, { width })} maximumFractionDigits={0} />
+                        <NumberInput label="Thickness (mm)" value={l.thickness} onChange={(thickness) => update(l.key, { thickness })} maximumFractionDigits={0} />
                       </div>
                     )}
                     {it && l.qty > 0 && (
                       <p className="mt-2 text-xs text-muted">
-                        Subtotal {formatIDR(l.qty * l.unitPrice)} · harga pokok setelah biaya tambahan{" "}
+                        Subtotal {formatIDR(l.qty * l.unitPrice)} · unit cost after extra costs{" "}
                         <b className="text-foreground">{formatIDR(landedByKey.get(l.key) ?? l.unitPrice)}</b>/{UOM_LABEL[it.uom]}
                         {it.standardCost > 0 && l.unitPrice > it.standardCost * 1.1 && (
-                          <span className="ml-1 text-warning">· {Math.round((l.unitPrice / it.standardCost - 1) * 100)}% di atas harga terakhir</span>
+                          <span className="ml-1 text-warning">· {Math.round((l.unitPrice / it.standardCost - 1) * 100)}% above the last price</span>
                         )}
                       </p>
                     )}
@@ -243,29 +243,29 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
               })}
               <div>
                 <Button size="sm" variant="tertiary" onPress={() => setLines([...lines, emptyLine()])}>
-                  <Plus className="size-4" /> Tambah barang
+                  <Plus className="size-4" /> Add item
                 </Button>
               </div>
             </div>
           </Section>
 
-          <Section title="Biaya tambahan" description="Ongkir, bongkar muat, pajak yang tidak dikreditkan, dll.">
+          <Section title="Extra costs" description="Freight, loading, non-creditable tax, etc.">
             <div className="flex flex-col gap-2">
               {extras.map((e) => (
                 <div key={e.key} className="grid grid-cols-[1fr_10rem_auto] items-end gap-2">
-                  <TextInput aria-label="Keterangan biaya" value={e.label} onChange={(label) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, label } : x)))} placeholder="Keterangan" />
-                  <NumberInput aria-label="Jumlah" value={e.amount} onChange={(amount) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, amount } : x)))} money />
-                  <Button isIconOnly variant="ghost" aria-label="Hapus biaya" onPress={() => setExtras(extras.filter((x) => x.key !== e.key))}>
+                  <TextInput aria-label="Cost description" value={e.label} onChange={(label) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, label } : x)))} placeholder="Description" />
+                  <NumberInput aria-label="Amount" value={e.amount} onChange={(amount) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, amount } : x)))} money />
+                  <Button isIconOnly variant="ghost" aria-label="Remove cost" onPress={() => setExtras(extras.filter((x) => x.key !== e.key))}>
                     <Trash2 className="size-4" />
                   </Button>
                 </div>
               ))}
               <div>
                 <Button size="sm" variant="tertiary" onPress={() => setExtras([...extras, { key: k(), label: "", amount: 0 }])}>
-                  <Plus className="size-4" /> Tambah biaya
+                  <Plus className="size-4" /> Add cost
                 </Button>
               </div>
-              <TextAreaInput label="Catatan" value={note} onChange={setNote} rows={2} />
+              <TextAreaInput label="Note" value={note} onChange={setNote} rows={2} />
             </div>
           </Section>
         </div>
@@ -273,21 +273,21 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
         <div className="xl:sticky xl:top-20 xl:self-start">
           <Card>
             <Card.Header>
-              <Card.Title className="text-base">Ringkasan</Card.Title>
+              <Card.Title className="text-base">Summary</Card.Title>
             </Card.Header>
             <Card.Content>
-              <Row label={`Barang (${input.lines.length})`} value={formatIDR(goods)} />
-              <Row label="Biaya tambahan" value={formatIDR(extraTotal)} />
+              <Row label={`Items (${input.lines.length})`} value={formatIDR(goods)} />
+              <Row label="Extra costs" value={formatIDR(extraTotal)} />
               <div className="my-2 border-t border-[var(--rule)]" />
               <Row label="Total" value={formatIDR(goods + extraTotal)} strong />
-              {workOrderId && <p className="mt-3 text-xs text-muted">Barang akan dicadangkan untuk {woOptions.find((o) => o.id === workOrderId)?.label.split(" · ")[0]}.</p>}
+              {workOrderId && <p className="mt-3 text-xs text-muted">Items will be reserved for {woOptions.find((o) => o.id === workOrderId)?.label.split(" · ")[0]}.</p>}
             </Card.Content>
             <Card.Footer className="flex-col items-stretch gap-2">
               <Button onPress={() => save(true)} isDisabled={!valid} fullWidth>
-                Simpan & terima barang
+                Save & receive
               </Button>
               <Button variant="secondary" onPress={() => save(false)} isDisabled={!valid} fullWidth>
-                Simpan — barang belum datang
+                Save — not delivered yet
               </Button>
             </Card.Footer>
           </Card>
@@ -298,8 +298,8 @@ function PurchaseForm({ existingId }: { existingId?: ID }) {
 }
 
 /**
- * Quantity helper on a purchase line: timber volume from piece size (kubikasi), or conversion
- * from the supplier's unit (roll, dus) to the stock unit.
+ * Quantity helper on a purchase line: timber volume from piece size, or conversion
+ * from the supplier's unit (roll, box) to the stock unit.
  */
 function QtyHelper({
   uom,
@@ -321,17 +321,17 @@ function QtyHelper({
     const vol = cubicMeters(pcs, t, w, len);
     return (
       <div className="mt-2 rounded-sm border border-dashed border-[var(--rule)] p-3">
-        <p className="eyebrow mb-2">Kubikasi: batang × tebal × lebar × panjang</p>
+        <p className="eyebrow mb-2">Timber volume: pieces × thickness × width × length</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <NumberInput label="Batang" value={pcs} onChange={setPcs} maximumFractionDigits={0} />
-          <NumberInput label="Tebal" value={t} onChange={setT} suffix="cm" />
-          <NumberInput label="Lebar" value={w} onChange={setW} suffix="cm" />
-          <NumberInput label="Panjang" value={len} onChange={setLen} suffix="m" />
+          <NumberInput label="Pieces" value={pcs} onChange={setPcs} maximumFractionDigits={0} />
+          <NumberInput label="Thickness" value={t} onChange={setT} suffix="cm" />
+          <NumberInput label="Width" value={w} onChange={setW} suffix="cm" />
+          <NumberInput label="Length" value={len} onChange={setLen} suffix="m" />
         </div>
         <div className="mt-2 flex items-center justify-between">
-          <span className="num text-sm">{vol.toLocaleString("id-ID", { maximumFractionDigits: 4 })} m³</span>
+          <span className="num text-sm">{vol.toLocaleString("en-GB", { maximumFractionDigits: 4 })} m³</span>
           <Button size="sm" variant="secondary" isDisabled={!vol} onPress={() => onApply(vol)}>
-            Pakai sebagai qty
+            Use as quantity
           </Button>
         </div>
       </div>
@@ -341,22 +341,22 @@ function QtyHelper({
     return (
       <div className="mt-2 rounded-sm border border-dashed border-[var(--rule)] p-3">
         <p className="eyebrow mb-2">
-          Satuan beli: 1 {purchaseUnit.label} = {purchaseUnit.factor} {uom}
+          Purchase unit: 1 {purchaseUnit.label} = {purchaseUnit.factor} {uom}
         </p>
         <div className="grid grid-cols-2 gap-2">
-          <NumberInput label={`Jumlah (${purchaseUnit.label})`} value={pq} onChange={setPq} />
-          <NumberInput label={`Harga per ${purchaseUnit.label}`} value={pp} onChange={setPp} money />
+          <NumberInput label={`Quantity (${purchaseUnit.label})`} value={pq} onChange={setPq} />
+          <NumberInput label={`Price per ${purchaseUnit.label}`} value={pp} onChange={setPp} money />
         </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="num text-sm">
             = {toStockQty(unit, pq)} {uom} @ {formatIDR(toStockPrice(unit, pp))}
           </span>
           <Button size="sm" variant="secondary" onPress={() => onApply(toStockQty(unit, pq), pp ? toStockPrice(unit, pp) : undefined)}>
-            Pakai
+            Use
           </Button>
         </div>
       </div>
     );
   }
-  return <p className="mt-2 text-xs text-muted">Kalkulator tersedia untuk material ber-satuan m³, atau yang punya satuan beli di data master.</p>;
+  return <p className="mt-2 text-xs text-muted">The calculator works for materials stocked in m³, or with a purchase unit set in master data.</p>;
 }

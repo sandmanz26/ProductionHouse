@@ -17,12 +17,12 @@ export function MovesTable({ moves, showItem = true }: { moves: StockMove[]; sho
   const { item } = useLookups();
   const lotCode = useMemo(() => new Map(db.lots.map((l) => [l.id, l.code])), [db.lots]);
   const columns: Column<StockMove>[] = [
-    { key: "at", header: "Waktu", isRowHeader: true, className: "whitespace-nowrap", cell: (m) => formatDateTime(m.at) },
+    { key: "at", header: "Time", isRowHeader: true, className: "whitespace-nowrap", cell: (m) => formatDateTime(m.at) },
     ...(showItem ? [{ key: "item", header: "Item", cell: (m: StockMove) => item(m.itemId)?.name ?? "?" }] : []),
     { key: "lot", header: "Lot", className: "whitespace-nowrap", cell: (m) => lotCode.get(m.lotId) ?? "?" },
     {
       key: "type",
-      header: "Jenis",
+      header: "Type",
       cell: (m) => (
         <div>
           <p>{MOVE_TYPE[m.type]}</p>
@@ -41,10 +41,10 @@ export function MovesTable({ moves, showItem = true }: { moves: StockMove[]; sho
         </span>
       ),
     },
-    { key: "value", header: "Nilai", align: "end", cell: (m) => (m.qty ? formatIDR(m.qty * m.unitCost) : "—") },
+    { key: "value", header: "Value", align: "end", cell: (m) => (m.qty ? formatIDR(m.qty * m.unitCost) : "—") },
     {
       key: "ref",
-      header: "Dokumen",
+      header: "Document",
       className: "whitespace-nowrap",
       cell: (m) => {
         const route = docRoute(m.ref);
@@ -54,11 +54,11 @@ export function MovesTable({ moves, showItem = true }: { moves: StockMove[]; sho
   ];
   return (
     <DataTable
-      label="Mutasi stok"
+      label="Stock movements"
       columns={columns}
       rows={moves}
       dependencies={[lotCode]}
-      empty={<EmptyBlock icon={<ArrowLeftRight className="size-5" />} title="Belum ada mutasi" description="Setiap barang masuk, keluar, dipotong, atau dipindah meninggalkan jejak di sini." />}
+      empty={<EmptyBlock icon={<ArrowLeftRight className="size-5" />} title="No movements yet" description="Every item received, issued, cut or transferred leaves a trail here." />}
     />
   );
 }
@@ -77,21 +77,21 @@ export default function MovesPage() {
   );
   return (
     <>
-      <PageHeader title="Mutasi Stok" description="Jejak audit setiap perubahan stok. Tidak bisa diubah manual." />
+      <PageHeader title="Stock movements" description="Audit trail of every stock change. It cannot be edited by hand." />
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[20rem_16rem]">
         <ItemPicker value={itemId} onChange={setItemId} aria-label="Filter item" />
         <SelectInput
-          aria-label="Jenis mutasi"
+          aria-label="Movement type"
           value={type}
           onChange={setType}
-          options={[{ id: "semua", label: "Semua jenis" }, ...(Object.keys(MOVE_TYPE) as MoveType[]).map((t) => ({ id: t, label: MOVE_TYPE[t] }))]}
+          options={[{ id: "semua", label: "All types" }, ...(Object.keys(MOVE_TYPE) as MoveType[]).map((t) => ({ id: t, label: MOVE_TYPE[t] }))]}
         />
       </div>
       <MovesTable moves={filtered.slice(0, limit)} />
       {filtered.length > limit && (
         <div className="mt-4 flex justify-center">
           <Button variant="secondary" onPress={() => setLimit(limit + PAGE)}>
-            Tampilkan lebih banyak ({filtered.length - limit} lagi)
+            Show more ({filtered.length - limit} more)
           </Button>
         </div>
       )}

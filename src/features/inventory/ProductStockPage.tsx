@@ -30,7 +30,7 @@ export default function ProductStockPage() {
   const columns: Column<RowT>[] = [
     {
       key: "name",
-      header: "Produk",
+      header: "Product",
       isRowHeader: true,
       cell: (r) => (
         <div className="min-w-44">
@@ -41,58 +41,58 @@ export default function ProductStockPage() {
         </div>
       ),
     },
-    { key: "avail", header: "Siap jual/sewa", align: "end", cell: (r) => <span className="font-medium">{r.s.available}</span> },
-    { key: "rent", header: "Disewa", align: "end", cell: (r) => r.s.rented || <span className="text-muted">0</span> },
-    { key: "dmg", header: "Rusak", align: "end", cell: (r) => (r.s.damaged ? <span className="text-danger">{r.s.damaged}</span> : <span className="text-muted">0</span>) },
-    { key: "hpp", header: "HPP rata-rata", align: "end", cell: (r) => (r.s.total ? formatIDR(r.s.avgUnitCost) : <span className="text-muted">—</span>) },
-    { key: "price", header: "Harga jual", align: "end", cell: (r) => (r.salePrice ? formatIDR(r.salePrice) : "—") },
-    { key: "value", header: "Nilai stok", align: "end", cell: (r) => formatIDR(r.s.value) },
+    { key: "avail", header: "Ready to sell/rent", align: "end", cell: (r) => <span className="font-medium">{r.s.available}</span> },
+    { key: "rent", header: "On rent", align: "end", cell: (r) => r.s.rented || <span className="text-muted">0</span> },
+    { key: "dmg", header: "Damaged", align: "end", cell: (r) => (r.s.damaged ? <span className="text-danger">{r.s.damaged}</span> : <span className="text-muted">0</span>) },
+    { key: "hpp", header: "Average unit cost", align: "end", cell: (r) => (r.s.total ? formatIDR(r.s.avgUnitCost) : <span className="text-muted">—</span>) },
+    { key: "price", header: "Sale price", align: "end", cell: (r) => (r.salePrice ? formatIDR(r.salePrice) : "—") },
+    { key: "value", header: "Stock value", align: "end", cell: (r) => formatIDR(r.s.value) },
   ];
 
   return (
     <>
       <PageHeader
-        title="Stok Produk"
-        description="Per status: siap, disewa, rusak. HPP dari lot produksi aktual."
+        title="Product stock"
+        description="By status: ready, on rent, damaged. Unit cost comes from the actual production lots."
       />
-      <MetricStrip className="mb-5" items={[{ label: "Nilai produk", value: formatIDRCompact(sum(rows.map((r) => r.s.value))) }, { label: "Unit siap", value: sum(rows.map((r) => r.s.available)), tone: "success" }, { label: "Unit disewa", value: sum(rows.map((r) => r.s.rented)), tone: "accent", onPress: () => navigate("/sewa") }, { label: "Unit rusak", value: sum(rows.map((r) => r.s.damaged)), tone: damaged.length ? "danger" : "default" }]} />
+      <MetricStrip className="mb-5" items={[{ label: "Product value", value: formatIDRCompact(sum(rows.map((r) => r.s.value))) }, { label: "Units ready", value: sum(rows.map((r) => r.s.available)), tone: "success" }, { label: "Units on rent", value: sum(rows.map((r) => r.s.rented)), tone: "accent", onPress: () => navigate("/rentals") }, { label: "Units damaged", value: sum(rows.map((r) => r.s.damaged)), tone: damaged.length ? "danger" : "default" }]} />
 
       {damaged.length > 0 && (
-        <Section title="Unit rusak" description="Perbaiki lewat perintah kerja agar biaya perbaikan masuk ke HPP unit, atau tandai layak bila hanya perlu dibersihkan." className="mb-6" bodyClassName="p-0">
+        <Section title="Damaged units" description="Repair through a work order so the repair cost goes into the unit cost, or mark as usable if it only needs cleaning." className="mb-6" bodyClassName="p-0">
           <ul className="divide-y divide-separator">
             {damaged.map((l) => (
               <li key={l.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium">
-                    {item(l.itemId)?.name} <span className="font-normal text-muted">· {l.code} · {l.qty} unit</span>
+                    {item(l.itemId)?.name} <span className="font-normal text-muted">· {l.code} · {l.qty} units</span>
                   </p>
                   <p className="text-xs text-muted">
-                    HPP {formatIDR(l.unitCost)} · {l.location}
+                    Unit cost {formatIDR(l.unitCost)} · {l.location}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   {inRepair.has(l.id) ? (
-                    <span className="text-sm text-accent">Sedang diperbaiki</span>
+                    <span className="text-sm text-accent">In repair</span>
                   ) : (
                     <>
                       <ConfirmButton
                         size="sm"
                         variant="ghost"
-                        title="Tandai unit layak?"
-                        description="Gunakan bila kerusakan sangat ringan dan tidak butuh bahan/tenaga kerja."
-                        confirmLabel="Tandai layak"
-                        onConfirm={() => run((d) => markLotUsable(d, l.id), "Unit kembali tersedia")}
+                        title="Mark unit as usable?"
+                        description="Use this when the damage is very minor and needs no materials or labour."
+                        confirmLabel="Mark as usable"
+                        onConfirm={() => run((d) => markLotUsable(d, l.id), "Unit available again")}
                       >
-                        Tandai layak
+                        Mark as usable
                       </ConfirmButton>
                       <Button
                         size="sm"
                         onPress={() => {
-                          const wo = run((d) => createRepairOrder(d, l.id), (w) => `${w.code} dibuat`);
-                          if (wo) navigate(`/produksi/${wo.id}`);
+                          const wo = run((d) => createRepairOrder(d, l.id), (w) => `${w.code} created`);
+                          if (wo) navigate(`/work-orders/${wo.id}`);
                         }}
                       >
-                        <Wrench className="size-4" /> Perbaiki
+                        <Wrench className="size-4" /> Repair
                       </Button>
                     </>
                   )}
@@ -104,11 +104,11 @@ export default function ProductStockPage() {
       )}
 
       <DataTable
-        label="Stok produk"
+        label="Product stock"
         columns={columns}
         rows={rows}
-        onRowAction={(r) => navigate(`/stok/item/${r.id}`)}
-        empty={<EmptyBlock icon={<Armchair className="size-5" />} title="Belum ada produk jadi" description="Produk masuk gudang saat perintah kerja ditutup atau hasil sebagian diterima." />}
+        onRowAction={(r) => navigate(`/stock/items/${r.id}`)}
+        empty={<EmptyBlock icon={<Armchair className="size-5" />} title="No finished products yet" description="Products enter the warehouse when a work order is completed or a partial output is received." />}
       />
     </>
   );

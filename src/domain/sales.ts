@@ -20,16 +20,16 @@ export const soRef = (so: SalesOrder): DocRef => ({ type: "sale", id: so.id, cod
 /** Practical loadable volume per container (CBM). Verify with the forwarder per shipment. */
 export const CONTAINER_CBM: Record<ContainerType, number> = { LCL: 15, "20GP": 28, "40GP": 58, "40HC": 68 };
 export const CONTAINER_LABEL: Record<ContainerType, string> = {
-  LCL: "LCL (gabungan)",
+  LCL: "LCL (shared)",
   "20GP": "20' GP",
   "40GP": "40' GP",
   "40HC": "40' HC",
 };
 
 export const EU_COUNTRIES = [
-  "Austria", "Belgia", "Bulgaria", "Kroasia", "Siprus", "Ceko", "Denmark", "Estonia", "Finlandia", "Prancis",
-  "Jerman", "Yunani", "Hungaria", "Irlandia", "Italia", "Latvia", "Lituania", "Luksemburg", "Malta", "Belanda",
-  "Polandia", "Portugal", "Rumania", "Slowakia", "Slovenia", "Spanyol", "Swedia",
+  "Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France",
+  "Germany", "Greece", "Hungary", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands",
+  "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden",
 ];
 
 export const isEuDestination = (country?: string) =>
@@ -53,30 +53,30 @@ export interface SalesInput {
 
 export function getSalesOrder(db: Db, id: ID): SalesOrder {
   const so = db.sales.find((s) => s.id === id);
-  assert(so, "Order penjualan tidak ditemukan.");
+  assert(so, "Sales order not found — it may have been deleted.");
   return so;
 }
 
 function validate(db: Db, input: SalesInput, keep?: ReadonlySet<ID>) {
-  assertDate(input.date, "Tanggal order");
-  if (input.dueDate) assert(input.dueDate >= input.date, "Target kirim tidak boleh sebelum tanggal order.");
-  if (input.paymentDueDate) assert(input.paymentDueDate >= input.date, "Jatuh tempo bayar tidak boleh sebelum tanggal order.");
+  assertDate(input.date, "Order date");
+  if (input.dueDate) assert(input.dueDate >= input.date, "Ship-by date cannot be before the order date.");
+  if (input.paymentDueDate) assert(input.paymentDueDate >= input.date, "Payment due date cannot be before the order date.");
   assertPartnerRole(db, input.customerId, "customer");
-  assert(input.lines.length > 0, "Tambahkan minimal satu produk.");
-  assert(Number.isFinite(input.exchangeRate) && input.exchangeRate > 0, "Kurs harus lebih dari 0.");
-  if (input.currency === "IDR") assert(input.exchangeRate === 1, "Kurs IDR harus 1.");
+  assert(input.lines.length > 0, "Add at least one product.");
+  assert(Number.isFinite(input.exchangeRate) && input.exchangeRate > 0, "Exchange rate must be more than 0.");
+  if (input.currency === "IDR") assert(input.exchangeRate === 1, "Exchange rate for IDR must be 1.");
   for (const l of input.lines) {
     const item = getUsableItem(db, l.itemId, keep);
-    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
-    assertAmount(l.unitPrice, `Harga ${item.name}`);
+    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty of ${item.name} must be more than 0.`);
+    assertAmount(l.unitPrice, `Price of ${item.name}`);
   }
-  assertAmount(input.discount ?? 0, "Diskon");
-  assertAmount(input.shippingCharge ?? 0, "Ongkir");
+  assertAmount(input.discount ?? 0, "Discount");
+  assertAmount(input.shippingCharge ?? 0, "Shipping charge");
   const dp = input.dpPercent ?? 0;
-  assert(Number.isFinite(dp) && dp >= 0 && dp <= 100, "DP harus antara 0–100%.");
+  assert(Number.isFinite(dp) && dp >= 0 && dp <= 100, "Down payment must be between 0–100%.");
   const subtotal = sum(input.lines.map((l) => l.qty * l.unitPrice));
-  assert((input.discount ?? 0) <= subtotal + (input.shippingCharge ?? 0), "Diskon melebihi nilai order.");
-  if (input.channel === "ekspor") assert(input.export, "Lengkapi data ekspor.");
+  assert((input.discount ?? 0) <= subtotal + (input.shippingCharge ?? 0), "Discount is more than the order value — lower it.");
+  if (input.channel === "ekspor") assert(input.export, "Fill in the export details.");
 }
 
 export function createSalesOrder(db: Db, input: SalesInput): SalesOrder {
@@ -108,12 +108,12 @@ export function createSalesOrder(db: Db, input: SalesInput): SalesOrder {
 
 export function updateSalesOrder(db: Db, id: ID, input: SalesInput): SalesOrder {
   const so = getSalesOrder(db, id);
-  assert(so.status === "draft" || so.status === "dikonfirmasi", "Order yang sudah dikirim tidak bisa diubah.");
+  assert(so.status === "draft" || so.status === "dikonfirmasi", "An order that has shipped cannot be edited.");
   validate(db, input, new Set(so.lines.map((l) => l.itemId)));
   const paidSoFar = sum(so.payments.map((p) => p.amount));
-  assert(!so.payments.length || input.currency === so.currency, "Mata uang tidak bisa diganti setelah ada pembayaran.");
+  assert(!so.payments.length || input.currency === so.currency, "Currency cannot change once a payment is recorded.");
   const newTotal = salesTotals(db, { ...so, lines: input.lines.map((l) => ({ id: "", ...l })), discount: input.discount ?? 0, shippingCharge: input.shippingCharge ?? 0 }).total;
-  assert(newTotal + 0.01 >= paidSoFar, "Total baru lebih kecil dari yang sudah dibayar — catat refund dulu.");
+  assert(newTotal + 0.01 >= paidSoFar, "The new total is less than what was already paid — record a refund first.");
   Object.assign(so, {
     channel: input.channel,
     customerId: input.customerId,
@@ -135,16 +135,16 @@ export function updateSalesOrder(db: Db, id: ID, input: SalesInput): SalesOrder 
 /** Export/shipping fields remain editable until the order is closed. */
 export function updateExportInfo(db: Db, id: ID, info: ExportInfo): SalesOrder {
   const so = getSalesOrder(db, id);
-  assert(so.channel === "ekspor", "Bukan order ekspor.");
-  assert(so.status !== "batal" && so.status !== "selesai", "Order sudah ditutup.");
+  assert(so.channel === "ekspor", "This is not an export order.");
+  assert(so.status !== "batal" && so.status !== "selesai", "This order is already closed.");
   so.export = info;
   return so;
 }
 
 export function confirmSalesOrder(db: Db, id: ID): SalesOrder {
   const so = getSalesOrder(db, id);
-  assert(so.status === "draft", "Order sudah dikonfirmasi.");
-  assert(so.customerId, "Pilih pelanggan sebelum mengonfirmasi order.");
+  assert(so.status === "draft", "This order is already confirmed.");
+  assert(so.customerId, "Choose a customer before confirming the order.");
   so.status = "dikonfirmasi";
   return so;
 }
@@ -174,26 +174,26 @@ export function deliverSalesOrder(
   opts: { at?: string; note?: string } = {},
 ): Delivery {
   const so = getSalesOrder(db, id);
-  assert(so.status === "dikonfirmasi" || so.status === "dikirim_sebagian", "Konfirmasi order sebelum mengirim.");
+  assert(so.status === "dikonfirmasi" || so.status === "dikirim_sebagian", "Confirm the order before shipping.");
   const at = opts.at ?? nowIso();
   const ref = soRef(so);
   const delivery: Delivery = { id: newId(), at, lines: [], note: opts.note };
   const valid = lines.filter((l) => l.qty > EPS);
-  assert(valid.length > 0, "Isi qty yang dikirim.");
+  assert(valid.length > 0, "Enter the qty to ship.");
   for (const line of valid) {
     const item = getItem(db, line.itemId);
     const outstanding = roundQty(orderedQty(so, line.itemId) - deliveredQty(so, line.itemId));
-    assert(line.qty <= outstanding + EPS, `Qty kirim ${item.name} melebihi sisa order (${outstanding}).`);
+    assert(line.qty <= outstanding + EPS, `Ship qty of ${item.name} is more than what is left on the order (${outstanding}).`);
     let picks = line.picks;
     if (!picks) {
       const s = suggestLots(db, line.itemId, line.qty, { useRemnants: false });
-      assert(s.shortage <= EPS, `Stok ${item.name} tidak cukup untuk dikirim (kurang ${s.shortage} ${item.uom}).`);
+      assert(s.shortage <= EPS, `Not enough ${item.name} in stock to ship (short ${s.shortage} ${item.uom}).`);
       picks = s.picks;
     }
-    assert(Math.abs(sum(picks.map((p) => p.qty)) - line.qty) < EPS, `Pilihan lot ${item.name} tidak sama dengan qty kirim.`);
+    assert(Math.abs(sum(picks.map((p) => p.qty)) - line.qty) < EPS, `Lots picked for ${item.name} do not add up to the ship qty.`);
     for (const p of orderPicks(db, picks)) {
       const lot = getLot(db, p.lotId);
-      assert(lot.itemId === line.itemId, "Lot tidak sesuai dengan produk.");
+      assert(lot.itemId === line.itemId, "Lot does not match the product — pick a lot of this item.");
       assertCostOrder(db, lot.id);
       takeFromLot(db, lot.id, p.qty, "keluar_penjualan", ref, { at });
       delivery.lines.push({ itemId: line.itemId, lotId: lot.id, qty: roundQty(p.qty), unitCost: lot.unitCost });
@@ -206,19 +206,19 @@ export function deliverSalesOrder(
 
 export function completeSalesOrder(db: Db, id: ID): SalesOrder {
   const so = getSalesOrder(db, id);
-  assert(so.status === "dikirim", "Order harus terkirim penuh sebelum diselesaikan.");
+  assert(so.status === "dikirim", "Ship the order in full before completing it.");
   const paid = sum(so.payments.map((p) => p.amount));
   const balance = salesTotals(db, so).total - paid;
-  assert(balance <= 0.5, `Masih ada sisa tagihan ${roundMoney(balance)} ${so.currency} — catat pelunasan dulu.`);
+  assert(balance <= 0.5, `${roundMoney(balance)} ${so.currency} is still unpaid — record the final payment first.`);
   so.status = "selesai";
   return so;
 }
 
 export function cancelSalesOrder(db: Db, id: ID): SalesOrder {
   const so = getSalesOrder(db, id);
-  assert(so.deliveries.length === 0, "Order yang sudah ada pengiriman tidak dapat dibatalkan.");
-  assert(so.payments.length === 0, "Order sudah ada pembayaran — kembalikan/hapus pembayaran dulu.");
-  assert(so.status !== "batal", "Order sudah dibatalkan.");
+  assert(so.deliveries.length === 0, "An order with deliveries cannot be cancelled.");
+  assert(so.payments.length === 0, "This order has payments — refund or delete them first.");
+  assert(so.status !== "batal", "This order is already cancelled.");
   so.status = "batal";
   return so;
 }
@@ -297,7 +297,7 @@ export function packingList(db: Pick<Db, "items">, so: SalesOrder) {
     return {
       itemId: l.itemId,
       sku: item?.sku ?? "-",
-      name: item?.name ?? "(item terhapus)",
+      name: item?.name ?? "(deleted item)",
       hsCode: item?.hsCode,
       qty: l.qty,
       cartons,
@@ -329,15 +329,15 @@ export function exportWarnings(db: Pick<Db, "items">, so: SalesOrder): string[] 
   if (so.channel !== "ekspor" || !so.export) return [];
   const w: string[] = [];
   const e = so.export;
-  if (!e.vLegalNo) w.push("No. Dokumen V-Legal (SVLK) belum diisi.");
+  if (!e.vLegalNo) w.push("V-Legal document no. (SVLK) is not filled in.");
   if (isEuDestination(e.destinationCountry) && !e.eudrDdsRef)
-    w.push("Tujuan Uni Eropa: referensi Due Diligence Statement (EUDR) belum diisi.");
+    w.push("EU destination: Due Diligence Statement (EUDR) reference is not filled in.");
   const pl = packingList(db, so);
   const missing = pl.rows.filter((r) => r.missingSpec).map((r) => r.name);
-  if (missing.length) w.push(`Data kemasan belum lengkap: ${missing.join(", ")}.`);
+  if (missing.length) w.push(`Packing data is incomplete: ${missing.join(", ")}.`);
   const noHs = so.lines.map((l) => db.items.find((i) => i.id === l.itemId)).filter((i) => i && !i.hsCode);
-  if (noHs.length) w.push(`HS Code belum diisi: ${noHs.map((i) => i!.name).join(", ")}.`);
-  if (pl.capacity && pl.fill > 1) w.push(`Volume ${pl.totals.cbm} CBM melebihi kapasitas kontainer (${pl.capacity} CBM).`);
+  if (noHs.length) w.push(`HS code is not filled in: ${noHs.map((i) => i!.name).join(", ")}.`);
+  if (pl.capacity && pl.fill > 1) w.push(`Volume ${pl.totals.cbm} CBM is more than the container holds (${pl.capacity} CBM).`);
   return w;
 }
 
@@ -361,18 +361,18 @@ export function productionShortages(db: Db, so: SalesOrder) {
 
 export function createWorkOrdersForShortage(db: Db, soId: ID): WorkOrder[] {
   const so = getSalesOrder(db, soId);
-  assert(so.status !== "batal" && so.status !== "selesai", "Order sudah ditutup.");
+  assert(so.status !== "batal" && so.status !== "selesai", "This order is already closed.");
   const shortages = productionShortages(db, so);
-  assert(shortages.length > 0, "Stok cukup — tidak perlu produksi tambahan.");
+  assert(shortages.length > 0, "Stock is enough — no extra production needed.");
   return shortages.map((s) => {
     const specs = so.lines.filter((l) => l.itemId === s.itemId && l.spec).map((l) => l.spec);
     return createWorkOrder(db, {
       type: "produksi",
-      title: `${getItem(db, s.itemId).name} untuk ${so.code}`,
+      title: `${getItem(db, s.itemId).name} for ${so.code}`,
       plannedOutputs: [{ itemId: s.itemId, qty: s.shortage }],
       salesOrderId: so.id,
       dueDate: so.dueDate,
-      note: specs.length ? `Spesifikasi pesanan: ${specs.join("; ")}` : undefined,
+      note: specs.length ? `Order spec: ${specs.join("; ")}` : undefined,
     });
   });
 }
@@ -382,7 +382,7 @@ export function saleReturnedQty(so: SalesOrder, itemId: ID): number {
 }
 
 /**
- * Customer return (retur penjualan). Goods come back at their original delivery cost — good
+ * Customer return (sales return). Goods come back at their original delivery cost — good
  * units as available stock, defective units as damaged (ready for a repair order) — and the
  * customer is credited at the order price.
  */
@@ -393,9 +393,9 @@ export function returnSale(
   opts: { at?: string; location?: string } = {},
 ): SalesOrder {
   const so = getSalesOrder(db, soId);
-  assert(so.deliveries.length > 0, "Belum ada barang terkirim untuk diretur.");
+  assert(so.deliveries.length > 0, "Nothing has shipped yet, so nothing can be returned.");
   const valid = entries.filter((e) => e.qty > EPS);
-  assert(valid.length > 0, "Isi qty retur.");
+  assert(valid.length > 0, "Enter the return qty.");
   const at = opts.at ?? nowIso();
   const ref = soRef(so);
   for (const e of valid) {
@@ -403,7 +403,7 @@ export function returnSale(
     const delivered = deliveredQty(so, e.itemId);
     // Earlier entries of this call are already pushed to so.returns.
     const already = saleReturnedQty(so, e.itemId);
-    assert(e.qty <= delivered - already + EPS, `Retur ${item.name} melebihi yang terkirim (${roundQty(delivered - already)} tersisa).`);
+    assert(e.qty <= delivered - already + EPS, `Return of ${item.name} is more than was shipped (${roundQty(delivered - already)} left).`);
     const lines = so.deliveries.flatMap((d) => d.lines.filter((l) => l.itemId === e.itemId));
     const unitCost = roundMoney(sum(lines.map((l) => l.qty * l.unitCost)) / sum(lines.map((l) => l.qty)));
     const ordered = so.lines.filter((l) => l.itemId === e.itemId);

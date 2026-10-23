@@ -1,4 +1,4 @@
-import { Button, SearchField, Tabs, type Key } from "@heroui/react";
+import { Button, Tabs, type Key } from "@heroui/react";
 import { Package, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -14,26 +14,23 @@ export default function ItemsPage() {
   const { stock } = useLookups();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const kind: ItemKind = params.get("jenis") === "material" ? "material" : "product";
-  const [q, setQ] = useState("");
+  const kind: ItemKind = params.get("type") === "material" ? "material" : "product";
   const [showArchived, setShowArchived] = useState(false);
 
   const rows = useMemo(() => {
-    const term = q.trim().toLowerCase();
     return db.items
       .filter((i) => i.kind === kind && (showArchived || !i.archived))
-      .filter((i) => !term || i.name.toLowerCase().includes(term) || i.sku.toLowerCase().includes(term))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [db.items, kind, q, showArchived]);
+  }, [db.items, kind, showArchived]);
 
   const nameCol: Column<Item> = {
     key: "name",
-    header: kind === "product" ? "Produk" : "Material",
+    header: kind === "product" ? "Product" : "Material",
     isRowHeader: true,
     cell: (i) => (
       <div className="min-w-44">
         <p className="font-medium">
-          {i.name} {i.archived && <StatusChip tone="default">Diarsipkan</StatusChip>}
+          {i.name} {i.archived && <StatusChip tone="default">Archived</StatusChip>}
         </p>
         <p className="text-xs text-muted">
           {i.sku} · {categoryLabel(i.category)}
@@ -45,66 +42,60 @@ export default function ItemsPage() {
     kind === "product"
       ? [
           nameCol,
-          { key: "bom", header: "BOM", align: "end", cell: (i) => `${i.bom?.length ?? 0} bahan` },
-          { key: "labor", header: "Jam kerja", align: "end", cell: (i) => formatQty(i.laborHours ?? 0) },
-          { key: "std", header: "HPP standar", align: "end", cell: (i) => formatIDR(standardProductCost(db, i)) },
-          { key: "price", header: "Harga jual", align: "end", cell: (i) => (i.salePrice ? formatIDR(i.salePrice) : "—") },
-          { key: "rent", header: "Sewa/hari", align: "end", cell: (i) => (i.rentalRatePerDay ? formatIDR(i.rentalRatePerDay) : "—") },
-          { key: "stock", header: "Stok", align: "end", cell: (i) => stock.get(i.id)?.total ?? 0 },
+          { key: "bom", header: "BOM", align: "end", cell: (i) => `${i.bom?.length ?? 0} materials` },
+          { key: "labor", header: "Labour hours", align: "end", cell: (i) => formatQty(i.laborHours ?? 0) },
+          { key: "std", header: "Standard cost", align: "end", cell: (i) => formatIDR(standardProductCost(db, i)) },
+          { key: "price", header: "Sale price", align: "end", cell: (i) => (i.salePrice ? formatIDR(i.salePrice) : "—") },
+          { key: "rent", header: "Rent/day", align: "end", cell: (i) => (i.rentalRatePerDay ? formatIDR(i.rentalRatePerDay) : "—") },
+          { key: "stock", header: "Stock", align: "end", cell: (i) => stock.get(i.id)?.total ?? 0 },
         ]
       : [
           nameCol,
-          { key: "uom", header: "Satuan", cell: (i) => i.uom },
-          { key: "std", header: "Harga terakhir", align: "end", cell: (i) => formatIDR(i.standardCost) },
-          { key: "rem", header: "Lacak sisa", cell: (i) => (i.trackRemnant ? <StatusChip tone="success">Ya</StatusChip> : <span className="text-muted">Tidak</span>) },
-          { key: "rop", header: "Titik pesan", align: "end", cell: (i) => (i.reorderPoint ? formatQty(i.reorderPoint, i.uom) : "—") },
-          { key: "stock", header: "Stok", align: "end", cell: (i) => formatQty(stock.get(i.id)?.available ?? 0, i.uom) },
+          { key: "uom", header: "Unit", cell: (i) => i.uom },
+          { key: "std", header: "Last price", align: "end", cell: (i) => formatIDR(i.standardCost) },
+          { key: "rem", header: "Track offcuts", cell: (i) => (i.trackRemnant ? <StatusChip tone="success">Yes</StatusChip> : <span className="text-muted">No</span>) },
+          { key: "rop", header: "Reorder point", align: "end", cell: (i) => (i.reorderPoint ? formatQty(i.reorderPoint, i.uom) : "—") },
+          { key: "stock", header: "Stock", align: "end", cell: (i) => formatQty(stock.get(i.id)?.available ?? 0, i.uom) },
         ];
 
   return (
     <>
       <PageHeader
-        title="Produk & Material"
-        description="Resep bahan (BOM), rute tahapan, harga, tarif sewa, data ekspor."
+        title="Products & materials"
+        description="Bill of materials (BOM), stage route, prices, rental rates, export data."
         actions={
-          <Button onPress={() => navigate(`/master/item/baru?jenis=${kind}`)}>
-            <Plus className="size-4" /> {kind === "product" ? "Produk baru" : "Material baru"}
+          <Button onPress={() => navigate(`/items/new?type=${kind}`)}>
+            <Plus className="size-4" /> {kind === "product" ? "New product" : "New material"}
           </Button>
         }
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs selectedKey={kind} onSelectionChange={(k: Key) => setParams({ jenis: String(k) }, { replace: true })}>
           <Tabs.ListContainer>
-            <Tabs.List aria-label="Jenis item">
+            <Tabs.List aria-label="Item type">
               <Tabs.Tab id="product">
-                Produk
+                Products
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab id="material">
-                Material
+                Materials
                 <Tabs.Indicator />
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
         </Tabs>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <SwitchInput isSelected={showArchived} onChange={setShowArchived} label="Tampilkan arsip" />
-          <SearchField value={q} onChange={setQ} aria-label="Cari" className="sm:w-64">
-            <SearchField.Group>
-              <SearchField.SearchIcon />
-              <SearchField.Input placeholder="Cari nama atau kode…" />
-              <SearchField.ClearButton />
-            </SearchField.Group>
-          </SearchField>
+          <SwitchInput isSelected={showArchived} onChange={setShowArchived} label="Show archived" />
         </div>
       </div>
       <DataTable
-        label="Daftar item"
+        toolbar searchText={(i) => `${i.name} ${i.sku}`}
+        label="Item list"
         columns={columns}
         rows={rows}
         dependencies={[kind, stock]}
-        onRowAction={(i) => navigate(`/master/item/${i.id}`)}
-        empty={<EmptyBlock icon={<Package className="size-5" />} title={kind === "material" ? "Belum ada material" : "Belum ada produk"} description={kind === "material" ? "Mulai dari bahan yang paling sering dibeli: kayu, papan, busa, hardware." : "Produk membawa resep bahan, jam kerja standar, harga jual, dan tarif sewa."} action={<Button onPress={() => navigate(`/master/item/baru?jenis=${kind}`)}>Tambah</Button>} />}
+        onRowAction={(i) => navigate(`/items/${i.id}`)}
+        empty={<EmptyBlock icon={<Package className="size-5" />} title={kind === "material" ? "No materials yet" : "No products yet"} description={kind === "material" ? "Start with the materials you buy most often: timber, boards, foam, hardware." : "A product carries its bill of materials, standard labour hours, sale price and rental rate."} action={<Button onPress={() => navigate(`/items/new?type=${kind}`)}>Add</Button>} />}
       />
     </>
   );

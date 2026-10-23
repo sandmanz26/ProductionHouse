@@ -22,57 +22,57 @@ export default function RecipeDetailPage() {
   const flow = useMemo(() => (r ? recipeFlow(db, r, batches || 1) : null), [db, r, batches]);
   const cost = useMemo(() => (r ? recipeCost(db, r, batches || 1) : null), [db, r, batches]);
   const perf = useMemo(() => (r ? recipePerformance(db, r.id) : null), [db, r]);
-  if (!r || !flow || !cost || !perf) return <RecordNotFound what="Resep" back="/resep" />;
+  if (!r || !flow || !cost || !perf) return <RecordNotFound what="Recipe" back="/recipes" />;
   const main = item(r.outputs[0]?.itemId);
 
   const runCols: Column<RecipeRun & { id: string }>[] = [
-    { key: "wo", header: "Pekerjaan", isRowHeader: true, cell: (x) => <Link href={`/produksi/${x.woId}`}>{x.code}</Link> },
+    { key: "wo", header: "Job", isRowHeader: true, cell: (x) => <Link href={`/work-orders/${x.woId}`}>{x.code}</Link> },
     { key: "b", header: "Batch", align: "end", cell: (x) => formatQty(x.batches) },
-    { key: "yield", header: "Hasil vs rencana", align: "end", cell: (x) => <span className={x.yield < 0.98 ? "text-danger" : undefined}>{formatPct(x.yield, 0)}</span> },
-    { key: "mat", header: "Pemakaian bahan", align: "end", cell: (x) => <span className={x.materialUse > 1.05 ? "text-danger" : x.materialUse < 0.97 ? "text-success" : undefined}>{formatPct(x.materialUse, 0)}</span> },
-    { key: "sisa", header: "Sisa kembali", align: "end", cell: (x) => `${formatQty(x.remnantPct)}%` },
-    { key: "hpp", header: `HPP / ${main ? UOM_LABEL[main.uom] : "unit"}`, align: "end", cell: (x) => formatIDR(x.unitCost) },
-    { key: "std", header: "Standar", align: "end", cell: (x) => <span className="text-muted">{formatIDR(x.standardUnitCost)}</span> },
+    { key: "yield", header: "Output vs plan", align: "end", cell: (x) => <span className={x.yield < 0.98 ? "text-danger" : undefined}>{formatPct(x.yield, 0)}</span> },
+    { key: "mat", header: "Material usage", align: "end", cell: (x) => <span className={x.materialUse > 1.05 ? "text-danger" : x.materialUse < 0.97 ? "text-success" : undefined}>{formatPct(x.materialUse, 0)}</span> },
+    { key: "sisa", header: "Offcuts returned", align: "end", cell: (x) => `${formatQty(x.remnantPct)}%` },
+    { key: "hpp", header: `Unit cost / ${main ? UOM_LABEL[main.uom] : "unit"}`, align: "end", cell: (x) => formatIDR(x.unitCost) },
+    { key: "std", header: "Standard", align: "end", cell: (x) => <span className="text-muted">{formatIDR(x.standardUnitCost)}</span> },
   ];
 
   return (
     <>
       <PageHeader
-        back="/resep"
+        back="/recipes"
         title={r.name}
         badge={
           <>
             <Tag>{WO_TYPE[r.type].label}</Tag>
-            {r.archived && <StatusChip tone="default">Diarsipkan</StatusChip>}
+            {r.archived && <StatusChip tone="default">Archived</StatusChip>}
           </>
         }
-        description={`${r.code} · jumlah per batch · ${r.laborHours} jam kerja`}
+        description={`${r.code} · quantities per batch · ${r.laborHours} labour hours`}
         actions={
           <>
             {r.archived ? (
-              <Button variant="secondary" onPress={() => run((d) => restoreRecipe(d, r.id), "Resep dipulihkan")}>
-                <RotateCcw className="size-4" /> Pulihkan
+              <Button variant="secondary" onPress={() => run((d) => restoreRecipe(d, r.id), "Recipe restored")}>
+                <RotateCcw className="size-4" /> Restore
               </Button>
             ) : (
               <ConfirmButton
                 variant="ghost"
-                title={`Hapus ${r.name}?`}
-                description="Resep yang sudah dipakai perintah kerja diarsipkan, bukan dihapus, agar riwayatnya tetap terbaca."
-                confirmLabel="Hapus / arsipkan"
+                title={`Delete ${r.name}?`}
+                description="A recipe already used by a work order is archived, not deleted, so its history stays readable."
+                confirmLabel="Delete / archive"
                 onConfirm={() => {
-                  const res = run((d) => removeRecipe(d, r.id), (x) => (x === "deleted" ? "Resep dihapus" : "Resep diarsipkan"));
-                  if (res === "deleted") navigate("/resep", { replace: true });
+                  const res = run((d) => removeRecipe(d, r.id), (x) => (x === "deleted" ? "Recipe deleted" : "Recipe archived"));
+                  if (res === "deleted") navigate("/recipes", { replace: true });
                 }}
               >
-                <Archive className="size-4" /> Hapus
+                <Archive className="size-4" /> Delete
               </ConfirmButton>
             )}
-            <Button variant="secondary" onPress={() => navigate(`/resep/${r.id}/ubah`)}>
-              <Pencil className="size-4" /> Ubah
+            <Button variant="secondary" onPress={() => navigate(`/recipes/${r.id}/edit`)}>
+              <Pencil className="size-4" /> Edit
             </Button>
             {!r.archived && (
-              <Button onPress={() => navigate(`/produksi/baru?resep=${r.id}`)}>
-                <Hammer className="size-4" /> Buat perintah kerja
+              <Button onPress={() => navigate(`/work-orders/new?recipe=${r.id}`)}>
+                <Hammer className="size-4" /> Create work order
               </Button>
             )}
           </>
@@ -82,40 +82,40 @@ export default function RecipeDetailPage() {
       <MetricStrip
         className="mb-6"
         items={[
-          { label: "HPP standar", value: formatIDR(cost.outputs[0]?.unitCost ?? 0), hint: main ? `per ${UOM_LABEL[main.uom]} ${main.name}` : undefined },
-          { label: "Dipakai", value: `${perf.runs.length}×`, hint: "pekerjaan selesai" },
-          { label: "Hasil vs rencana", value: perf.runs.length ? formatPct(perf.avgYield, 0) : "—", tone: perf.runs.length && perf.avgYield < 0.98 ? "danger" : "default" },
-          { label: "Pemakaian bahan", value: perf.runs.length ? formatPct(perf.avgMaterialUse, 0) : "—", hint: "100% = sesuai resep", tone: perf.avgMaterialUse > 1.05 ? "danger" : "default" },
+          { label: "Standard cost", value: formatIDR(cost.outputs[0]?.unitCost ?? 0), hint: main ? `per ${UOM_LABEL[main.uom]} ${main.name}` : undefined },
+          { label: "Used", value: `${perf.runs.length}×`, hint: "jobs completed" },
+          { label: "Output vs plan", value: perf.runs.length ? formatPct(perf.avgYield, 0) : "—", tone: perf.runs.length && perf.avgYield < 0.98 ? "danger" : "default" },
+          { label: "Material usage", value: perf.runs.length ? formatPct(perf.avgMaterialUse, 0) : "—", hint: "100% = as per recipe", tone: perf.avgMaterialUse > 1.05 ? "danger" : "default" },
         ]}
       />
 
       <Section
-        title="Peta resep"
-        description="Pada harga standar. Ubah jumlah batch untuk melihat skala pekerjaan."
+        title="Recipe map"
+        description="At standard cost. Change the number of batches to see the job at scale."
         actions={
           <div className="w-28">
-            <NumberInput aria-label="Jumlah batch" value={batches} onChange={setBatches} suffix="batch" maximumFractionDigits={2} />
+            <NumberInput aria-label="Number of batches" value={batches} onChange={setBatches} suffix="batch" maximumFractionDigits={2} />
           </div>
         }
         className="mb-6"
         bodyClassName="p-0"
       >
-        <FlowDiagram graph={flow} label={`Peta resep ${r.name}`} />
+        <FlowDiagram graph={flow} label={`Recipe map ${r.name}`} />
       </Section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Section title="Riwayat pemakaian" description="Setiap pekerjaan selesai dibandingkan dengan resep — tanda resep perlu diperbarui." className="xl:col-span-2" bodyClassName="p-0">
+        <Section title="Usage history" description="Each completed job compared with the recipe — a sign of when the recipe needs updating." className="xl:col-span-2" bodyClassName="p-0">
           <DataTable
-            label="Riwayat pemakaian resep"
+            label="Recipe usage history"
             columns={runCols}
             rows={perf.runs.map((x) => ({ ...x, id: x.woId }))}
-            empty={<EmptyBlock title="Belum pernah dipakai sampai selesai" description="Buat perintah kerja dari resep ini; hasilnya akan dibandingkan di sini." />}
+            empty={<EmptyBlock title="Not used on a completed job yet" description="Create a work order from this recipe; its results are compared here." />}
           />
         </Section>
-        <Section title={`Biaya standar · ${formatQty(batches)} batch`}>
-          <Row label="Bahan" value={formatIDR(cost.material)} />
-          {cost.remnantCredit > 0 && <Row label={`− perkiraan sisa (${r.expectedRemnantPct}%)`} value={formatIDR(cost.remnantCredit)} muted />}
-          <Row label="Tenaga kerja" value={formatIDR(cost.labor)} />
+        <Section title={`Standard cost · ${formatQty(batches)} batch`}>
+          <Row label="Materials" value={formatIDR(cost.material)} />
+          {cost.remnantCredit > 0 && <Row label={`− expected offcuts (${r.expectedRemnantPct}%)`} value={formatIDR(cost.remnantCredit)} muted />}
+          <Row label="Labour" value={formatIDR(cost.labor)} />
           <Row label="Overhead" value={formatIDR(cost.overhead)} />
           <div className="my-2 border-t border-[var(--rule)]" />
           <Row label="Total" value={formatIDR(cost.total)} strong />
@@ -123,9 +123,9 @@ export default function RecipeDetailPage() {
             <KeyValue
               columns={1}
               items={[
-                ["Tahapan", r.stages.length ? r.stages.join(" → ") : "Rute default"],
-                ["Perkiraan limbah", `${r.expectedWastePct}% dari qty bahan`],
-                ["Catatan", r.note],
+                ["Stages", r.stages.length ? r.stages.join(" → ") : "Default route"],
+                ["Expected waste", `${r.expectedWastePct}% of material qty`],
+                ["Note", r.note],
               ]}
             />
           </div>

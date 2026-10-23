@@ -4,13 +4,13 @@ import type { DocRef } from "@/domain";
 export function docRoute(ref: DocRef): string | undefined {
   switch (ref.type) {
     case "purchase":
-      return `/pembelian/${ref.id}`;
+      return `/purchases/${ref.id}`;
     case "workOrder":
-      return `/produksi/${ref.id}`;
+      return `/work-orders/${ref.id}`;
     case "sale":
-      return `/penjualan/${ref.id}`;
+      return `/sales/${ref.id}`;
     case "rental":
-      return `/sewa/${ref.id}`;
+      return `/rentals/${ref.id}`;
     default:
       return undefined;
   }

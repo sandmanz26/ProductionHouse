@@ -23,12 +23,12 @@ export function OpeningStockDialog({ itemId, isOpen, onOpenChange }: { itemId: I
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      title={`Tambah stok ${it?.name ?? ""}`}
-      description="Untuk saldo awal atau stok yang ditemukan saat opname. Pembelian baru sebaiknya lewat menu Pembelian."
+      title={`Add stock ${it?.name ?? ""}`}
+      description="For opening stock or stock found during a count. Record new purchases through Purchasing instead."
       footer={
         <>
           <Button variant="tertiary" onPress={() => onOpenChange(false)}>
-            Batal
+            Cancel
           </Button>
           <Button
             onPress={() => {
@@ -43,12 +43,12 @@ export function OpeningStockDialog({ itemId, isOpen, onOpenChange }: { itemId: I
                     note: note || undefined,
                     dimensions: dims.length && dims.width ? { length: dims.length, width: dims.width, thickness: dims.thickness || undefined } : undefined,
                   }),
-                (l) => `Lot ${l.code} ditambahkan`,
+                (l) => `Lot ${l.code} added`,
               );
               if (ok) onOpenChange(false);
             }}
           >
-            Simpan
+            Save
           </Button>
         </>
       }
@@ -56,27 +56,27 @@ export function OpeningStockDialog({ itemId, isOpen, onOpenChange }: { itemId: I
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
           <NumberInput label="Qty" value={qty} onChange={setQty} suffix={it ? UOM_LABEL[it.uom] : undefined} />
-          <NumberInput label="Harga pokok / satuan" value={unitCost} onChange={setUnitCost} money />
+          <NumberInput label="Unit cost" value={unitCost} onChange={setUnitCost} money />
         </div>
-        <SelectInput label="Lokasi" value={location} onChange={setLocation} options={db.settings.locations.map((l) => ({ id: l, label: l }))} />
-        {it?.kind === "material" && <SwitchInput isSelected={isRemnant} onChange={setIsRemnant} label="Ini sisa / potongan" description="Akan diprioritaskan saat pengambilan bahan." />}
+        <SelectInput label="Location" value={location} onChange={setLocation} options={db.settings.locations.map((l) => ({ id: l, label: l }))} />
+        {it?.kind === "material" && <SwitchInput isSelected={isRemnant} onChange={setIsRemnant} label="This is an offcut" description="Offcuts are used first when materials are issued." />}
         {it?.kind === "material" && (
           <div className="grid grid-cols-3 gap-2">
-            <NumberInput label="P (mm)" value={dims.length} onChange={(length) => setDims({ ...dims, length })} maximumFractionDigits={0} />
-            <NumberInput label="L (mm)" value={dims.width} onChange={(width) => setDims({ ...dims, width })} maximumFractionDigits={0} />
+            <NumberInput label="L (mm)" value={dims.length} onChange={(length) => setDims({ ...dims, length })} maximumFractionDigits={0} />
+            <NumberInput label="W (mm)" value={dims.width} onChange={(width) => setDims({ ...dims, width })} maximumFractionDigits={0} />
             <NumberInput label="T (mm)" value={dims.thickness} onChange={(thickness) => setDims({ ...dims, thickness })} maximumFractionDigits={0} />
           </div>
         )}
-        <TextInput label="Catatan" value={note} onChange={setNote} />
+        <TextInput label="Note" value={note} onChange={setNote} />
       </div>
     </TaskModal>
   );
 }
 
-/** Stock opname for a single lot, plus location change. */
+/** Stock count for a single lot, plus location change. */
 export function LotAdjustDialog({ lot, onClose }: { lot: Lot | null; onClose: () => void }) {
   return (
-    <TaskModal isOpen={!!lot} onOpenChange={(o) => !o && onClose()} size="sm" title={`Opname ${lot?.code ?? ""}`} description="Masukkan jumlah fisik hasil hitung. Selisih dicatat sebagai penyesuaian.">
+    <TaskModal isOpen={!!lot} onOpenChange={(o) => !o && onClose()} size="sm" title={`Count ${lot?.code ?? ""}`} description="Enter the physical quantity you counted. The difference is recorded as an adjustment.">
       {lot && <LotAdjustForm lot={lot} onDone={onClose} />}
     </TaskModal>
   );
@@ -93,38 +93,38 @@ function LotAdjustForm({ lot, onDone }: { lot: Lot; onDone: () => void }) {
   const diff = counted - lot.qty;
   return (
     <div className="flex flex-col gap-3">
-      <NumberInput label="Qty fisik" value={counted} onChange={setCounted} suffix={it ? UOM_LABEL[it.uom] : undefined} description={`Tercatat ${formatQty(lot.qty, it?.uom)}${diff ? ` · selisih ${diff > 0 ? "+" : ""}${formatQty(diff, it?.uom)}` : ""}`} />
+      <NumberInput label="Counted quantity" value={counted} onChange={setCounted} suffix={it ? UOM_LABEL[it.uom] : undefined} description={`On record ${formatQty(lot.qty, it?.uom)}${diff ? ` · difference ${diff > 0 ? "+" : ""}${formatQty(diff, it?.uom)}` : ""}`} />
       <SelectInput
-        label="Lokasi"
+        label="Location"
         value={location}
         onChange={setLocation}
         options={[...new Set([...db.settings.locations, lot.location])].map((l) => ({ id: l, label: l }))}
       />
-      <TextInput label="Alasan" value={note} onChange={setNote} placeholder="mis. hasil opname bulanan" />
+      <TextInput label="Reason" value={note} onChange={setNote} placeholder="e.g. monthly stock count" />
       <div className="flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button
           onPress={() => {
             const ok = run((d) => {
               if (location !== lot.location) updateLotInfo(d, lot.id, { location });
               return adjustLotQty(d, lot.id, counted, note || undefined);
-            }, "Stok diperbarui");
+            }, "Stock updated");
             if (ok) onDone();
           }}
         >
-          Simpan
+          Save
         </Button>
       </div>
     </div>
   );
 }
 
-/** Move part of a lot to another location (e.g. gudang → workshop). */
+/** Move part of a lot to another location (e.g. warehouse → workshop). */
 export function TransferDialog({ lot, onClose }: { lot: Lot | null; onClose: () => void }) {
   return (
-    <TaskModal isOpen={!!lot} onOpenChange={(o) => !o && onClose()} size="sm" title={`Pindah ${lot?.code ?? ""}`} description="Harga pokok ikut berpindah; stok total tidak berubah.">
+    <TaskModal isOpen={!!lot} onOpenChange={(o) => !o && onClose()} size="sm" title={`Transfer ${lot?.code ?? ""}`} description="The unit cost moves with it; total stock does not change.">
       {lot && <TransferForm lot={lot} onDone={onClose} />}
     </TaskModal>
   );
@@ -141,22 +141,22 @@ function TransferForm({ lot, onDone }: { lot: Lot; onDone: () => void }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm">
-        Dari <b>{lot.location}</b> · tersedia {formatQty(lot.qty, it?.uom)}
+        From <b>{lot.location}</b> · available {formatQty(lot.qty, it?.uom)}
       </p>
-      <NumberInput label="Qty dipindah" value={qty} onChange={setQty} maxValue={lot.qty} suffix={it ? UOM_LABEL[it.uom] : undefined} />
-      <SelectInput label="Ke lokasi" value={to} onChange={setTo} options={targets.map((l) => ({ id: l, label: l }))} placeholder={targets.length ? "Pilih…" : "Tambah lokasi di Pengaturan"} />
+      <NumberInput label="Quantity to transfer" value={qty} onChange={setQty} maxValue={lot.qty} suffix={it ? UOM_LABEL[it.uom] : undefined} />
+      <SelectInput label="To location" value={to} onChange={setTo} options={targets.map((l) => ({ id: l, label: l }))} placeholder={targets.length ? "Choose…" : "Add a location in Settings"} />
       <div className="flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button
           isDisabled={!to || qty <= 0}
           onPress={() => {
-            const ok = run((d) => transferLot(d, lot.id, qty, to), `${formatQty(qty, it?.uom)} dipindah ke ${to}`);
+            const ok = run((d) => transferLot(d, lot.id, qty, to), `${formatQty(qty, it?.uom)} transferred to ${to}`);
             if (ok) onDone();
           }}
         >
-          Pindahkan
+          Transfer
         </Button>
       </div>
     </div>
@@ -170,8 +170,8 @@ export function MergeLotsDialog({ itemId, isOpen, onOpenChange }: { itemId: ID; 
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      title="Gabung lot"
-      description="Satukan beberapa lot barang yang sama — mis. potongan sisa berukuran sama diikat jadi satu. Harga pokok menjadi rata-rata tertimbang; jejak asal tetap tersimpan."
+      title="Merge lots"
+      description="Combine several lots of the same item — e.g. offcuts of the same size bundled together. The unit cost becomes the weighted average; the origin trail is kept."
     >
       {isOpen && <MergeForm itemId={itemId} onDone={() => onOpenChange(false)} />}
     </TaskModal>
@@ -195,7 +195,7 @@ function MergeForm({ itemId, onDone }: { itemId: ID; onDone: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <fieldset className="rounded-md border border-[var(--rule)]">
-        <legend className="sr-only">Lot yang digabung</legend>
+        <legend className="sr-only">Lots to merge</legend>
         <ul className="max-h-64 divide-y divide-[var(--rule)] overflow-y-auto">
           {lots.map((l) => (
             <li key={l.id}>
@@ -203,7 +203,7 @@ function MergeForm({ itemId, onDone }: { itemId: ID; onDone: () => void }) {
                 <input type="checkbox" checked={picked.includes(l.id)} onChange={() => toggle(l.id)} className="accent-[var(--accent)]" />
                 <span className="flex-1">
                   <b className="font-medium">{l.code}</b>
-                  {l.isRemnant && <span className="text-success"> · sisa</span>}
+                  {l.isRemnant && <span className="text-success"> · offcut</span>}
                   <span className="text-muted">
                     {" "}
                     · {l.location}
@@ -217,37 +217,37 @@ function MergeForm({ itemId, onDone }: { itemId: ID; onDone: () => void }) {
         </ul>
       </fieldset>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <SelectInput label="Lokasi lot gabungan" value={location} onChange={setLocation} options={db.settings.locations.map((l) => ({ id: l, label: l }))} />
+        <SelectInput label="Merged lot location" value={location} onChange={setLocation} options={db.settings.locations.map((l) => ({ id: l, label: l }))} />
         <div className="grid grid-cols-3 gap-2">
-          <NumberInput label="P (mm)" value={dims.length} onChange={(v) => setDims({ ...dims, length: v })} />
-          <NumberInput label="L (mm)" value={dims.width} onChange={(v) => setDims({ ...dims, width: v })} />
+          <NumberInput label="L (mm)" value={dims.length} onChange={(v) => setDims({ ...dims, length: v })} />
+          <NumberInput label="W (mm)" value={dims.width} onChange={(v) => setDims({ ...dims, width: v })} />
           <NumberInput label="T (mm)" value={dims.thickness} onChange={(v) => setDims({ ...dims, thickness: v })} />
         </div>
       </div>
       <div className="rounded-md bg-default/60 p-3 text-sm">
         <div className="flex justify-between">
-          <span>Hasil gabungan</span>
+          <span>Merged result</span>
           <b className="num">
             {formatQty(qty, it?.uom)} · {qty ? formatIDR(value / qty) : "—"}/{it ? UOM_LABEL[it.uom] : ""}
           </b>
         </div>
-        {mixed && <p className="mt-1 text-danger">Sisa material tidak bisa digabung dengan stok biasa atau stok yang dicadangkan.</p>}
+        {mixed && <p className="mt-1 text-danger">Offcuts cannot be merged with regular or reserved stock.</p>}
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button
           isDisabled={chosen.length < 2 || mixed}
           onPress={() => {
             const ok = run(
               (d) => mergeLots(d, picked, { location, dimensions: dims.length && dims.width ? { length: dims.length, width: dims.width, thickness: dims.thickness || undefined } : undefined }),
-              (l) => `${chosen.length} lot digabung menjadi ${l.code}`,
+              (l) => `${chosen.length} lots merged into ${l.code}`,
             );
             if (ok) onDone();
           }}
         >
-          Gabung {chosen.length >= 2 ? `${chosen.length} lot` : ""}
+          Merge {chosen.length >= 2 ? `${chosen.length} lots` : ""}
         </Button>
       </div>
     </div>

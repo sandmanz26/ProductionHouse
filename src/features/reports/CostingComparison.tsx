@@ -26,7 +26,7 @@ export function CostingComparison() {
   const current = db.settings.costingMethod;
 
   const summary: { id: string; label: string; method?: CostingMethod; outflow: number; ending: number }[] = [
-    { id: "recorded", label: "Tercatat di buku", outflow: recordedOut, ending: total((r) => r.recorded.ending) },
+    { id: "recorded", label: "As recorded", outflow: recordedOut, ending: total((r) => r.recorded.ending) },
     ...SIMULATED.map((m) => ({
       id: m,
       label: COSTING_LABEL[m],
@@ -39,21 +39,21 @@ export function CostingComparison() {
   const summaryCols: Column<(typeof summary)[number]>[] = [
     {
       key: "m",
-      header: "Metode",
+      header: "Method",
       isRowHeader: true,
       cell: (r) => (
         <span className="flex flex-wrap items-center gap-2">
           <span className={r.method === current ? "font-semibold" : "font-medium"}>{r.label}</span>
-          {r.method === current && <span className="text-xs text-accent">dipakai</span>}
-          {r.method && !COSTING_COMPLIANCE[r.method].psak && <span className="text-xs text-danger">bukan PSAK</span>}
+          {r.method === current && <span className="text-xs text-accent">in use</span>}
+          {r.method && !COSTING_COMPLIANCE[r.method].psak && <span className="text-xs text-danger">not PSAK</span>}
         </span>
       ),
     },
-    { key: "out", header: kind === "material" ? "Biaya bahan keluar" : "HPP barang keluar", align: "end", cell: (r) => formatIDR(r.outflow) },
-    { key: "end", header: "Nilai stok akhir", align: "end", cell: (r) => formatIDR(r.ending) },
+    { key: "out", header: kind === "material" ? "Cost of materials out" : "COGS of items out", align: "end", cell: (r) => formatIDR(r.outflow) },
+    { key: "end", header: "Ending stock value", align: "end", cell: (r) => formatIDR(r.ending) },
     {
       key: "diff",
-      header: "Selisih biaya vs buku",
+      header: "Cost difference vs recorded",
       align: "end",
       cell: (r) => {
         if (r.id === "recorded") return <span className="text-muted">—</span>;
@@ -66,13 +66,13 @@ export function CostingComparison() {
   const itemCols: Column<MethodComparisonRow & { id: string }>[] = [
     {
       key: "item",
-      header: "Barang",
+      header: "Item",
       isRowHeader: true,
       cell: (r) => (
         <div className="min-w-36">
           <p className="font-medium">{item(r.itemId)?.name}</p>
           <p className="text-xs text-muted">
-            keluar {formatQty(r.outflowQty, item(r.itemId)?.uom)} · sisa {formatQty(r.endingQty, item(r.itemId)?.uom)}
+            out {formatQty(r.outflowQty, item(r.itemId)?.uom)} · left {formatQty(r.endingQty, item(r.itemId)?.uom)}
           </p>
         </div>
       ),
@@ -85,12 +85,12 @@ export function CostingComparison() {
     })),
     {
       key: "spread",
-      header: "Rentang",
+      header: "Spread",
       align: "end",
       cell: (r) => {
         const xs = SIMULATED.map((m) => r[m].outflow);
         const spread = Math.max(...xs) - Math.min(...xs);
-        return spread < 1 ? <span className="text-muted">sama</span> : formatIDR(spread);
+        return spread < 1 ? <span className="text-muted">same</span> : formatIDR(spread);
       },
     },
   ];
@@ -98,10 +98,10 @@ export function CostingComparison() {
   return (
     <div className="flex flex-col gap-6">
       <Section
-        title="Perbandingan metode biaya"
-        description="Kartu stok diputar ulang dengan setiap metode: berapa biaya barang yang keluar dan berapa nilai stok yang tersisa. Totalnya selalu sama — metode hanya menggeser biaya antara HPP dan persediaan."
+        title="Costing method comparison"
+        description="The stock ledger replayed under each method: the cost of items that went out and the value of the stock left. The total is always the same — the method only shifts cost between COGS and inventory."
         actions={
-          <div role="radiogroup" aria-label="Jenis barang" className="flex gap-1 text-[13px]">
+          <div role="radiogroup" aria-label="Item type" className="flex gap-1 text-[13px]">
             {(["material", "product"] as ItemKind[]).map((k) => (
               <button
                 key={k}
@@ -111,18 +111,18 @@ export function CostingComparison() {
                 onClick={() => setKind(k)}
                 className={`rounded-sm border px-2.5 py-1 ${kind === k ? "border-accent font-medium" : "border-[var(--rule)] text-muted hover:text-foreground"}`}
               >
-                {k === "material" ? "Material" : "Produk"}
+                {k === "material" ? "Material" : "Product"}
               </button>
             ))}
           </div>
         }
         bodyClassName="p-0"
       >
-        <DataTable label="Ringkasan per metode" columns={summaryCols} rows={summary} dependencies={[current, kind]} />
+        <DataTable label="Summary by method" columns={summaryCols} rows={summary} dependencies={[current, kind]} />
       </Section>
-      <Section title="Per barang" description="Barang dengan rentang terbesar paling sensitif terhadap pilihan metode — biasanya yang harganya naik-turun tajam." bodyClassName="p-0">
+      <Section title="By item" description="Items with the widest spread are the most sensitive to the choice of method — usually the ones whose price swings sharply." bodyClassName="p-0">
         <DataTable
-          label="Perbandingan per barang"
+          label="Comparison by item"
           columns={itemCols}
           rows={rows
             .map((r) => ({ ...r, id: r.itemId }))
@@ -131,8 +131,8 @@ export function CostingComparison() {
         />
       </Section>
       <p className="text-xs text-muted">
-        Simulasi memakai harga masuk sebagaimana tercatat (pembelian, saldo awal, hasil produksi). Dampak lanjutan ke HPP produk yang dibuat dari bahan
-        tersebut tidak dihitung ulang. Sisa material dan barang khusus pekerjaan diperlakukan sebagai lapisan biasa.
+        The simulation uses inbound costs as recorded (purchases, opening stock, production output). The knock-on effect on the cost of products made from
+        those materials is not recalculated. Offcuts and items bought for a specific job are treated as ordinary layers.
       </p>
     </div>
   );

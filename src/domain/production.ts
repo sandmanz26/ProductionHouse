@@ -66,7 +66,7 @@ const outputsUnrestricted = (type: WorkOrderType) => type === "dekonstruksi" || 
 
 export function getWorkOrder(db: Db, id: ID): WorkOrder {
   const wo = db.workOrders.find((w) => w.id === id);
-  assert(wo, "Perintah kerja tidak ditemukan.");
+  assert(wo, "Work order not found.");
   return wo;
 }
 
@@ -99,56 +99,56 @@ function normalizeExtra(extra: WorkOrderInput["extraCosts"]): ExtraCost[] {
   return (extra ?? [])
     .filter((c) => c.label.trim() || c.amount)
     .map((c) => {
-      assertAmount(c.amount, "Biaya lain");
-      return { id: newId(), label: c.label.trim() || "Biaya lain", amount: c.amount };
+      assertAmount(c.amount, "Other cost");
+      return { id: newId(), label: c.label.trim() || "Other cost", amount: c.amount };
     });
 }
 
 function validatePlan(db: Db, input: WorkOrderInput, keep?: ReadonlySet<ID>) {
-  assert(input.title.trim(), "Judul perintah kerja wajib diisi.");
-  if (input.laborHours !== undefined) assertAmount(input.laborHours, "Jam kerja");
-  if (input.laborRate !== undefined) assertAmount(input.laborRate, "Tarif tenaga kerja");
+  assert(input.title.trim(), "Enter a work order title.");
+  if (input.laborHours !== undefined) assertAmount(input.laborHours, "Labour hours");
+  if (input.laborRate !== undefined) assertAmount(input.laborRate, "Labour rate");
   if (input.overhead !== undefined) assertAmount(input.overhead, "Overhead");
   for (const o of input.plannedOutputs) {
     const item = getUsableItem(db, o.itemId, keep);
-    assert(Number.isFinite(o.qty) && o.qty > EPS, `Qty output ${item.name} harus lebih dari 0.`);
+    assert(Number.isFinite(o.qty) && o.qty > EPS, `Output qty for ${item.name} must be more than 0.`);
     if (!outputsUnrestricted(input.type)) {
       assert(
         isProducibleIn(db, item),
-        `${item.name} tidak bisa diproduksi: hanya produk, atau material yang punya resep (komponen / bahan olahan).`,
+        `${item.name} cannot be produced: only products, or materials with a recipe (component / processed material).`,
       );
     }
   }
   for (const i of input.plannedInputs ?? []) {
     // Inputs are existing stock (e.g. an archived product being dismantled), so archive is fine.
     const item = getItem(db, i.itemId);
-    assert(Number.isFinite(i.qty) && i.qty > EPS, `Qty input ${item.name} harus lebih dari 0.`);
-    if (i.lotId) assert(getLot(db, i.lotId).itemId === i.itemId, "Lot input tidak sesuai dengan item.");
+    assert(Number.isFinite(i.qty) && i.qty > EPS, `Input qty for ${item.name} must be more than 0.`);
+    if (i.lotId) assert(getLot(db, i.lotId).itemId === i.itemId, "Input lot does not match the item.");
   }
   if (input.type === "produksi") {
-    assert(input.plannedOutputs.length > 0, "Tentukan barang yang akan dibuat.");
+    assert(input.plannedOutputs.length > 0, "Choose the item to make.");
   }
   if (input.type === "konversi" || input.type === "gabung" || input.type === "dekonstruksi" || input.type === "perbaikan") {
-    assert((input.plannedInputs ?? []).length > 0, "Tentukan barang asal yang akan diproses.");
+    assert((input.plannedInputs ?? []).length > 0, "Choose the source item to process.");
   }
   if (input.type === "gabung") {
     const outputItems = new Set(input.plannedOutputs.map((o) => o.itemId));
-    assert(outputItems.size === 1, "Gabung menghasilkan tepat satu jenis barang.");
+    assert(outputItems.size === 1, "A merge makes exactly one kind of item.");
     const inputs = input.plannedInputs ?? [];
-    // Two different things (meja + kursi, kayu + lem), or two units of one (dua papan dilem).
+    // Two different things (table + chairs, timber + glue), or two units of one (two boards glued).
     assert(
       new Set(inputs.map((i) => i.itemId)).size >= 2 || sum(inputs.map((i) => i.qty)) >= 2 - EPS,
-      "Gabung butuh minimal dua barang (atau dua unit) yang disatukan.",
+      "A merge needs at least two items (or two units) to join.",
     );
-    assert(!inputs.some((i) => outputItems.has(i.itemId)), "Barang hasil gabung tidak boleh menjadi bahannya sendiri.");
+    assert(!inputs.some((i) => outputItems.has(i.itemId)), "The merged item cannot be one of its own inputs.");
   }
 }
 
 function defaultStageNames(db: Db, input: WorkOrderInput): string[] {
   if (input.stages) return input.stages;
-  if (input.type === "perbaikan") return ["Perbaikan", "QC"];
-  if (input.type === "dekonstruksi") return ["Bongkar", "Sortir bahan"];
-  if (input.type === "gabung") return ["Siapkan bagian", "Gabung", "QC"];
+  if (input.type === "perbaikan") return ["Repair", "QC"];
+  if (input.type === "dekonstruksi") return ["Dismantle", "Sort materials"];
+  if (input.type === "gabung") return ["Prepare parts", "Join", "QC"];
   const route = input.plannedOutputs.map((o) => findItem(db, o.itemId)?.stages).find((s) => s?.length);
   return route ?? db.settings.defaultStages ?? [];
 }
@@ -201,7 +201,7 @@ export type WorkOrderPatch = Partial<
 
 export function updateWorkOrder(db: Db, id: ID, patch: WorkOrderPatch): WorkOrder {
   const wo = getWorkOrder(db, id);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   if (patch.plannedOutputs || patch.plannedInputs) {
     validatePlan(
       db,
@@ -215,17 +215,17 @@ export function updateWorkOrder(db: Db, id: ID, patch: WorkOrderPatch): WorkOrde
     );
   }
   if (patch.title !== undefined) {
-    assert(patch.title.trim(), "Judul perintah kerja wajib diisi.");
+    assert(patch.title.trim(), "Enter a work order title.");
     wo.title = patch.title.trim();
   }
   if (patch.dueDate !== undefined) wo.dueDate = patch.dueDate || undefined;
   if (patch.note !== undefined) wo.note = patch.note;
   if (patch.laborHours !== undefined) {
-    assertAmount(patch.laborHours, "Jam kerja");
+    assertAmount(patch.laborHours, "Labour hours");
     wo.laborHours = patch.laborHours;
   }
   if (patch.laborRate !== undefined) {
-    assertAmount(patch.laborRate, "Tarif tenaga kerja");
+    assertAmount(patch.laborRate, "Labour rate");
     wo.laborRate = patch.laborRate;
   }
   if (patch.overhead !== undefined) {
@@ -324,13 +324,13 @@ export function requirements(db: Db, wo: WorkOrder): Requirement[] {
  */
 export function createComponentOrders(db: Db, woId: ID): WorkOrder[] {
   const wo = getWorkOrder(db, woId);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   const todo = requirements(db, wo).filter((r) => r.producible && r.shortage - r.inComponentOrders > EPS);
-  assert(todo.length > 0, "Tidak ada komponen yang perlu diproduksi.");
+  assert(todo.length > 0, "No components need producing.");
   return todo.map((r) => {
     const item = getItem(db, r.itemId);
     const qty = roundQty(r.shortage - r.inComponentOrders);
-    const title = `${item.name} untuk ${wo.code}`;
+    const title = `${item.name} for ${wo.code}`;
     // No BOM of its own: follow the item's recipe, in whole batches.
     const recipe = item.bom?.length ? undefined : recipesFor(db, item.id)[0];
     const perBatch = recipe?.outputs.find((o) => o.itemId === item.id)?.qty ?? 0;
@@ -358,14 +358,14 @@ export function createComponentOrders(db: Db, woId: ID): WorkOrder[] {
 
 export function startWorkOrder(db: Db, id: ID, at = nowIso()): WorkOrder {
   const wo = getWorkOrder(db, id);
-  assert(wo.status === "rencana", `Perintah kerja ${wo.code} tidak dalam status rencana.`);
+  assert(wo.status === "rencana", `Work order ${wo.code} is not in Planned status.`);
   wo.status = "berjalan";
   wo.startedAt = at;
   return wo;
 }
 
 function ensureRunning(db: Db, wo: WorkOrder, at: string) {
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   if (wo.status === "rencana") startWorkOrder(db, wo.id, at);
 }
 
@@ -373,9 +373,9 @@ function ensureRunning(db: Db, wo: WorkOrder, at: string) {
 export function setStageStatus(db: Db, woId: ID, stageId: ID, status: StageStatus, at = nowIso()): WorkOrder {
   const wo = getWorkOrder(db, woId);
   const stage = wo.stages.find((s) => s.id === stageId);
-  assert(stage, "Tahap tidak ditemukan.");
+  assert(stage, "Stage not found.");
   if (status !== "menunggu") ensureRunning(db, wo, at);
-  else assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  else assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   stage.status = status;
   if (status === "menunggu") {
     stage.startedAt = undefined;
@@ -410,7 +410,7 @@ export interface LaborLogInput {
   at?: string;
 }
 
-/** Books labour: hours × rate (harian) and/or pieces × piece rate (borongan). */
+/** Books labour: hours × rate (day rate) and/or pieces × piece rate. */
 export function addLaborLog(db: Db, woId: ID, input: LaborLogInput): LaborLog {
   const wo = getWorkOrder(db, woId);
   const at = input.at ?? nowIso();
@@ -418,11 +418,11 @@ export function addLaborLog(db: Db, woId: ID, input: LaborLogInput): LaborLog {
   const pieces = input.pieces ?? 0;
   const rate = input.rate ?? wo.laborRate;
   const pieceRate = input.pieceRate ?? 0;
-  assert(input.worker.trim(), "Isi nama pekerja / tim.");
-  assert(hours >= 0 && pieces >= 0 && rate >= 0 && pieceRate >= 0, "Jam, unit, dan tarif tidak boleh negatif.");
-  assert(hours > 0 || pieces > 0, "Isi jam kerja atau jumlah unit borongan.");
-  if (pieces > 0) assert(pieceRate > 0, "Isi tarif borongan per unit.");
-  if (input.stageId) assert(wo.stages.some((s) => s.id === input.stageId), "Tahap tidak ditemukan.");
+  assert(input.worker.trim(), "Enter the worker or team name.");
+  assert(hours >= 0 && pieces >= 0 && rate >= 0 && pieceRate >= 0, "Hours, pieces and rates cannot be negative.");
+  assert(hours > 0 || pieces > 0, "Enter labour hours or a piece count.");
+  if (pieces > 0) assert(pieceRate > 0, "Enter the piece rate per unit.");
+  if (input.stageId) assert(wo.stages.some((s) => s.id === input.stageId), "Stage not found.");
   ensureRunning(db, wo, at);
   const log: LaborLog = {
     id: newId(),
@@ -448,8 +448,8 @@ export function addLaborLog(db: Db, woId: ID, input: LaborLogInput): LaborLog {
 
 export function removeLaborLog(db: Db, woId: ID, logId: ID) {
   const wo = getWorkOrder(db, woId);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
-  assert(wo.laborLogs.some((l) => l.id === logId), "Catatan kerja tidak ditemukan.");
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
+  assert(wo.laborLogs.some((l) => l.id === logId), "Labour log entry not found.");
   wo.laborLogs = wo.laborLogs.filter((l) => l.id !== logId);
   return true;
 }
@@ -473,9 +473,9 @@ function issuableStatuses(wo: WorkOrder, lot: Lot): Lot["status"][] {
 
 export function issueMaterials(db: Db, woId: ID, picks: { lotId: ID; qty: number }[], at = nowIso()): WorkOrder {
   const wo = getWorkOrder(db, woId);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   const valid = picks.filter((p) => p.qty > EPS);
-  assert(valid.length > 0, "Tidak ada bahan yang diambil.");
+  assert(valid.length > 0, "No materials to issue.");
   ensureRunning(db, wo, at);
   const ref = woRef(wo);
   const plannedLotIds = new Set(wo.plannedInputs.map((i) => i.lotId).filter(Boolean));
@@ -483,9 +483,9 @@ export function issueMaterials(db: Db, woId: ID, picks: { lotId: ID; qty: number
     const lot = getLot(db, pick.lotId);
     assert(
       !lot.reservedForWo || lot.reservedForWo === wo.id,
-      `Lot ${lot.code} dicadangkan untuk perintah kerja lain.`,
+      `Lot ${lot.code} is reserved for another work order.`,
     );
-    assert(!lot.receiptId || !wo.receipts.some((r) => r.id === lot.receiptId), "Hasil pekerjaan ini tidak bisa dipakai sebagai bahannya sendiri.");
+    assert(!lot.receiptId || !wo.receipts.some((r) => r.id === lot.receiptId), "Output of this work order cannot be used as its own material.");
     // The unit named in the plan (the chair to repair or dismantle) is specific by definition.
     if (!plannedLotIds.has(lot.id)) assertCostOrder(db, lot.id);
     takeFromLot(db, lot.id, pick.qty, "keluar_produksi", ref, { at, allowStatus: issuableStatuses(wo, lot) });
@@ -523,10 +523,10 @@ export function suggestIssue(db: Db, wo: WorkOrder, itemId: ID, qty: number, use
 /** Undo (part of) an issue before completion — the material goes back to its lot. */
 export function unissue(db: Db, woId: ID, issueId: ID, qty: number, at = nowIso()): WorkOrder {
   const wo = getWorkOrder(db, woId);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   const issue = wo.issues.find((i) => i.id === issueId);
-  assert(issue, "Data pengambilan tidak ditemukan.");
-  assert(qty > EPS && qty <= issue.qty + EPS, "Qty pengembalian melebihi yang diambil.");
+  assert(issue, "Issue record not found.");
+  assert(qty > EPS && qty <= issue.qty + EPS, "Return qty is more than was issued.");
   returnToLot(db, getLot(db, issue.lotId), qty, issue.unitCost, { type: "kembali_produksi", ref: woRef(wo), at });
   issue.qty = roundQty(issue.qty - qty);
   if (issue.qty <= EPS) wo.issues = wo.issues.filter((i) => i.id !== issueId);
@@ -547,7 +547,7 @@ export function receivedQty(wo: WorkOrder, itemId?: ID) {
 
 /**
  * Receives finished units before the order is closed (e.g. ship 12 of 24 chairs now). The lot is
- * valued at standard cost; on completion it is revalued to actual HPP and the difference on units
+ * valued at standard cost; on completion it is revalued to actual cost and the difference on units
  * already sold is reported as cost variance.
  */
 export function receiveOutput(
@@ -558,18 +558,18 @@ export function receiveOutput(
   const wo = getWorkOrder(db, woId);
   const at = input.at ?? nowIso();
   const item = getItem(db, input.itemId);
-  assert(input.qty > EPS, "Qty hasil harus lebih dari 0.");
-  assert(wo.type !== "dekonstruksi", "Hasil dekonstruksi dicatat saat pekerjaan selesai.");
+  assert(input.qty > EPS, "Output qty must be more than 0.");
+  assert(wo.type !== "dekonstruksi", "Dismantling output is recorded when the work order is completed.");
   assert(
     wo.plannedOutputs.some((o) => o.itemId === item.id),
-    `${item.name} bukan hasil yang direncanakan di ${wo.code}.`,
+    `${item.name} is not a planned output of ${wo.code}.`,
   );
   assertDimensions(input.dimensions);
   const planned = sum(wo.plannedOutputs.filter((o) => o.itemId === item.id).map((o) => o.qty));
   const already = receivedQty(wo, item.id);
   assert(
     already + input.qty <= planned + EPS,
-    `Hasil sebagian ${item.name} melebihi rencana (${roundQty(already)} dari ${roundQty(planned)} sudah diterima). Sisa hasil dicatat saat pekerjaan selesai.`,
+    `Partial output of ${item.name} is more than planned (${roundQty(already)} of ${roundQty(planned)} already received). Record the rest when the work order is completed.`,
   );
   ensureRunning(db, wo, at);
   const unitCost = provisionalUnitCost(db, item);
@@ -588,9 +588,9 @@ export function receiveOutput(
     status: grade === "reject" ? "rusak" : "tersedia",
     receiptId,
     createdAt: at,
-    note: "Hasil sebagian — HPP sementara",
+    note: "Partial output — provisional cost",
   });
-  recordMove(db, { lot, qty: lot.qty, type: "masuk_produksi", ref, at, note: "Hasil sebagian (HPP sementara)" });
+  recordMove(db, { lot, qty: lot.qty, type: "masuk_produksi", ref, at, note: "Partial output (provisional cost)" });
   const receipt: OutputReceipt = { id: receiptId, at, itemId: item.id, qty: roundQty(input.qty), grade, provisionalUnitCost: unitCost, lotId: lot.id };
   wo.receipts.push(receipt);
   return receipt;
@@ -619,25 +619,25 @@ function receiptRemaining(db: Db, receiptId: ID) {
 }
 
 /**
- * Pure HPP calculation for a work order and a proposed completion. Throws on invalid input,
+ * Pure job-cost calculation for a work order and a proposed completion. Throws on invalid input,
  * so it doubles as validation for the completion form (live preview).
  */
 export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): CostSummary {
   const outputs = input.outputs.filter((o) => o.qty > EPS);
   const returns = input.returns.filter((r) => r.qty > EPS || (r.salvageValue ?? 0) > 0);
-  assert(wo.issues.length > 0, "Belum ada bahan yang diambil untuk perintah kerja ini.");
-  assert(outputs.length > 0 || wo.receipts.length > 0, "Isi minimal satu hasil (output).");
+  assert(wo.issues.length > 0, "No materials have been issued to this work order yet.");
+  assert(outputs.length > 0 || wo.receipts.length > 0, "Enter at least one output.");
   for (const o of input.outputs) {
     const item = getItem(db, o.itemId);
-    assert(Number.isFinite(o.qty) && o.qty >= 0, `Qty hasil ${item.name} tidak valid.`);
-    if (o.sharePct !== undefined) assertAmount(o.sharePct, `Porsi biaya ${item.name}`);
+    assert(Number.isFinite(o.qty) && o.qty >= 0, `Output qty for ${item.name} is not valid.`);
+    if (o.sharePct !== undefined) assertAmount(o.sharePct, `Cost share for ${item.name}`);
     assertDimensions(o.dimensions);
     if (!outputsUnrestricted(wo.type) && o.qty > EPS) {
-      assert(isProducibleIn(db, item), `${item.name} tidak bisa diproduksi: pilih produk, atau material yang punya resep.`);
+      assert(isProducibleIn(db, item), `${item.name} cannot be produced: choose a product, or a material with a recipe.`);
     }
   }
   for (const r of input.returns) {
-    assert(Number.isFinite(r.qty), "Qty pengembalian harus berupa angka.");
+    assert(Number.isFinite(r.qty), "Return qty must be a number.");
     assertDimensions(r.dimensions);
   }
 
@@ -676,15 +676,15 @@ export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): Cost
   for (const r of returns) {
     const item = getItem(db, r.itemId);
     const line = byItem.get(r.itemId);
-    assert(line, `${item.name} tidak pernah diambil di perintah kerja ini, jadi tidak bisa dikembalikan.`);
-    assert(r.qty >= 0, "Qty pengembalian tidak boleh negatif.");
+    assert(line, `${item.name} was never issued to this work order, so it cannot be returned.`);
+    assert(r.qty >= 0, "Return qty cannot be negative.");
     if (r.kind === "utuh") {
       const lotId = r.lotId ?? largestIssueLot(wo, r.itemId);
       const issuedFromLot = sum(wo.issues.filter((i) => i.lotId === lotId).map((i) => i.qty));
       const already = returnedPerLot.get(lotId) ?? 0;
       assert(
         r.qty + already <= issuedFromLot + EPS,
-        `Pengembalian utuh ${item.name} melebihi qty yang diambil dari lot tersebut.`,
+        `Whole return of ${item.name} is more than was issued from that lot.`,
       );
       returnedPerLot.set(lotId, already + r.qty);
       const unitCost = wo.issues.find((i) => i.lotId === lotId)?.unitCost ?? line.avgUnitCost;
@@ -695,7 +695,7 @@ export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): Cost
       line.returnedValue += r.qty * line.avgUnitCost;
     } else {
       const salvage = r.salvageValue ?? 0;
-      assert(salvage >= 0, "Nilai limbah tidak boleh negatif.");
+      assert(salvage >= 0, "Salvage value cannot be negative.");
       line.scrapQty += r.qty;
       line.scrapValue += salvage;
     }
@@ -705,11 +705,11 @@ export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): Cost
     const item = getItem(db, line.itemId);
     assert(
       line.returnedQty + line.scrapQty <= line.issuedQty + EPS,
-      `Total sisa/limbah ${item.name} (${roundQty(line.returnedQty + line.scrapQty)}) melebihi yang diambil (${roundQty(line.issuedQty)}).`,
+      `Total offcuts/waste of ${item.name} (${roundQty(line.returnedQty + line.scrapQty)}) is more than was issued (${roundQty(line.issuedQty)}).`,
     );
     assert(
       line.returnedValue + line.scrapValue <= line.issuedValue + 0.01,
-      `Nilai sisa + limbah ${item.name} melebihi nilai bahan yang diambil.`,
+      `Offcut + waste value of ${item.name} is more than the value of material issued.`,
     );
     line.netQty = roundQty(line.issuedQty - line.returnedQty);
     line.netValue = roundMoney(line.issuedValue - line.returnedValue - line.scrapValue);
@@ -729,14 +729,14 @@ export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): Cost
   const materialNet = roundMoney(materialGross - returnCredit - scrapRecovery);
   const laborHours = input.laborHours ?? wo.laborHours;
   const laborRate = input.laborRate ?? wo.laborRate;
-  assertAmount(laborHours, "Jam kerja");
-  assertAmount(laborRate, "Tarif tenaga kerja");
+  assertAmount(laborHours, "Labour hours");
+  assertAmount(laborRate, "Labour rate");
   const laborInfo = laborCostOf({ laborLogs: wo.laborLogs, laborHours, laborRate });
   const labor = laborInfo.amount;
   assertAmount(input.overhead ?? wo.overhead, "Overhead");
   const overhead = roundMoney(input.overhead ?? wo.overhead);
   const extraList = input.extraCosts ?? wo.extraCosts;
-  for (const c of extraList) assertAmount(c.amount, "Biaya lain");
+  for (const c of extraList) assertAmount(c.amount, "Other cost");
   const extra = roundMoney(sum(extraList.map((c) => c.amount)));
   const total = roundMoney(materialNet + labor + overhead + extra);
 
@@ -744,7 +744,7 @@ export function computeCost(db: Db, wo: WorkOrder, input: CompletionInput): Cost
   if (wo.receipts.length) {
     assert(
       outputs.every((o) => o.sharePct === undefined),
-      "Porsi biaya manual tidak bisa dipakai bila sudah ada hasil sebagian.",
+      "Manual cost shares cannot be used once partial output has been received.",
     );
   }
   const receivedByItem = new Map<ID, number>();
@@ -819,7 +819,7 @@ function largestIssueLot(wo: WorkOrder, itemId: ID): ID {
       bestQty = q;
     }
   }
-  assert(best, "Lot asal tidak ditemukan.");
+  assert(best, "Source lot not found.");
   return best;
 }
 
@@ -839,10 +839,10 @@ function allocate(
   if (manual) {
     assert(
       outputs.every((o) => o.sharePct !== undefined && o.sharePct >= 0),
-      "Jika porsi biaya diisi manual, semua output harus diisi.",
+      "When cost shares are entered manually, fill in every output.",
     );
     const totalPct = sum(outputs.map((o) => o.sharePct ?? 0));
-    assert(Math.abs(totalPct - 100) < 0.01, `Total porsi biaya harus 100% (sekarang ${roundQty(totalPct)}%).`);
+    assert(Math.abs(totalPct - 100) < 0.01, `Cost shares must total 100% (now ${roundQty(totalPct)}%).`);
     weights = outputs.map((o) => o.sharePct ?? 0);
   } else {
     weights = outputs.map((o) => o.qty * allocationBasis(getItem(db, o.itemId)));
@@ -874,8 +874,8 @@ function allocate(
 }
 
 /**
- * Default completion proposal: planned outputs minus what was already received, and a "sisa"
- * row for every remnant-tracked material.
+ * Default completion proposal: planned outputs minus what was already received, and an offcut
+ * ("sisa") row for every remnant-tracked material.
  */
 export function defaultCompletion(db: Db, wo: WorkOrder): CompletionInput {
   const issuedItems = [...new Set(wo.issues.map((i) => i.itemId))];
@@ -900,7 +900,7 @@ export function completeWorkOrder(
   opts: { at?: string; location?: string } = {},
 ): WorkOrder {
   const wo = getWorkOrder(db, woId);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
   if (input.laborHours !== undefined) wo.laborHours = input.laborHours;
   if (input.laborRate !== undefined) wo.laborRate = input.laborRate;
   if (input.overhead !== undefined) wo.overhead = input.overhead;
@@ -959,14 +959,14 @@ export function completeWorkOrder(
       location,
       status: reject ? "rusak" : "tersedia",
       createdAt: at,
-      note: reject ? "Reject QC — perlu rework" : wo.type === "dekonstruksi" && item.kind === "material" ? "Bahan hasil bongkaran" : undefined,
+      note: reject ? "QC reject — needs rework" : wo.type === "dekonstruksi" && item.kind === "material" ? "Material recovered by dismantling" : undefined,
     });
-    recordMove(db, { lot, qty: lot.qty, type: "masuk_produksi", ref, at, note: reject ? "Reject QC" : undefined });
+    recordMove(db, { lot, qty: lot.qty, type: "masuk_produksi", ref, at, note: reject ? "QC reject" : undefined });
     createdLotIds.push(lot.id);
     outputs.push({ id: newId(), itemId: o.itemId, qty: o.qty, sharePct: o.sharePct, dimensions: o.dimensions, grade: o.grade });
   }
 
-  // Partial output still in stock is revalued from provisional to actual HPP. The difference is
+  // Partial output still in stock is revalued from provisional to actual cost. The difference is
   // applied as a delta, so a lot already blended into a moving average keeps its other value.
   for (const r of wo.receipts) {
     const actual = unitOf.get(r.itemId);
@@ -975,7 +975,7 @@ export function completeWorkOrder(
     if (Math.abs(delta) < 0.005) continue;
     for (const lot of db.lots.filter((l) => l.receiptId === r.id && l.qty > EPS)) {
       lot.unitCost = roundMoney(Math.max(0, lot.unitCost + delta));
-      recordMove(db, { lot, qty: 0, type: "revaluasi", ref, at, unitCost: lot.unitCost, note: "HPP sementara → HPP aktual" });
+      recordMove(db, { lot, qty: 0, type: "revaluasi", ref, at, unitCost: lot.unitCost, note: "Provisional cost → actual cost" });
     }
   }
 
@@ -1005,12 +1005,12 @@ export function releaseReservations(db: Db, woId: ID): Lot[] {
 
 export function cancelWorkOrder(db: Db, woId: ID, at = nowIso()): WorkOrder {
   const wo = getWorkOrder(db, woId);
-  assert(isOpenWo(wo), `Perintah kerja ${wo.code} sudah ditutup.`);
-  assert(wo.receipts.length === 0, "Sudah ada hasil yang diterima — selesaikan pekerjaan ini, jangan dibatalkan.");
+  assert(isOpenWo(wo), `Work order ${wo.code} is already closed.`);
+  assert(wo.receipts.length === 0, "Output has already been received — complete this work order instead of cancelling it.");
   const openChildren = db.workOrders.filter((w) => w.parentWoId === wo.id && isOpenWo(w));
   assert(
     openChildren.length === 0,
-    `Masih ada perintah komponen yang berjalan (${openChildren.map((w) => w.code).join(", ")}) — selesaikan atau batalkan dulu.`,
+    `Component work orders are still open (${openChildren.map((w) => w.code).join(", ")}) — complete or cancel them first.`,
   );
   for (const issue of [...wo.issues]) unissue(db, wo.id, issue.id, issue.qty, at);
   releaseReservations(db, wo.id);
@@ -1033,11 +1033,11 @@ export function standardProductCost(db: Pick<Db, "items" | "settings">, product:
 export function createRepairOrder(db: Db, lotId: ID, title?: string): WorkOrder {
   const lot = getLot(db, lotId);
   const item = getItem(db, lot.itemId);
-  assert(item.kind === "product", "Perbaikan hanya untuk produk.");
-  assert(lot.status === "rusak", "Unit ini tidak berstatus rusak.");
+  assert(item.kind === "product", "Repair is for products only.");
+  assert(lot.status === "rusak", "This unit is not marked as damaged.");
   return createWorkOrder(db, {
     type: "perbaikan",
-    title: title || `Perbaikan ${item.name} (${lot.code})`,
+    title: title || `Repair ${item.name} (${lot.code})`,
     plannedOutputs: [{ itemId: item.id, qty: lot.qty }],
     plannedInputs: [{ itemId: item.id, qty: lot.qty, lotId }],
     laborHours: 0,

@@ -48,7 +48,7 @@ export default function WorkOrderDetailPage() {
   const lotsById = useMemo(() => new Map(db.lots.map((l) => [l.id, l])), [db.lots]);
   const flow = useMemo(() => (wo ? workOrderFlow(db, wo) : { nodes: [], links: [] }), [db, wo]);
 
-  if (!wo) return <RecordNotFound what="Perintah kerja" back="/produksi" />;
+  if (!wo) return <RecordNotFound what="Work order" back="/work-orders" />;
 
   const open = isOpenWo(wo);
   const shortages = reqs.filter((r) => r.shortage > 0);
@@ -70,16 +70,16 @@ export default function WorkOrderDetailPage() {
         return (
           <div className="flex items-center gap-1.5">
             <span className="font-medium">{lot?.code ?? "?"}</span>
-            {lot?.isRemnant && <Recycle className="size-3.5 text-success" aria-label="Sisa" />}
+            {lot?.isRemnant && <Recycle className="size-3.5 text-success" aria-label="Offcut" />}
           </div>
         );
       },
     },
-    { key: "item", header: "Bahan", cell: (i) => item(i.itemId)?.name ?? "?" },
+    { key: "item", header: "Material", cell: (i) => item(i.itemId)?.name ?? "?" },
     { key: "qty", header: "Qty", align: "end", cell: (i) => formatQty(i.qty, item(i.itemId)?.uom) },
-    { key: "cost", header: "Harga/satuan", align: "end", cell: (i) => formatIDR(i.unitCost) },
-    { key: "value", header: "Nilai", align: "end", cell: (i) => formatIDR(i.qty * i.unitCost) },
-    { key: "at", header: "Waktu", cell: (i) => <span className="text-muted">{formatDateTime(i.at)}</span> },
+    { key: "cost", header: "Unit cost", align: "end", cell: (i) => formatIDR(i.unitCost) },
+    { key: "value", header: "Value", align: "end", cell: (i) => formatIDR(i.qty * i.unitCost) },
+    { key: "at", header: "Time", cell: (i) => <span className="text-muted">{formatDateTime(i.at)}</span> },
     ...(open
       ? [
           {
@@ -90,10 +90,10 @@ export default function WorkOrderDetailPage() {
               <ConfirmButton
                 size="sm"
                 variant="ghost"
-                title="Kembalikan bahan ke gudang?"
-                description={`${formatQty(i.qty, item(i.itemId)?.uom)} ${item(i.itemId)?.name} dikembalikan ke lot asalnya dengan harga yang sama.`}
-                confirmLabel="Kembalikan"
-                onConfirm={() => run((d) => unissue(d, wo.id, i.id, i.qty), "Bahan dikembalikan ke gudang")}
+                title="Return material to the warehouse?"
+                description={`${formatQty(i.qty, item(i.itemId)?.uom)} ${item(i.itemId)?.name} goes back to its source lot at the same cost.`}
+                confirmLabel="Return"
+                onConfirm={() => run((d) => unissue(d, wo.id, i.id, i.qty), "Material returned to the warehouse")}
               >
                 <Undo2 className="size-4" />
               </ConfirmButton>
@@ -109,7 +109,7 @@ export default function WorkOrderDetailPage() {
   return (
     <>
       <PageHeader
-        back="/produksi"
+        back="/work-orders"
         title={wo.title}
         badge={
           <>
@@ -117,35 +117,35 @@ export default function WorkOrderDetailPage() {
             <StatusChip tone={WO_STATUS[wo.status].tone}>{WO_STATUS[wo.status].label}</StatusChip>
           </>
         }
-        description={`${wo.code} · dibuat ${formatDate(wo.createdAt)}${wo.dueDate ? ` · target ${formatDate(wo.dueDate)}` : ""}`}
+        description={`${wo.code} · created ${formatDate(wo.createdAt)}${wo.dueDate ? ` · due ${formatDate(wo.dueDate)}` : ""}`}
         actions={
           open && (
             <>
               <ConfirmButton
                 variant="danger-soft"
                 danger
-                title={`Batalkan ${wo.code}?`}
-                description="Semua bahan yang sudah diambil dikembalikan ke gudang, dan cadangan pembelian dilepas."
-                confirmLabel="Batalkan pekerjaan"
-                onConfirm={() => run((d) => cancelWorkOrder(d, wo.id), `${wo.code} dibatalkan`)}
+                title={`Cancel ${wo.code}?`}
+                description="All issued materials go back to the warehouse, and purchase reservations are released."
+                confirmLabel="Cancel job"
+                onConfirm={() => run((d) => cancelWorkOrder(d, wo.id), `${wo.code} cancelled`)}
               >
-                Batalkan
+                Cancel
               </ConfirmButton>
               {wo.status === "rencana" && (
-                <Button variant="secondary" onPress={() => run((d) => startWorkOrder(d, wo.id), `${wo.code} mulai dikerjakan`)}>
-                  <Play className="size-4" /> Mulai
+                <Button variant="secondary" onPress={() => run((d) => startWorkOrder(d, wo.id), `${wo.code} started`)}>
+                  <Play className="size-4" /> Start
                 </Button>
               )}
               <Button variant="secondary" onPress={() => setIssueReq({ itemId: null, qty: 1 })}>
-                <Plus className="size-4" /> Ambil bahan
+                <Plus className="size-4" /> Issue materials
               </Button>
               {wo.type !== "dekonstruksi" && wo.plannedOutputs.length > 0 && (
                 <Button variant="secondary" onPress={() => setReceiving(true)}>
-                  <PackagePlus className="size-4" /> Terima sebagian
+                  <PackagePlus className="size-4" /> Receive partial
                 </Button>
               )}
               <Button onPress={() => setCompleting(true)} isDisabled={wo.issues.length === 0}>
-                <PackageCheck className="size-4" /> Selesaikan
+                <PackageCheck className="size-4" /> Complete
               </Button>
             </>
           )
@@ -153,40 +153,40 @@ export default function WorkOrderDetailPage() {
       />
 
       <Section
-        title="Peta proses"
+        title="Process map"
         description={
           wo.cost
-            ? "Ke mana setiap rupiah pekerjaan ini mengalir: bahan dan tenaga kerja masuk, hasil, sisa, dan limbah keluar — lalu ke mana hasilnya pergi."
+            ? "Where every rupiah of this job went: materials and labour in, output, offcuts and waste out — then where the output went."
             : wo.issues.length
-              ? "Yang sudah masuk ke pekerjaan ini sejauh ini. Peta lengkap terkunci saat pekerjaan selesai."
-              : "Rencana pada harga standar. Berubah menjadi angka nyata begitu bahan diambil."
+              ? "What has gone into this job so far. The full map is locked when the job is done."
+              : "The plan at standard cost. It turns into actual figures once materials are issued."
         }
         className="mb-6"
         bodyClassName="p-0"
       >
-        <FlowDiagram graph={flow} label={`Peta proses ${wo.code}`} />
+        <FlowDiagram graph={flow} label={`Process map ${wo.code}`} />
       </Section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
           {open && (
             <Section
-              title="Kebutuhan bahan"
-              description={`${recipe ? `Dari resep ${recipe.name}` : "Dari BOM produk dan bahan tambahan"}. Klik Ambil untuk mengeluarkan bahan dari gudang.`}
+              title="Material requirements"
+              description={`${recipe ? `From recipe ${recipe.name}` : "From the product BOM and extra materials"}. Click Issue to take materials out of the warehouse.`}
               actions={
                 <>
                   {componentShort.length > 0 && (
                     <Button
                       size="sm"
                       variant="secondary"
-                      onPress={() => run((d) => createComponentOrders(d, wo.id), (w) => `${w.length} perintah komponen dibuat`)}
+                      onPress={() => run((d) => createComponentOrders(d, wo.id), (w) => `${w.length} component orders created`)}
                     >
-                      <GitBranch className="size-4" /> Produksi komponen
+                      <GitBranch className="size-4" /> Make components
                     </Button>
                   )}
                   {shortages.some((r) => !r.producible) && (
-                    <Button size="sm" onPress={() => navigate(`/pembelian/baru?wo=${wo.id}`)}>
-                      <ShoppingCart className="size-4" /> Beli kekurangan
+                    <Button size="sm" onPress={() => navigate(`/purchases/new?wo=${wo.id}`)}>
+                      <ShoppingCart className="size-4" /> Buy shortfall
                     </Button>
                   )}
                 </>
@@ -196,7 +196,7 @@ export default function WorkOrderDetailPage() {
               {reqs.length ? (
                 <RequirementsTable reqs={reqs} onIssue={(r) => setIssueReq({ itemId: r.itemId, qty: r.remaining })} />
               ) : (
-                <EmptyBlock title="Tidak ada kebutuhan standar" description="Ambil bahan secara bebas lewat tombol Ambil bahan." />
+                <EmptyBlock title="No standard requirements" description="Issue any material with the Issue materials button." />
               )}
             </Section>
           )}
@@ -205,53 +205,53 @@ export default function WorkOrderDetailPage() {
 
           {wo.receipts.length > 0 && (
             <Section
-              title="Hasil sebagian"
-              description={wo.status === "selesai" ? "Sudah direvaluasi ke HPP aktual." : "Masuk gudang dengan HPP sementara; disesuaikan saat pekerjaan ditutup."}
+              title="Partial output"
+              description={wo.status === "selesai" ? "Already revalued to actual cost." : "Received at provisional cost; adjusted when the job is closed."}
               bodyClassName="p-0"
             >
               <DataTable
-                label="Hasil sebagian"
+                label="Partial output"
                 rows={wo.receipts}
                 columns={[
-                  { key: "at", header: "Waktu", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => formatDateTime(r.at) },
-                  { key: "item", header: "Barang", cell: (r) => item(r.itemId)?.name ?? "?" },
+                  { key: "at", header: "Time", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => formatDateTime(r.at) },
+                  { key: "item", header: "Item", cell: (r) => item(r.itemId)?.name ?? "?" },
                   { key: "qty", header: "Qty", align: "end", cell: (r) => formatQty(r.qty, item(r.itemId)?.uom) },
                   { key: "grade", header: "QC", cell: (r) => <StatusChip tone={r.grade === "reject" ? "danger" : "success"}>{OUTPUT_GRADE[r.grade]}</StatusChip> },
-                  { key: "cost", header: "HPP sementara", align: "end", cell: (r) => formatIDR(r.provisionalUnitCost) },
+                  { key: "cost", header: "Provisional cost", align: "end", cell: (r) => formatIDR(r.provisionalUnitCost) },
                 ]}
               />
             </Section>
           )}
 
           <Section
-            title="Bahan diambil"
-            description={wo.issues.length ? `Total nilai ${formatIDR(issuedValue)}` : undefined}
+            title="Materials issued"
+            description={wo.issues.length ? `Total value ${formatIDR(issuedValue)}` : undefined}
             bodyClassName="p-0"
           >
             <DataTable
-              label="Bahan diambil"
+              label="Materials issued"
               columns={issueColumns}
               rows={wo.issues}
               dependencies={[lotsById, open]}
-              empty={<EmptyBlock title="Belum ada bahan diambil" description="Bahan yang diambil dari gudang tercatat di sini beserta harga lotnya." />}
+              empty={<EmptyBlock title="No materials issued yet" description="Materials issued from the warehouse are recorded here with their lot cost." />}
             />
           </Section>
 
           {wo.status === "selesai" && wo.cost && (
             <>
-              <Section title="Pemakaian bahan vs standar" bodyClassName="p-0">
+              <Section title="Material usage vs standard" bodyClassName="p-0">
                 <DataTable
-                  label="Pemakaian bahan"
+                  label="Material usage"
                   rows={wo.cost.lines.map((l) => ({ ...l, id: l.itemId }))}
                   columns={[
-                    { key: "item", header: "Bahan", isRowHeader: true, cell: (l) => item(l.itemId)?.name ?? "?" },
-                    { key: "issued", header: "Diambil", align: "end", cell: (l) => formatQty(l.issuedQty, item(l.itemId)?.uom) },
-                    { key: "ret", header: "Kembali/sisa", align: "end", cell: (l) => formatQty(l.returnedQty, item(l.itemId)?.uom) },
-                    { key: "scrap", header: "Limbah", align: "end", cell: (l) => formatQty(l.scrapQty, item(l.itemId)?.uom) },
-                    { key: "std", header: "Standar BOM", align: "end", cell: (l) => (l.standardQty ? formatQty(l.standardQty, item(l.itemId)?.uom) : "—") },
+                    { key: "item", header: "Material", isRowHeader: true, cell: (l) => item(l.itemId)?.name ?? "?" },
+                    { key: "issued", header: "Issued", align: "end", cell: (l) => formatQty(l.issuedQty, item(l.itemId)?.uom) },
+                    { key: "ret", header: "Returned/offcut", align: "end", cell: (l) => formatQty(l.returnedQty, item(l.itemId)?.uom) },
+                    { key: "scrap", header: "Waste", align: "end", cell: (l) => formatQty(l.scrapQty, item(l.itemId)?.uom) },
+                    { key: "std", header: "BOM standard", align: "end", cell: (l) => (l.standardQty ? formatQty(l.standardQty, item(l.itemId)?.uom) : "—") },
                     {
                       key: "var",
-                      header: "Selisih",
+                      header: "Variance",
                       align: "end",
                       cell: (l) => {
                         if (!l.standardQty) return "—";
@@ -259,26 +259,26 @@ export default function WorkOrderDetailPage() {
                         return <span className={v > 0.05 ? "text-danger" : v < -0.05 ? "text-success" : ""}>{v > 0 ? "+" : ""}{formatPct(v)}</span>;
                       },
                     },
-                    { key: "net", header: "Nilai neto", align: "end", cell: (l) => formatIDR(l.netValue) },
+                    { key: "net", header: "Net value", align: "end", cell: (l) => formatIDR(l.netValue) },
                   ]}
                 />
               </Section>
-              <Section title="Barang masuk gudang dari pekerjaan ini" bodyClassName="p-0">
+              <Section title="Items received from this job" bodyClassName="p-0">
                 <DataTable
-                  label="Lot hasil"
+                  label="Output lots"
                   rows={createdLots}
-                  onRowAction={(l) => navigate(`/stok/item/${l.itemId}`)}
+                  onRowAction={(l) => navigate(`/stock/items/${l.itemId}`)}
                   columns={[
                     { key: "code", header: "Lot", isRowHeader: true, className: "whitespace-nowrap", cell: (l) => <span className="font-medium">{l.code}</span> },
                     { key: "item", header: "Item", cell: (l) => item(l.itemId)?.name ?? "?" },
                     {
                       key: "type",
-                      header: "Jenis",
-                      cell: (l) => <StatusChip tone={l.isRemnant ? "success" : "accent"}>{l.isRemnant ? "Sisa material" : LOT_ORIGIN[l.origin]}</StatusChip>,
+                      header: "Type",
+                      cell: (l) => <StatusChip tone={l.isRemnant ? "success" : "accent"}>{l.isRemnant ? "Offcut" : LOT_ORIGIN[l.origin]}</StatusChip>,
                     },
-                    { key: "dims", header: "Ukuran", cell: (l) => <span className="text-muted">{formatDims(l.dimensions) || "—"}</span> },
-                    { key: "qty", header: "Qty kini", align: "end", cell: (l) => formatQty(l.qty, item(l.itemId)?.uom) },
-                    { key: "cost", header: "HPP/satuan", align: "end", cell: (l) => formatIDR(l.unitCost) },
+                    { key: "dims", header: "Size", cell: (l) => <span className="text-muted">{formatDims(l.dimensions) || "—"}</span> },
+                    { key: "qty", header: "Qty now", align: "end", cell: (l) => formatQty(l.qty, item(l.itemId)?.uom) },
+                    { key: "cost", header: "Unit cost", align: "end", cell: (l) => formatIDR(l.unitCost) },
                   ]}
                 />
               </Section>
@@ -288,7 +288,7 @@ export default function WorkOrderDetailPage() {
 
         <div className="flex flex-col gap-6">
           {wo.status === "selesai" && wo.cost ? (
-            <Section title="HPP pekerjaan" description={`Dikunci ${formatDateTime(wo.completedAt)}`}>
+            <Section title="Job cost" description={`Locked ${formatDateTime(wo.completedAt)}`}>
               <CostBreakdown cost={wo.cost} />
             </Section>
           ) : (
@@ -299,13 +299,13 @@ export default function WorkOrderDetailPage() {
           {!open && wo.laborLogs.length > 0 && <LaborPanel wo={wo} />}
 
           {(children.length > 0 || parent) && (
-            <Section title="Struktur pekerjaan">
-              {parent && <Row label="Bagian dari" value={<Link href={`/produksi/${parent.id}`}><Code>{parent.code}</Code></Link>} />}
+            <Section title="Job structure">
+              {parent && <Row label="Part of" value={<Link href={`/work-orders/${parent.id}`}><Code>{parent.code}</Code></Link>} />}
               {children.map((c) => (
                 <Row
                   key={c.id}
                   label={
-                    <Link href={`/produksi/${c.id}`}>
+                    <Link href={`/work-orders/${c.id}`}>
                       <Code>{c.code}</Code> <span className="text-sm">{c.title}</span>
                     </Link>
                   }
@@ -315,15 +315,15 @@ export default function WorkOrderDetailPage() {
             </Section>
           )}
 
-          <Section title="Rencana hasil">
+          <Section title="Planned output">
             {wo.plannedOutputs.length === 0 ? (
-              <p className="text-sm text-muted">Ditentukan saat selesai.</p>
+              <p className="text-sm text-muted">Set on completion.</p>
             ) : (
               wo.plannedOutputs.map((o) => <Row key={o.id} label={item(o.itemId)?.name ?? "?"} value={formatQty(o.qty, item(o.itemId)?.uom)} />)
             )}
             {wo.plannedInputs.length > 0 && (
               <>
-                <p className="eyebrow mt-3 mb-1">Barang asal / tambahan</p>
+                <p className="eyebrow mt-3 mb-1">Source / extra items</p>
                 {wo.plannedInputs.map((i) => (
                   <Row
                     key={i.id}
@@ -339,37 +339,37 @@ export default function WorkOrderDetailPage() {
             <KeyValue
               columns={1}
               items={[
-                ["Mulai", formatDateTime(wo.startedAt)],
-                ["Selesai", formatDateTime(wo.completedAt)],
+                ["Started", formatDateTime(wo.startedAt)],
+                ["Completed", formatDateTime(wo.completedAt)],
                 [
-                  "Untuk order",
+                  "For order",
                   so ? (
-                    <Link href={`/penjualan/${so.id}`}>
+                    <Link href={`/sales/${so.id}`}>
                       {so.code} · {partnerName(so.customerId)}
                     </Link>
                   ) : (
                     "—"
                   ),
                 ],
-                ["Resep", recipe ? <Link href={`/resep/${recipe.id}`}>{recipe.name}{wo.batches && wo.batches !== 1 ? ` × ${wo.batches} batch` : ""}</Link> : "—"],
-                ["Catatan", wo.note],
+                ["Recipe", recipe ? <Link href={`/recipes/${recipe.id}`}>{recipe.name}{wo.batches && wo.batches !== 1 ? ` × ${wo.batches} batch` : ""}</Link> : "—"],
+                ["Note", wo.note],
               ]}
             />
           </Section>
 
           {purchases.length > 0 && (
-            <Section title="Pembelian khusus pekerjaan ini">
+            <Section title="Purchases for this job">
               {purchases.map((p) => (
                 <Row
                   key={p.id}
-                  label={<Link href={`/pembelian/${p.id}`}>{p.code}</Link>}
+                  label={<Link href={`/purchases/${p.id}`}>{p.code}</Link>}
                   value={<StatusChip tone={PURCHASE_STATUS[p.status].tone}>{PURCHASE_STATUS[p.status].label}</StatusChip>}
                 />
               ))}
               {wo.status === "selesai" && (
                 <p className="mt-2 flex items-start gap-2 text-xs text-muted">
                   <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
-                  Sisa pembelian telah dilepas menjadi stok bebas dengan harga belinya — siap dipakai produksi berikutnya.
+                  Leftover purchased stock has been released to free stock at its purchase price — ready for the next job.
                 </p>
               )}
             </Section>
@@ -396,36 +396,36 @@ const run = useRun();
     overhead !== wo.overhead ||
     JSON.stringify(extras) !== JSON.stringify(wo.extraCosts);
   return (
-    <Section title="Biaya berjalan" description="Bisa diubah sampai pekerjaan selesai.">
+    <Section title="Running cost" description="You can change this until the job is done.">
       <div className="flex flex-col gap-3">
-        <Row label="Bahan diambil" value={formatIDR(issuedValue)} />
+        <Row label="Materials issued" value={formatIDR(issuedValue)} />
         {wo.laborLogs.length ? (
-          <Row label="Tenaga kerja (dari catatan kerja)" value={formatIDR(laborCostOf(wo).amount)} />
+          <Row label="Labour (from labour log)" value={formatIDR(laborCostOf(wo).amount)} />
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="Rencana jam kerja" value={laborHours} onChange={setLaborHours} suffix="jam" />
-            <NumberInput label="Tarif/jam" value={laborRate} onChange={setLaborRate} money />
+            <NumberInput label="Planned labour hours" value={laborHours} onChange={setLaborHours} suffix="h" />
+            <NumberInput label="Rate/hour" value={laborRate} onChange={setLaborRate} money />
           </div>
         )}
         <NumberInput label="Overhead" value={overhead} onChange={setOverhead} money />
         <div>
-          <p className="mb-1 text-sm font-medium">Biaya lain (jasa luar, transport)</p>
+          <p className="mb-1 text-sm font-medium">Other costs (outside services, transport)</p>
           {extras.map((c, idx) => (
             <div key={c.id} className="mb-2 grid grid-cols-[1fr_8rem_auto] gap-2">
-              <TextInput aria-label="Keterangan" value={c.label} onChange={(label) => setExtras(extras.map((x, i) => (i === idx ? { ...x, label } : x)))} placeholder="Keterangan" />
-              <NumberInput aria-label="Jumlah" value={c.amount} onChange={(amount) => setExtras(extras.map((x, i) => (i === idx ? { ...x, amount } : x)))} money />
-              <Button isIconOnly variant="ghost" aria-label="Hapus" onPress={() => setExtras(extras.filter((_, i) => i !== idx))}>
+              <TextInput aria-label="Description" value={c.label} onChange={(label) => setExtras(extras.map((x, i) => (i === idx ? { ...x, label } : x)))} placeholder="Description" />
+              <NumberInput aria-label="Amount" value={c.amount} onChange={(amount) => setExtras(extras.map((x, i) => (i === idx ? { ...x, amount } : x)))} money />
+              <Button isIconOnly variant="ghost" aria-label="Remove" onPress={() => setExtras(extras.filter((_, i) => i !== idx))}>
                 <Trash2 className="size-4" />
               </Button>
             </div>
           ))}
           <Button size="sm" variant="tertiary" onPress={() => setExtras([...extras, { id: newId(), label: "", amount: 0 }])}>
-            <Plus className="size-4" /> Biaya lain
+            <Plus className="size-4" /> Other cost
           </Button>
         </div>
         <div className="border-t border-[var(--rule)] pt-2">
           <Row
-            label="Estimasi total saat ini"
+            label="Current estimated total"
             value={formatIDR(issuedValue + (wo.laborLogs.length ? laborCostOf(wo).amount : laborHours * laborRate) + overhead + sum(extras.map((e) => e.amount)))}
             strong
           />
@@ -433,9 +433,9 @@ const run = useRun();
         <Button
           variant="secondary"
           isDisabled={!dirty}
-          onPress={() => run((d) => updateWorkOrder(d, wo.id, { laborHours, laborRate, overhead, extraCosts: extras }), "Biaya disimpan")}
+          onPress={() => run((d) => updateWorkOrder(d, wo.id, { laborHours, laborRate, overhead, extraCosts: extras }), "Costs saved")}
         >
-          Simpan biaya
+          Save costs
         </Button>
       </div>
     </Section>

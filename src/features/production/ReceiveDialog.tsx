@@ -14,8 +14,8 @@ export function ReceiveDialog({ wo, isOpen, onOpenChange }: { wo: WorkOrder; isO
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      title="Terima hasil sebagian"
-      description="Unit yang sudah jadi masuk gudang sekarang dengan HPP standar. Saat pekerjaan ditutup, nilainya disesuaikan ke HPP aktual; selisih atas unit yang sudah terjual dicatat sebagai selisih HPP."
+      title="Receive partial output"
+      description="Finished units go into the warehouse now at standard cost. When the job is closed, their value is adjusted to actual cost; the difference on units already sold is recorded as a cost variance."
     >
       {isOpen && <ReceiveForm wo={wo} onDone={() => onOpenChange(false)} />}
     </TaskModal>
@@ -36,30 +36,30 @@ function ReceiveForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
   return (
     <div className="flex flex-col gap-3">
       <SelectInput
-        label="Barang"
+        label="Item"
         value={itemId}
         onChange={setItemId}
-        options={wo.plannedOutputs.map((o) => ({ id: o.itemId, label: item(o.itemId)?.name ?? "?", description: `rencana ${formatQty(o.qty)} · sudah diterima ${formatQty(receivedQty(wo, o.itemId))}` }))}
+        options={wo.plannedOutputs.map((o) => ({ id: o.itemId, label: item(o.itemId)?.name ?? "?", description: `planned ${formatQty(o.qty)} · received ${formatQty(receivedQty(wo, o.itemId))}` }))}
       />
       <div className="grid grid-cols-2 gap-3">
-        <NumberInput label="Qty" value={qty} onChange={setQty} description={`Sisa rencana ${formatQty(left, it?.uom)}`} />
-        <SelectInput label="Hasil QC" value={grade} onChange={(v) => setGrade(v as OutputGrade)} options={(Object.keys(OUTPUT_GRADE) as OutputGrade[]).map((g) => ({ id: g, label: OUTPUT_GRADE[g] }))} />
+        <NumberInput label="Qty" value={qty} onChange={setQty} description={`Left to receive ${formatQty(left, it?.uom)}`} />
+        <SelectInput label="QC result" value={grade} onChange={(v) => setGrade(v as OutputGrade)} options={(Object.keys(OUTPUT_GRADE) as OutputGrade[]).map((g) => ({ id: g, label: OUTPUT_GRADE[g] }))} />
       </div>
       <p className="text-xs text-muted">
-        HPP sementara {formatIDR(unit)} per unit{grade === "reject" ? " · unit reject masuk sebagai rusak, siap dibuatkan perintah perbaikan" : ""}.
+        Provisional cost {formatIDR(unit)} per unit{grade === "reject" ? " · reject units go in as damaged, ready for a repair order" : ""}.
       </p>
       <div className="flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button
           isDisabled={!itemId || qty <= 0}
           onPress={() => {
-            const ok = run((d) => receiveOutput(d, wo.id, { itemId, qty, grade }), `${formatQty(qty, it?.uom)} ${it?.name} masuk gudang`);
+            const ok = run((d) => receiveOutput(d, wo.id, { itemId, qty, grade }), `${formatQty(qty, it?.uom)} ${it?.name} received into the warehouse`);
             if (ok) onDone();
           }}
         >
-          Terima ke gudang
+          Receive into warehouse
         </Button>
       </div>
     </div>

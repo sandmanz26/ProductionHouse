@@ -38,17 +38,17 @@ export function billedAmount(db: Db, doc: PayableDoc, id: ID): { billed: number;
 
 function findSale(db: Db, id: ID): SalesOrder {
   const so = db.sales.find((s) => s.id === id);
-  assert(so, "Order penjualan tidak ditemukan.");
+  assert(so, "Sales order not found — it may have been deleted.");
   return so;
 }
 function findPurchase(db: Db, id: ID): Purchase {
   const p = db.purchases.find((x) => x.id === id);
-  assert(p, "Pembelian tidak ditemukan.");
+  assert(p, "Purchase not found — it may have been deleted.");
   return p;
 }
 function findRental(db: Db, id: ID): Rental {
   const r = db.rentals.find((x) => x.id === id);
-  assert(r, "Data sewa tidak ditemukan.");
+  assert(r, "Rental not found — it may have been deleted.");
   return r;
 }
 
@@ -63,21 +63,21 @@ function paymentsOf(db: Db, doc: PayableDoc, id: ID): Payment[] {
  * blocked so the balance can never silently turn into an unexplained credit.
  */
 export function addPayment(db: Db, doc: PayableDoc, id: ID, input: PaymentInput): Payment {
-  assertDate(input.date, "Tanggal pembayaran");
-  assert(typeof input.amount === "number" && Number.isFinite(input.amount), "Jumlah pembayaran harus berupa angka.");
-  assert(Math.abs(input.amount) > EPS, "Jumlah pembayaran tidak boleh 0.");
-  if (doc === "sale") assert(findSale(db, id).status !== "batal", "Order sudah dibatalkan.");
-  if (doc === "purchase") assert(findPurchase(db, id).status !== "batal", "Pembelian sudah dibatalkan.");
-  if (doc === "rental") assert(findRental(db, id).status !== "batal", "Sewa sudah dibatalkan.");
+  assertDate(input.date, "Payment date");
+  assert(typeof input.amount === "number" && Number.isFinite(input.amount), "Payment amount must be a number.");
+  assert(Math.abs(input.amount) > EPS, "Payment amount cannot be 0.");
+  if (doc === "sale") assert(findSale(db, id).status !== "batal", "This order is cancelled — payments cannot be recorded.");
+  if (doc === "purchase") assert(findPurchase(db, id).status !== "batal", "This purchase is cancelled — payments cannot be recorded.");
+  if (doc === "rental") assert(findRental(db, id).status !== "batal", "This rental is cancelled — payments cannot be recorded.");
   const { balance } = billedAmount(db, doc, id);
   const list = paymentsOf(db, doc, id);
   if (input.amount > 0) {
     // A sale may be paid up front (DP) up to its full value, before anything is shipped.
-    assert(input.amount <= balance + 0.01, `Pembayaran melebihi sisa tagihan (${roundMoney(Math.max(0, balance))}).`);
+    assert(input.amount <= balance + 0.01, `Payment is more than the balance due (${roundMoney(Math.max(0, balance))}).`);
   } else {
     // Refund: of money paid, or of a rental deposit that exceeds the final bill.
     const refundable = doc === "rental" ? Math.max(-balance, paid(list)) : paid(list);
-    assert(-input.amount <= refundable + 0.01, `Refund melebihi yang bisa dikembalikan (${roundMoney(Math.max(0, refundable))}).`);
+    assert(-input.amount <= refundable + 0.01, `Refund is more than can be returned (${roundMoney(Math.max(0, refundable))}).`);
   }
   const payment: Payment = {
     id: newId(),
@@ -93,11 +93,11 @@ export function addPayment(db: Db, doc: PayableDoc, id: ID, input: PaymentInput)
 export function removePayment(db: Db, doc: PayableDoc, id: ID, paymentId: ID) {
   const list = paymentsOf(db, doc, id);
   const idx = list.findIndex((p) => p.id === paymentId);
-  assert(idx >= 0, "Pembayaran tidak ditemukan.");
+  assert(idx >= 0, "Payment not found — it may have been deleted.");
   const removed = list[idx]!;
   if (removed.amount < 0) {
     // Undoing a refund puts the money back on the document; it must not exceed the bill.
-    assert(billedAmount(db, doc, id).balance + removed.amount >= -0.01 || doc === "rental", "Refund ini tidak bisa dihapus karena membuat pembayaran melebihi tagihan.");
+    assert(billedAmount(db, doc, id).balance + removed.amount >= -0.01 || doc === "rental", "This refund cannot be deleted — payments would then exceed the bill.");
   }
   list.splice(idx, 1);
   return true;
@@ -217,10 +217,10 @@ export function payables(db: Db, asOf: ISODate = today()): OpenItem[] {
 }
 
 export const AGING_BUCKETS = [
-  { key: "belum", label: "Belum jatuh tempo", test: (d: number) => d <= 0 },
-  { key: "1-30", label: "1–30 hari", test: (d: number) => d >= 1 && d <= 30 },
-  { key: "31-60", label: "31–60 hari", test: (d: number) => d >= 31 && d <= 60 },
-  { key: "60+", label: "> 60 hari", test: (d: number) => d > 60 },
+  { key: "belum", label: "Not yet due", test: (d: number) => d <= 0 },
+  { key: "1-30", label: "1–30 days", test: (d: number) => d >= 1 && d <= 30 },
+  { key: "31-60", label: "31–60 days", test: (d: number) => d >= 31 && d <= 60 },
+  { key: "60+", label: "> 60 days", test: (d: number) => d > 60 },
 ] as const;
 
 export function agingSummary(items: OpenItem[]) {

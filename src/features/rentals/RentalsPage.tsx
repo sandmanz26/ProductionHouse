@@ -1,4 +1,4 @@
-import { Button, SearchField, Tabs, type Key } from "@heroui/react";
+import { Button, Tabs, type Key } from "@heroui/react";
 import { CalendarClock, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -16,16 +16,13 @@ export default function RentalsPage() {
   const { item, partnerName } = useLookups();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("aktif");
-  const [q, setQ] = useState("");
   const t = today();
 
   const rows = useMemo(() => {
-    const term = q.trim().toLowerCase();
     return [...db.rentals]
       .filter((r) => (filter === "aktif" ? r.status === "dipesan" || r.status === "berjalan" : filter === "selesai" ? r.status === "selesai" || r.status === "batal" : true))
-      .filter((r) => !term || r.code.toLowerCase().includes(term) || r.project.toLowerCase().includes(term) || partnerName(r.customerId).toLowerCase().includes(term))
       .sort((a, b) => b.startDate.localeCompare(a.startDate));
-  }, [db.rentals, filter, q, partnerName]);
+  }, [db.rentals, filter]);
 
   const grid = useMemo(() => {
     const days = Array.from({ length: DAYS }, (_, i) => addDays(t, i));
@@ -39,10 +36,10 @@ export default function RentalsPage() {
   }, [db, t]);
 
   const columns: Column<Rental>[] = [
-    { key: "code", header: "Kode", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => <span className="font-medium">{r.code}</span> },
+    { key: "code", header: "Code", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => <span className="font-medium">{r.code}</span> },
     {
       key: "proj",
-      header: "Acara / proyek",
+      header: "Event / project",
       cell: (r) => (
         <div className="min-w-48">
           <p className="font-medium">{r.project}</p>
@@ -52,46 +49,46 @@ export default function RentalsPage() {
         </div>
       ),
     },
-    { key: "kind", header: "Jenis", cell: (r) => <StatusChip tone={r.kind === "sewa" ? "accent" : "default"}>{r.kind === "sewa" ? "Sewa" : "Pinjam"}</StatusChip> },
+    { key: "kind", header: "Type", cell: (r) => <StatusChip tone={r.kind === "sewa" ? "accent" : "default"}>{r.kind === "sewa" ? "Rental" : "Loan"}</StatusChip> },
     {
       key: "dates",
-      header: "Periode",
+      header: "Period",
       className: "whitespace-nowrap",
       cell: (r) => {
         const late = r.status === "berjalan" && r.endDate < t && outstandingCheckouts(r).length > 0;
         return (
           <span className={late ? "font-medium text-danger" : ""}>
             {formatDate(r.startDate)} – {formatDate(r.endDate)}
-            {late && " · terlambat"}
+            {late && " · late"}
           </span>
         );
       },
     },
-    { key: "total", header: "Tagihan", align: "end", cell: (r) => (r.kind === "sewa" ? formatIDR(rentalCharges(r, t).total) : <span className="text-muted">—</span>) },
+    { key: "total", header: "Charges", align: "end", cell: (r) => (r.kind === "sewa" ? formatIDR(rentalCharges(r, t).total) : <span className="text-muted">—</span>) },
     { key: "status", header: "Status", cell: (r) => <StatusChip tone={RENTAL_STATUS[r.status].tone}>{RENTAL_STATUS[r.status].label}</StatusChip> },
   ];
 
   return (
     <>
       <PageHeader
-        title="Sewa & Pinjam"
-        description="Event, syuting, pemotretan, mitra. Bentrok tanggal dicek otomatis."
+        title="Rental & loan"
+        description="Events, film shoots, photo shoots, partners. Date clashes are checked automatically."
         actions={
-          <Button onPress={() => navigate("/sewa/baru")}>
-            <Plus className="size-4" /> Booking baru
+          <Button onPress={() => navigate("/rentals/new")}>
+            <Plus className="size-4" /> New booking
           </Button>
         }
       />
 
       {grid.rows.length > 0 && (
-        <Section title={`Ketersediaan ${DAYS} hari ke depan`} description="Angka = unit yang masih bisa dibooking per hari." className="mb-6" bodyClassName="overflow-x-auto">
+        <Section title={`Availability for the next ${DAYS} days`} description="Number = units still free to book that day." className="mb-6" bodyClassName="overflow-x-auto">
           <table className="w-full min-w-[720px] border-separate border-spacing-1 text-xs">
             <thead>
               <tr>
-                <th className="text-left font-medium text-muted">Produk</th>
+                <th className="text-left font-medium text-muted">Product</th>
                 {grid.days.map((d) => (
                   <th key={d} className="w-9 text-center font-medium text-muted">
-                    <div>{new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { weekday: "narrow" })}</div>
+                    <div>{new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", { weekday: "narrow" })}</div>
                     <div className="text-foreground">{Number(d.slice(8))}</div>
                   </th>
                 ))}
@@ -104,7 +101,7 @@ export default function RentalsPage() {
                   {r.cells.map((c, i) => (
                     <td
                       key={i}
-                      title={`${c.available} dari ${c.owned} unit tersedia`}
+                      title={`${c.available} of ${c.owned} units available`}
                       className={`rounded-md py-1.5 text-center font-semibold tabular-nums ${
                         c.available <= 0 ? "bg-danger-soft text-danger-soft-foreground" : c.available < c.owned ? "bg-warning-soft text-warning-soft-foreground" : "bg-success-soft text-success-soft-foreground"
                       }`}
@@ -117,7 +114,7 @@ export default function RentalsPage() {
             </tbody>
           </table>
           <p className="mt-2 text-xs text-muted">
-            Total unit dapat disewakan: {sum(grid.rows.map((r) => r.cells[0]?.owned ?? 0))}. Unit rusak tidak dihitung sampai diperbaiki.
+            Total rentable units: {sum(grid.rows.map((r) => r.cells[0]?.owned ?? 0))}. Damaged units are not counted until repaired.
           </p>
         </Section>
       )}
@@ -127,34 +124,28 @@ export default function RentalsPage() {
           <Tabs.ListContainer>
             <Tabs.List aria-label="Filter status">
               <Tabs.Tab id="aktif">
-                Aktif
+                Active
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab id="selesai">
-                Riwayat
+                History
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab id="semua">
-                Semua
+                All
                 <Tabs.Indicator />
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
         </Tabs>
-        <SearchField value={q} onChange={setQ} aria-label="Cari sewa" className="sm:w-72">
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Cari kode, acara, klien…" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
       </div>
       <DataTable
-        label="Daftar sewa"
+        toolbar searchText={(r) => `${r.code} ${r.project} ${partnerName(r.customerId)}`}
+        label="Rental list"
         columns={columns}
         rows={rows}
-        onRowAction={(r) => navigate(`/sewa/${r.id}`)}
-        empty={<EmptyBlock icon={<CalendarClock className="size-5" />} title="Tidak ada sewa" description="Unit untuk event, syuting, atau showroom mitra. Pinjam = sewa dengan tarif nol." action={<Button onPress={() => navigate("/sewa/baru")}>Booking baru</Button>} />}
+        onRowAction={(r) => navigate(`/rentals/${r.id}`)}
+        empty={<EmptyBlock icon={<CalendarClock className="size-5" />} title="No rentals" description="Units for events, film shoots or partner showrooms. A loan is a rental at zero rate." action={<Button onPress={() => navigate("/rentals/new")}>New booking</Button>} />}
       />
     </>
   );

@@ -1,97 +1,97 @@
-# Spesifikasi Produk — Serat
+# Product specification — Serat
 
-## Modul & alur utama
+## Modules & main flows
 
-| Modul | Tugas pengguna | Hasil di sistem |
+| Module | User task | Result in the system |
 |-------|----------------|-----------------|
-| **Pembelian** | Catat pembelian, ongkir, terima barang | Lot baru per baris, harga pokok = harga + porsi biaya tambahan (dibagi menurut nilai) |
-| **Perintah Kerja** | Produksi baru · Konversi · Dekonstruksi · Perbaikan | Ambil bahan (lot) → selesaikan (output + sisa) → HPP terkunci |
-| **Penjualan** | Supply domestik / Ekspor | Pengiriman mengambil lot produk → HPP penjualan & margin; proforma + packing list |
-| **Sewa & Pinjam** | Booking, serah unit, terima kembali | Unit berstatus *disewa*; kembali *baik/rusak/hilang*; denda otomatis |
-| **Gudang** | Lihat stok, sisa, mutasi, stok opname | Kartu stok digital per lot |
-| **Laporan** | HPP, nilai stok, rendemen | Angka bisa ditelusuri sampai lot |
+| **Purchasing** | Record purchases, freight, receive goods | A new lot per line, unit cost = price + share of extra costs (split by value) |
+| **Work orders** | New production · Conversion · Dismantling · Repair | Issue materials (lots) → complete (output + offcuts) → job cost locked |
+| **Sales** | Domestic supply / Export | Delivery takes product lots → COGS & margin; proforma + packing list |
+| **Rental & loan** | Booking, hand over, take back | Units get status *on rent*; come back *good/damaged/lost*; automatic late fees |
+| **Warehouse** | View stock, offcuts, stock movements, stock count | Digital stock card per lot |
+| **Reports** | Job cost, stock value, yield | Every figure can be traced down to the lot |
 
-## Model data inti
+## Core data model
 
-- **Item** — material atau produk. Produk punya BOM (kebutuhan bahan per unit), jam kerja standar, harga jual, tarif sewa, HS code, data kemasan.
-- **Lot** — satu tumpukan stok dengan harga pokok per satuan sendiri, asal (pembelian, produksi, sisa, dekonstruksi, retur), status (tersedia/disewa/rusak), opsional dimensi & cadangan untuk perintah kerja tertentu.
-- **Mutasi stok** — jejak audit setiap perubahan qty lot, bertanda tangan dokumen sumber.
+- **Item** — a material or a product. A product has a BOM (materials needed per unit), standard labour hours, a selling price, a rental rate, an HS code, and packaging data.
+- **Lot** — one pile of stock with its own unit cost, an origin (purchase, production, offcut, dismantling, return), a status (available/on rent/damaged), and optional dimensions & a reservation for a specific work order.
+- **Stock movement** — an audit trail of every change to a lot's qty, stamped with its source document.
 
-## Metode biaya (HPP)
+## Costing method (job cost)
 
-Biaya dihitung per **lot**, sehingga sisa material membawa harganya sendiri. Lot biasa (yang bisa
-saling menggantikan) mengikuti **metode biaya** perusahaan atau barang: FIFO, rata-rata bergerak,
-identifikasi khusus, atau LIFO. Lihat [`COSTING.md`](COSTING.md).
+Cost is tracked per **lot**, so offcuts carry their own cost. Regular (interchangeable) lots
+follow the company's or the item's **costing method**: FIFO, moving average, specific
+identification, or LIFO. See [`COSTING.md`](COSTING.md).
 
-### Pengambilan bahan
-Urutan saran lot: (1) lot yang dicadangkan untuk perintah kerja ini → (2) lot **sisa** (terkecil yang cukup lebih dulu, agar potongan kecil habis) → (3) lot reguler menurut metode biaya (FIFO: terlama; LIFO: terbaru). Lot yang dicadangkan untuk perintah kerja lain tidak disarankan.
+### Issuing materials
+Lot suggestion order: (1) lots reserved for this work order → (2) **offcut** lots (the smallest that is large enough first, so small pieces get used up) → (3) regular lots by costing method (FIFO: oldest; LIFO: newest). Lots reserved for another work order are not suggested.
 
-### Penyelesaian perintah kerja
+### Completing a work order
 ```
-Bahan bruto      = Σ qty diambil × harga lot
-Kredit kembali   = Σ (utuh: qty × harga lot asal) + (sisa: qty × rata-rata harga bahan itu di WO ini)
-Nilai limbah     = Σ nilai jual limbah (NRV by-product, mis. serbuk gergaji)
-Bahan neto       = Bahan bruto − Kredit kembali − Nilai limbah
-Total biaya      = Bahan neto + Tenaga kerja (jam × tarif) + Overhead + Biaya lain
+Gross materials  = Σ qty issued × lot cost
+Return credit    = Σ (whole: qty × source lot cost) + (offcut: qty × average cost of that material in this WO)
+Salvage value    = Σ sales value of waste (by-product NRV, e.g. sawdust)
+Net materials    = Gross materials − Return credit − Salvage value
+Total cost       = Net materials + Labour (hours × rate) + Overhead + Other costs
 ```
-Sisa *layak pakai* menjadi lot baru berlabel **Sisa** dengan harga rata-rata bahan tersebut di WO ini. Pengembalian per bahan tidak boleh melebihi yang diambil.
+*Usable* offcuts become a new lot labelled **Offcut** at the average cost of that material in this WO. Returns per material may not exceed what was issued.
 
-### Alokasi ke beberapa output (biaya bersama)
-Bobot output = qty × dasar nilai. Dasar nilai: harga jual (produk) atau harga standar/pengganti (material). Jika semua bobot nol → dialokasikan menurut qty. Pengguna dapat menimpa porsi (%) secara manual.
+### Allocation to several outputs (joint cost)
+Output weight = qty × value basis. Value basis: selling price (products) or standard/replacement cost (materials). If all weights are zero → allocated by qty. Users can override the shares (%) manually.
 
-**Dekonstruksi** memakai *lower of cost or NRV*: nilai bahan hasil bongkaran dibatasi maksimal nilai penggantinya; kelebihan biaya dicatat sebagai **rugi dekonstruksi** agar bahan bekas tidak bernilai lebih mahal daripada bahan baru.
+**Dismantling** uses *lower of cost or NRV*: the value of recovered materials is capped at their replacement value; the excess cost is booked as a **dismantling loss**, so used material is never worth more than new material.
 
-### Sisa pembelian
-Pembelian dapat ditautkan ke perintah kerja → lot dicadangkan. Saat WO selesai/batal, cadangan dilepas otomatis; sisa tetap di stok dengan harga beli + ongkir aslinya dan dipakai produksi berikutnya. HPP WO hanya menanggung qty yang diambil dikurangi yang dikembalikan.
+### Purchase leftovers
+A purchase can be linked to a work order → its lots are reserved. When the WO is done or cancelled, the reservation is released automatically; the leftover stays in stock at its original purchase price + freight and is used by the next production run. The WO's job cost only bears the qty issued minus the qty returned.
 
-### Penjualan
-HPP penjualan = Σ qty dikirim × harga lot produk. Margin kotor = pendapatan (dalam IDR, memakai kurs order) − HPP.
+### Sales
+COGS = Σ qty shipped × product lot cost. Gross margin = revenue (in IDR, at the order's exchange rate) − COGS.
 
-## Sewa & pinjam
-- Hari sewa = selisih tanggal + 1 (inklusif). Denda telat = hari terlambat × tarif harian × qty.
-- Ketersediaan = unit milik (tersedia + disewa, tidak termasuk rusak) − unit yang dibooking pada rentang tanggal yang beririsan.
-- Kembali **rusak** → lot berstatus *rusak* → tombol "Buat Perintah Perbaikan". **Hilang** → lot dikurangi (mutasi hilang) + biaya ganti.
-- *Pinjam* = tarif 0 (mis. pemotretan, showroom mitra), alur sama.
+## Rental & loan
+- Rental days = date difference + 1 (inclusive). Late fee = days late × daily rate × qty.
+- Availability = owned units (available + on rent, excluding damaged) − units booked in overlapping date ranges.
+- Returned **damaged** → lot status *damaged* → "Create repair order" button. **Lost** → lot reduced (loss movement) + replacement charge.
+- *Loan* = rate 0 (e.g. photo shoots, partner showrooms), same flow.
 
-## Ekspor
-Field: Incoterm, pelabuhan muat/bongkar, negara tujuan, jenis kontainer, no. kontainer/segel, ETD, No. V-Legal (SVLK), referensi DDS EUDR. Estimasi kapasitas kontainer (praktis): 20GP ≈ 28 CBM, 40GP ≈ 58 CBM, 40HC ≈ 68 CBM — verifikasi dengan forwarder.
+## Export
+Fields: Incoterm, port of loading/discharge, destination country, container type, container/seal no., ETD, V-Legal no. (SVLK, Indonesia's timber legality assurance system), EUDR DDS reference. Practical container capacity estimates: 20GP ≈ 28 CBM, 40GP ≈ 58 CBM, 40HC ≈ 68 CBM — confirm with your forwarder.
 
-## Penyimpanan
-Tanpa backend: `localStorage` (versi skema + migrasi), ekspor/impor cadangan JSON, reset ke data demo.
+## Storage
+No backend: `localStorage` (schema version + migrations), JSON backup export/import, reset to demo data.
 
-## v2 — aturan tambahan
+## v2 — additional rules
 
-- **Komponen**: material dengan BOM dapat menjadi output produksi. `requirements()` menandai kekurangan komponen sebagai `producible`; `createComponentOrders()` membuat perintah anak (`parentWoId`). Komponen tidak pernah muncul di saran pembelian.
-- **Tenaga kerja**: bila ada catatan kerja, `labor = Σ(jam × tarif) + Σ(unit × tarif borongan)`; jika tidak, `jam rencana × tarif`.
-- **Hasil bertahap**: lot diterima dengan HPP standar (`receiptId`). Saat penutupan, biaya total dialokasikan ke (hasil akhir + hasil bertahap) per item → HPP aktual per unit. Lot hasil bertahap yang masih ada direvaluasi (mutasi `revaluasi`, qty 0); `variance = qty sudah keluar × (aktual − sementara)`. Pekerjaan dengan hasil bertahap tidak bisa dibatalkan.
-- **QC reject**: output `grade: "reject"` masuk sebagai lot `rusak` dengan HPP yang sama.
-- **Pembayaran**: tidak boleh melebihi sisa tagihan; refund maksimal yang sudah dibayar (sewa: kelebihan deposit). Piutang = order yang sudah dikirim, atau sudah lewat tanggal bayar. Order hanya bisa "selesai" bila lunas.
-- **Retur penjualan**: maksimal qty terkirim − sudah diretur; barang kembali dengan HPP kirim; kredit = qty × harga order.
+- **Components**: a material with a BOM can be a production output. `requirements()` flags component shortfalls as `producible`; `createComponentOrders()` creates child orders (`parentWoId`). Components never appear in purchase suggestions.
+- **Labour**: if there are labour log entries, `labor = Σ(hours × rate) + Σ(units × piece rate)`; otherwise `planned hours × rate`.
+- **Partial output**: lots are received at standard cost (`receiptId`). On close, total cost is allocated to (final output + partial output) per item → actual unit cost. Partial-output lots still in stock are revalued (`revaluasi` movement, qty 0); `variance = qty already issued × (actual − provisional)`. A job with partial output cannot be cancelled.
+- **QC reject**: output with `grade: "reject"` comes in as a `rusak` (damaged) lot at the same cost.
+- **Payments**: may not exceed the balance due; refunds are capped at what has been paid (rentals: excess deposit). Receivables = orders already shipped, or past their payment date. An order can only be "done" once paid in full.
+- **Sales returns**: at most qty shipped − qty already returned; goods come back at their shipped cost; credit = qty × order price.
 
-## v3 — kasus negatif (aturan penolakan)
+## v3 — negative cases (rejection rules)
 
-Setiap penolakan adalah `DomainError` berbahasa Indonesia dan **tidak mengubah data apa pun**
-(operasi berjalan di salinan; diuji di `src/domain/negative.test.ts`).
+Every rejection is a `DomainError` with a plain-English message and **changes no data at all**
+(operations run on a copy; tested in `src/domain/negative.test.ts`).
 
-| Area | Ditolak |
+| Area | Rejected |
 |---|---|
-| Angka | NaN/Infinity/negatif untuk qty, harga, tarif, overhead, deposit, diskon, pembayaran, ukuran P×L×T |
-| Master | kode ganda, resep yang memuat dirinya sendiri atau **melingkar** lewat komponen, ganti satuan saat masih ada stok |
-| Arsip | item yang diarsipkan tidak bisa dipakai di dokumen **baru** (dokumen lama yang sudah memuatnya tetap bisa diubah) |
-| Relasi | pelanggan sebagai pemasok dan sebaliknya; relasi yang tidak ada |
-| Tanggal | tanggal kosong; jatuh tempo / target kirim / selesai sewa sebelum tanggal dokumen |
-| Pengaturan | tarif bukan angka, umur sisa < 1 hari, lokasi kosong/ganda (dibersihkan), menghapus lokasi yang masih ada stok |
-| Gudang | lokasi tak dikenal; opname, pindah, atau buang unit yang sedang **disewa** |
-| Produksi | hasil yang bukan produk/komponen; hasil bertahap melebihi rencana; membatalkan induk saat perintah komponen masih terbuka; aksi apa pun pada pekerjaan yang sudah ditutup |
-| Penjualan | konfirmasi tanpa pelanggan; mengubah total di bawah yang sudah dibayar; ganti mata uang setelah ada pembayaran |
-| Sewa | mengubah booking di bawah yang sudah dibayar; kembali sebelum serah; serah ganda |
-| Cadangan | file dengan id ganda, rujukan ke item/lot yang tidak ada, qty bukan angka, record tanpa nama — ditolak utuh dengan pesan "rusak" |
+| Numbers | NaN/Infinity/negative for qty, price, rate, overhead, deposit, discount, payment, L×W×H size |
+| Master data | duplicate codes, a recipe that contains itself or is **circular** through components, changing the unit while stock exists |
+| Archive | archived items cannot be used in **new** documents (existing documents that already contain them can still be edited) |
+| Contacts | a customer used as a supplier and vice versa; contacts that do not exist |
+| Dates | empty dates; due date / target ship date / rental end before the document date |
+| Settings | non-numeric rates, offcut age < 1 day, empty/duplicate locations (cleaned up), deleting a location that still holds stock |
+| Warehouse | unknown locations; counting, transferring, or writing off a unit that is **on rent** |
+| Production | output that is not a product/component; partial output above plan; cancelling a parent while component orders are still open; any action on a job that is already closed |
+| Sales | confirming without a customer; changing the total below what has been paid; changing currency after a payment |
+| Rentals | changing a booking below what has been paid; taking back before hand-over; handing over twice |
+| Backup | files with duplicate ids, references to items/lots that do not exist, non-numeric qty, records without a name — rejected as a whole with a "corrupt" message |
 
-## v3.2 — resep, gabung, peta proses
+## v3.2 — recipes, merge, process maps
 
-Lihat [`PROCESS.md`](PROCESS.md). Ringkasnya:
-- Perintah kerja dari resep: bahan & hasil = resep × batch; BOM produk tidak dipakai.
-- Jenis **gabung**: satu jenis hasil, minimal dua barang atau dua unit masuk, hasil boleh material.
-- **Gabung lot**: barang sama, status tersedia, jenis sama (sisa/biasa), cadangan sama; biaya rata-rata
-  tertimbang; tanggal = lot tertua.
-- Peta proses menjaga nilai di setiap simpul proses; selisih tampil sebagai "Dalam proses".
+See [`PROCESS.md`](PROCESS.md). In short:
+- Work order from a recipe: materials & output = recipe × batches; the product BOM is not used.
+- **Merge** type: one output item, at least two items or two units in, the output may be a material.
+- **Merge lots**: same item, status available, same kind (offcut/regular), same reservation;
+  weighted-average cost; date = oldest lot.
+- Process maps conserve value at every process node; any difference shows as "Work in progress".

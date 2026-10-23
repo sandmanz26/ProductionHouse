@@ -57,11 +57,11 @@ export function landedUnitCosts(p: Pick<Purchase, "lines" | "extraCosts">): numb
 }
 
 function normalizeLines(db: Db, lines: PurchaseInput["lines"], keep?: ReadonlySet<ID>): PurchaseLine[] {
-  assert(lines.length > 0, "Tambahkan minimal satu barang.");
+  assert(lines.length > 0, "Add at least one item.");
   return lines.map((l) => {
     const item = getUsableItem(db, l.itemId, keep);
-    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
-    assertAmount(l.unitPrice, `Harga ${item.name}`);
+    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty of ${item.name} must be more than 0.`);
+    assertAmount(l.unitPrice, `Price of ${item.name}`);
     assertDimensions(l.dimensions);
     return { id: newId(), itemId: l.itemId, qty: l.qty, unitPrice: l.unitPrice, dimensions: l.dimensions };
   });
@@ -71,14 +71,14 @@ function normalizeExtra(extra: PurchaseInput["extraCosts"]): ExtraCost[] {
   return (extra ?? [])
     .filter((c) => c.label.trim() || c.amount)
     .map((c) => {
-      assertAmount(c.amount, "Biaya tambahan");
-      return { id: newId(), label: c.label.trim() || "Biaya lain", amount: c.amount };
+      assertAmount(c.amount, "Extra cost");
+      return { id: newId(), label: c.label.trim() || "Other cost", amount: c.amount };
     });
 }
 
 function validateHeader(db: Db, input: PurchaseInput) {
-  assertDate(input.date, "Tanggal pembelian");
-  if (input.dueDate) assert(input.dueDate >= input.date, "Tanggal jatuh tempo tidak boleh sebelum tanggal pembelian.");
+  assertDate(input.date, "Purchase date");
+  if (input.dueDate) assert(input.dueDate >= input.date, "Due date cannot be before the purchase date.");
   assertPartnerRole(db, input.supplierId, "supplier");
   validateWo(db, input.workOrderId);
 }
@@ -86,8 +86,8 @@ function validateHeader(db: Db, input: PurchaseInput) {
 function validateWo(db: Db, workOrderId?: ID) {
   if (!workOrderId) return;
   const wo = db.workOrders.find((w) => w.id === workOrderId);
-  assert(wo, "Perintah kerja tidak ditemukan.");
-  assert(wo.status === "rencana" || wo.status === "berjalan", `Perintah kerja ${wo.code} sudah ditutup.`);
+  assert(wo, "Work order not found — it may have been deleted.");
+  assert(wo.status === "rencana" || wo.status === "berjalan", `Work order ${wo.code} is already closed — link an open one.`);
 }
 
 export function createPurchase(db: Db, input: PurchaseInput): Purchase {
@@ -112,12 +112,12 @@ export function createPurchase(db: Db, input: PurchaseInput): Purchase {
 
 export function updatePurchase(db: Db, id: ID, input: PurchaseInput): Purchase {
   const p = getPurchase(db, id);
-  assert(p.status === "draft", "Hanya pembelian draft yang bisa diubah.");
+  assert(p.status === "draft", "Only draft purchases can be edited.");
   validateHeader(db, input);
   const lines = normalizeLines(db, input.lines, new Set(p.lines.map((l) => l.itemId)));
   const total = purchaseTotals({ lines, extraCosts: normalizeExtra(input.extraCosts) }).total;
   const paidSoFar = sum(p.payments.map((x) => x.amount));
-  assert(total + 0.01 >= paidSoFar, "Total baru lebih kecil dari yang sudah dibayar — catat refund dulu.");
+  assert(total + 0.01 >= paidSoFar, "The new total is less than what was already paid — record a refund first.");
   Object.assign(p, {
     supplierId: input.supplierId,
     date: input.date,
@@ -133,7 +133,7 @@ export function updatePurchase(db: Db, id: ID, input: PurchaseInput): Purchase {
 
 export function getPurchase(db: Db, id: ID): Purchase {
   const p = db.purchases.find((x) => x.id === id);
-  assert(p, "Pembelian tidak ditemukan.");
+  assert(p, "Purchase not found — it may have been deleted.");
   return p;
 }
 
@@ -143,7 +143,7 @@ export function getPurchase(db: Db, id: ID): Purchase {
  */
 export function receivePurchase(db: Db, id: ID, opts: { location?: string; at?: string } = {}): Purchase {
   const p = getPurchase(db, id);
-  assert(p.status === "draft", `Pembelian ${p.code} sudah ${p.status}.`);
+  assert(p.status === "draft", `Purchase ${p.code} is already ${p.status === "diterima" ? "received" : "cancelled"}.`);
   const wo = p.workOrderId ? db.workOrders.find((w) => w.id === p.workOrderId) : undefined;
   const reserve = wo && (wo.status === "rencana" || wo.status === "berjalan") ? wo.id : undefined;
   const at = opts.at ?? nowIso();
@@ -178,8 +178,8 @@ export function receivePurchase(db: Db, id: ID, opts: { location?: string; at?: 
 
 export function cancelPurchase(db: Db, id: ID): Purchase {
   const p = getPurchase(db, id);
-  assert(p.status === "draft", "Pembelian yang sudah diterima tidak dapat dibatalkan.");
-  assert(p.payments.length === 0, "Pembelian sudah dibayar — hapus pembayaran terlebih dahulu.");
+  assert(p.status === "draft", "A received purchase cannot be cancelled.");
+  assert(p.payments.length === 0, "This purchase has payments — delete them first.");
   p.status = "batal";
   return p;
 }

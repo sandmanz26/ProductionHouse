@@ -12,37 +12,37 @@ export function FirstSteps() {
   const steps = [
     {
       done: db.items.some((i) => i.kind === "material"),
-      title: "Daftarkan material",
-      body: "Kayu, papan, busa, hardware — dengan satuan stok dan satuan beli dari pemasok.",
-      href: "/master/item/baru?jenis=material",
-      cta: "Tambah material",
+      title: "Register materials",
+      body: "Wood, boards, foam, hardware — with the stock unit and the unit you buy from the supplier.",
+      href: "/items/new?type=material",
+      cta: "Add material",
     },
     {
       done: db.items.some((i) => i.kind === "product" && (i.bom?.length ?? 0) > 0),
-      title: "Buat produk dengan resep",
-      body: "Kebutuhan bahan per unit dan jam kerja standar. Dari sini kekurangan bahan dihitung otomatis.",
-      href: "/master/item/baru",
-      cta: "Tambah produk",
+      title: "Create a product with a recipe",
+      body: "Materials per unit and standard labour hours. Material shortages are worked out from this automatically.",
+      href: "/items/new",
+      cta: "Add product",
     },
     {
       done: db.lots.length > 0,
-      title: "Isi gudang",
-      body: "Catat pembelian (ongkir ikut ke harga pokok) atau stok awal dari Stok Material.",
-      href: "/pembelian/baru",
-      cta: "Catat pembelian",
+      title: "Stock the warehouse",
+      body: "Record a purchase (freight goes into the unit cost) or opening stock from Materials.",
+      href: "/purchases/new",
+      cta: "Record purchase",
     },
     {
       done: db.workOrders.length > 0,
-      title: "Buka perintah kerja pertama",
-      body: "Ambil bahan per lot, tutup dengan hasil dan sisa — HPP terkunci di situ.",
-      href: "/produksi/baru",
-      cta: "Buat perintah kerja",
+      title: "Open the first work order",
+      body: "Issue materials by lot, complete it with output and offcuts — the job cost locks there.",
+      href: "/work-orders/new",
+      cta: "Create work order",
     },
   ];
   if (steps.every((s) => s.done)) return null;
   const next = steps.findIndex((s) => !s.done);
   return (
-    <Section title="Langkah pertama" description={`${steps.filter((s) => s.done).length} dari ${steps.length} selesai`} bodyClassName="p-0">
+    <Section title="First steps" description={`${steps.filter((s) => s.done).length} of ${steps.length} done`} bodyClassName="p-0">
       <ol className="divide-y divide-[var(--rule)]">
         {steps.map((s, i) => (
           <li key={s.title} className="flex gap-4 px-4 py-3.5">
@@ -51,7 +51,7 @@ export function FirstSteps() {
                 s.done ? "border-success text-success" : i === next ? "border-accent text-accent" : "border-[var(--rule)] text-muted"
               }`}
             >
-              {s.done ? <Check className="size-3.5" aria-label="selesai" /> : String(i + 1).padStart(2, "0")}
+              {s.done ? <Check className="size-3.5" aria-label="done" /> : String(i + 1).padStart(2, "0")}
             </span>
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-medium ${s.done ? "text-muted line-through decoration-[var(--rule)]" : ""}`}>{s.title}</p>

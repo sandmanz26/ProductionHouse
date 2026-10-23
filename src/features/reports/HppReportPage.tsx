@@ -53,12 +53,12 @@ export default function HppReportPage() {
   }, [done]);
 
   const productCols: Column<ProductCostRow & { id: string }>[] = [
-    { key: "name", header: "Produk", isRowHeader: true, cell: (r) => <span className="font-medium">{r.item.name}</span> },
-    { key: "made", header: "Diproduksi", align: "end", cell: (r) => (r.produced ? formatQty(r.produced) : <span className="text-muted">—</span>) },
-    { key: "std", header: "HPP standar", align: "end", cell: (r) => formatIDR(r.standard) },
+    { key: "name", header: "Product", isRowHeader: true, cell: (r) => <span className="font-medium">{r.item.name}</span> },
+    { key: "made", header: "Produced", align: "end", cell: (r) => (r.produced ? formatQty(r.produced) : <span className="text-muted">—</span>) },
+    { key: "std", header: "Standard cost", align: "end", cell: (r) => formatIDR(r.standard) },
     {
       key: "act",
-      header: "HPP aktual rata-rata",
+      header: "Average actual cost",
       align: "end",
       cell: (r) => {
         if (!r.avgActual) return <span className="text-muted">—</span>;
@@ -69,14 +69,14 @@ export default function HppReportPage() {
             {r.standard > 0 && (
               <p className={`text-xs ${v > 0.05 ? "text-danger" : v < -0.05 ? "text-success" : "text-muted"}`}>
                 {v > 0 ? "+" : ""}
-                {formatPct(v)} vs standar
+                {formatPct(v)} vs standard
               </p>
             )}
           </div>
         );
       },
     },
-    { key: "price", header: "Harga jual", align: "end", cell: (r) => (r.salePrice ? formatIDR(r.salePrice) : "—") },
+    { key: "price", header: "Sales price", align: "end", cell: (r) => (r.salePrice ? formatIDR(r.salePrice) : "—") },
     {
       key: "margin",
       header: "Margin",
@@ -91,86 +91,86 @@ export default function HppReportPage() {
   ];
 
   const woCols: Column<WorkOrder>[] = [
-    { key: "code", header: "Kode", isRowHeader: true, className: "whitespace-nowrap", cell: (w) => <Link href={`/produksi/${w.id}`}>{w.code}</Link> },
-    { key: "type", header: "Jenis", cell: (w) => <StatusChip tone={WO_TYPE[w.type].tone}>{WO_TYPE[w.type].short}</StatusChip> },
+    { key: "code", header: "Code", isRowHeader: true, className: "whitespace-nowrap", cell: (w) => <Link href={`/work-orders/${w.id}`}>{w.code}</Link> },
+    { key: "type", header: "Type", cell: (w) => <StatusChip tone={WO_TYPE[w.type].tone}>{WO_TYPE[w.type].short}</StatusChip> },
     {
       key: "out",
-      header: "Hasil",
+      header: "Output",
       cell: (w) => (
         <span className="text-sm">{w.cost!.outputs.map((o) => `${formatQty(o.qty, item(o.itemId)?.uom)} ${item(o.itemId)?.name ?? ""}`).join(", ")}</span>
       ),
     },
-    { key: "date", header: "Selesai", className: "whitespace-nowrap", cell: (w) => formatDate(w.completedAt) },
-    { key: "mat", header: "Bahan neto", align: "end", cell: (w) => formatIDR(w.cost!.materialNet) },
+    { key: "date", header: "Completed", className: "whitespace-nowrap", cell: (w) => formatDate(w.completedAt) },
+    { key: "mat", header: "Net materials", align: "end", cell: (w) => formatIDR(w.cost!.materialNet) },
     {
       key: "credit",
-      header: "Hemat dari sisa",
+      header: "Saved by offcuts",
       align: "end",
       cell: (w) => {
         const c = w.cost!.returnCredit + w.cost!.scrapRecovery;
         return c ? <span className="text-success">{formatIDR(c)}</span> : <span className="text-muted">—</span>;
       },
     },
-    { key: "labor", header: "TK + overhead", align: "end", cell: (w) => formatIDR(w.cost!.labor + w.cost!.overhead + w.cost!.extra) },
-    { key: "total", header: "Total HPP", align: "end", cell: (w) => <b>{formatIDR(w.cost!.total)}</b> },
-    { key: "yield", header: "Rendemen", align: "end", cell: (w) => formatPct(w.cost!.yieldRatio) },
+    { key: "labor", header: "Labour + overhead", align: "end", cell: (w) => formatIDR(w.cost!.labor + w.cost!.overhead + w.cost!.extra) },
+    { key: "total", header: "Total cost", align: "end", cell: (w) => <b>{formatIDR(w.cost!.total)}</b> },
+    { key: "yield", header: "Yield", align: "end", cell: (w) => formatPct(w.cost!.yieldRatio) },
     { key: "rej", header: "Reject", align: "end", cell: (w) => (w.cost!.rejectQty ? <span className="text-danger">{w.cost!.rejectQty}</span> : "—") },
-    { key: "var", header: "Selisih HPP", align: "end", cell: (w) => (w.cost!.variance ? formatIDR(w.cost!.variance) : "—") },
+    { key: "var", header: "Cost variance", align: "end", cell: (w) => (w.cost!.variance ? formatIDR(w.cost!.variance) : "—") },
   ];
 
   const utilCols: Column<UtilizationRow & { id: string }>[] = [
-    { key: "item", header: "Produk sewa", isRowHeader: true, cell: (r) => item(r.itemId)?.name ?? "?" },
-    { key: "owned", header: "Unit dimiliki", align: "end", cell: (r) => r.owned },
-    { key: "days", header: "Unit-hari keluar", align: "end", cell: (r) => r.unitDays },
+    { key: "item", header: "Rental product", isRowHeader: true, cell: (r) => item(r.itemId)?.name ?? "?" },
+    { key: "owned", header: "Units owned", align: "end", cell: (r) => r.owned },
+    { key: "days", header: "Unit-days out", align: "end", cell: (r) => r.unitDays },
     {
       key: "util",
-      header: "Utilisasi 90 hari",
+      header: "90-day utilisation",
       align: "end",
       cell: (r) => <span className={r.utilization < 0.15 ? "text-warning" : ""}>{formatPct(r.utilization)}</span>,
     },
-    { key: "n", header: "Jumlah sewa", align: "end", cell: (r) => r.rentals },
-    { key: "rev", header: "Pendapatan", align: "end", cell: (r) => formatIDR(r.revenue) },
-    { key: "dmg", header: "Kembali rusak", align: "end", cell: (r) => (r.damaged ? <span className="text-danger">{r.damaged}</span> : "—") },
+    { key: "n", header: "Rentals", align: "end", cell: (r) => r.rentals },
+    { key: "rev", header: "Revenue", align: "end", cell: (r) => formatIDR(r.revenue) },
+    { key: "dmg", header: "Returned damaged", align: "end", cell: (r) => (r.damaged ? <span className="text-danger">{r.damaged}</span> : "—") },
   ];
 
   return (
     <>
       <PageHeader
-        title="Laporan HPP"
-        description="HPP aktual vs standar BOM, utilisasi sewa, dan nilai persediaan."
+        title="Cost report"
+        description="Actual cost vs BOM standard, rental utilisation and inventory value."
       />
       <MetricStrip
         className="mb-5"
         items={[
-          { label: "Total HPP produksi", value: formatIDRCompact(totals.total), hint: `${done.length} pekerjaan selesai` },
-          { label: "Bahan terpakai", value: formatIDRCompact(totals.material), hint: totals.total ? `${formatPct(totals.material / totals.total, 0)} dari HPP` : undefined },
-          { label: "Dihemat lewat sisa", value: formatIDRCompact(totals.credit), hint: totals.gross ? `${formatPct(totals.credit / totals.gross)} dari bahan diambil` : undefined },
-          { label: "TK & overhead", value: formatIDRCompact(totals.labor) },
-          { label: "Selisih HPP", value: formatIDRCompact(totals.variance), hint: `${totals.rejects} unit reject QC`, tone: totals.variance > 0 ? "warning" : "default" },
+          { label: "Total production cost", value: formatIDRCompact(totals.total), hint: `${done.length} jobs completed` },
+          { label: "Materials used", value: formatIDRCompact(totals.material), hint: totals.total ? `${formatPct(totals.material / totals.total, 0)} of job cost` : undefined },
+          { label: "Saved through offcuts", value: formatIDRCompact(totals.credit), hint: totals.gross ? `${formatPct(totals.credit / totals.gross)} of materials issued` : undefined },
+          { label: "Labour & overhead", value: formatIDRCompact(totals.labor) },
+          { label: "Cost variance", value: formatIDRCompact(totals.variance), hint: `${totals.rejects} QC reject units`, tone: totals.variance > 0 ? "warning" : "default" },
         ]}
       />
 
       <Tabs selectedKey={view} onSelectionChange={(k: Key) => setView(k as View)} className="mb-4">
         <Tabs.ListContainer>
-          <Tabs.List aria-label="Tampilan laporan">
+          <Tabs.List aria-label="Report view">
             <Tabs.Tab id="produk">
-              Per produk
+              By product
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="pekerjaan">
-              Per pekerjaan
+              By job
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="sewa">
-              Utilisasi sewa
+              Rental utilisation
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="nilai">
-              Nilai persediaan
+              Inventory value
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="metode">
-              Metode biaya
+              Costing methods
               <Tabs.Indicator />
             </Tabs.Tab>
           </Tabs.List>
@@ -178,39 +178,39 @@ export default function HppReportPage() {
       </Tabs>
 
       {view === "produk" && (
-        <DataTable label="HPP per produk" columns={productCols} rows={products.map((p) => ({ ...p, id: p.item.id }))} onRowAction={(r) => navigate(`/master/item/${r.item.id}`)} />
+        <DataTable label="Cost by product" columns={productCols} rows={products.map((p) => ({ ...p, id: p.item.id }))} onRowAction={(r) => navigate(`/items/${r.item.id}`)} />
       )}
-      {view === "pekerjaan" && <DataTable label="HPP per pekerjaan" columns={woCols} rows={done} onRowAction={(w) => navigate(`/produksi/${w.id}`)} />}
+      {view === "pekerjaan" && <DataTable label="Cost by job" columns={woCols} rows={done} onRowAction={(w) => navigate(`/work-orders/${w.id}`)} />}
       {view === "sewa" && (
         <>
-          <DataTable label="Utilisasi sewa" columns={utilCols} rows={util.map((u) => ({ ...u, id: u.itemId }))} />
-          <p className="mt-2 text-xs text-muted">Utilisasi = unit-hari keluar ÷ (unit dimiliki × 90 hari). Unit dengan utilisasi rendah lebih baik dijual atau dipakai untuk produksi lain.</p>
+          <DataTable label="Rental utilisation" columns={utilCols} rows={util.map((u) => ({ ...u, id: u.itemId }))} />
+          <p className="mt-2 text-xs text-muted">Utilisation = unit-days out ÷ (units owned × 90 days). Units with low utilisation are better sold or used for other production.</p>
         </>
       )}
       {view === "metode" && <CostingComparison />}
       {view === "nilai" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Section title="Ringkasan nilai persediaan">
-            <ValRow label="Material (termasuk sisa)" value={valuation.materials} total={valuation.total} />
-            <ValRow label="— di antaranya sisa material" value={valuation.remnants} total={valuation.total} muted />
-            <ValRow label="Produk jadi" value={valuation.products} total={valuation.total} />
-            <ValRow label="— di antaranya sedang disewa" value={valuation.rented} total={valuation.total} muted />
-            <ValRow label="— di antaranya rusak" value={valuation.damaged} total={valuation.total} muted />
+          <Section title="Inventory value summary">
+            <ValRow label="Materials (including offcuts)" value={valuation.materials} total={valuation.total} />
+            <ValRow label="— of which offcuts" value={valuation.remnants} total={valuation.total} muted />
+            <ValRow label="Finished products" value={valuation.products} total={valuation.total} />
+            <ValRow label="— of which on rent" value={valuation.rented} total={valuation.total} muted />
+            <ValRow label="— of which damaged" value={valuation.damaged} total={valuation.total} muted />
             <div className="mt-2 flex justify-between border-t border-[var(--rule)] pt-2 font-semibold">
-              <span>Total persediaan</span>
+              <span>Total inventory</span>
               <span className="tabular-nums">{formatIDR(valuation.total)}</span>
             </div>
           </Section>
-          <Section title="Cara membaca">
+          <Section title="How to read this">
             <ul className="list-disc space-y-2 pl-4 text-sm text-muted">
-              <li>Setiap lot punya harga pokoknya sendiri: pembelian (harga + ongkir), hasil produksi (HPP aktual), atau sisa (harga rata-rata bahan di pekerjaan asalnya).</li>
+              <li>Every lot has its own unit cost: purchase (price + shipping), production output (actual cost), or offcut (the average material cost on the job it came from).</li>
               <li>
-                Metode biaya saat ini <b className="text-foreground">{COSTING_LABEL[db.settings.costingMethod]}</b> menentukan lot biasa mana yang keluar lebih dulu
-                (atau, untuk rata-rata, harga bersama semua lot). Bandingkan dampaknya di tab Metode biaya.
+                The current costing method <b className="text-foreground">{COSTING_LABEL[db.settings.costingMethod]}</b> decides which regular lot goes out first
+                (or, for moving average, the shared cost of all lots). Compare the effect on the Costing methods tab.
               </li>
-              <li>Sisa material mengurangi HPP pekerjaan yang menghasilkannya dan menambah nilai persediaan — tidak hilang sebagai biaya.</li>
-              <li>Dekonstruksi tidak menaikkan nilai bahan di atas harga barunya; kelebihannya dicatat sebagai rugi.</li>
-              <li>Unit yang disewakan tetap aset perusahaan dan tetap dihitung dalam persediaan.</li>
+              <li>Offcuts lower the cost of the job that produced them and add to inventory value — they are not lost as cost.</li>
+              <li>Dismantling never values materials above their new price; any excess is recorded as a loss.</li>
+              <li>Units out on rent remain company assets and are still counted in inventory.</li>
             </ul>
           </Section>
         </div>

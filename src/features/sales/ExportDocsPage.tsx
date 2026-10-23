@@ -15,24 +15,24 @@ export default function ExportDocsPage() {
   const db = useDb();
   const [doc, setDoc] = useState<Doc>("proforma");
   const so = db.sales.find((s) => s.id === id);
-  if (!so) return <RecordNotFound what="Order" back="/penjualan" />;
+  if (!so) return <RecordNotFound what="Order" back="/sales" />;
 
   return (
     <>
       <div className="print:hidden">
         <PageHeader
-          back={`/penjualan/${so.id}`}
-          title={`Dokumen ${so.code}`}
-          description="Dokumen dalam bahasa Inggris untuk buyer luar negeri. Cetak atau simpan sebagai PDF dari dialog cetak browser."
+          back={`/sales/${so.id}`}
+          title={`Documents ${so.code}`}
+          description="English documents for overseas buyers. Print, or save as PDF from the browser's print dialog."
           actions={
             <Button onPress={() => window.print()}>
-              <Printer className="size-4" /> Cetak / PDF
+              <Printer className="size-4" /> Print / PDF
             </Button>
           }
         />
         <Tabs selectedKey={doc} onSelectionChange={(k: Key) => setDoc(k as Doc)} className="mb-4">
           <Tabs.ListContainer>
-            <Tabs.List aria-label="Jenis dokumen">
+            <Tabs.List aria-label="Document type">
               <Tabs.Tab id="proforma">
                 Proforma Invoice
                 <Tabs.Indicator />
@@ -65,7 +65,7 @@ function DocHeader({ title, so }: { title: string; so: SalesOrder }) {
           <p className="text-lg font-bold">{s.companyName}</p>
           <p className="text-neutral-600">{s.companyAddress}</p>
           <p className="text-neutral-600">{[s.companyPhone, s.companyEmail].filter(Boolean).join(" · ")}</p>
-          {s.npwp && <p className="text-neutral-600">NPWP {s.npwp}</p>}
+          {s.npwp && <p className="text-neutral-600">Tax ID (NPWP) {s.npwp}</p>}
         </div>
         <div className="sm:text-right">
           <p className="text-xl font-bold tracking-wide uppercase">{title}</p>
@@ -212,7 +212,7 @@ function Packing({ so }: { so: SalesOrder }) {
               <td className="py-2 pr-2">{r.sku}</td>
               <td className="py-2 pr-2">
                 {r.name}
-                {r.missingSpec && <span className="ml-1 text-red-600 print:hidden">(data kemasan kosong)</span>}
+                {r.missingSpec && <span className="ml-1 text-red-600 print:hidden">(packaging data missing)</span>}
               </td>
               <td className="py-2 pr-2 text-right tabular-nums">{formatNumber(r.qty)}</td>
               <td className="py-2 pr-2 text-right tabular-nums">{formatNumber(r.cartons)}</td>

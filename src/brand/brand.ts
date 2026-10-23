@@ -4,10 +4,10 @@
  */
 export const BRAND = {
   name: "Serat",
-  version: "3.3",
+  version: "4.0",
   /** The promise, used on the welcome screen and in metadata. */
-  line: "Setiap potongan punya harga.",
-  descriptor: "Buku kerja produksi untuk bengkel mebel",
+  line: "Every offcut has a price.",
+  descriptor: "The production ledger for furniture workshops",
   pitch:
-    "Bahan diambil per lot, sisa kembali ke gudang dengan harganya sendiri, dan HPP terkunci saat pekerjaan ditutup — dari kayu gelondong sampai kontainer ekspor.",
+    "Materials are issued by lot, offcuts go back to stock at their own price, and the job cost locks when the work order closes — from raw logs to the export container.",
 } as const;

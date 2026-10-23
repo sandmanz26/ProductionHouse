@@ -8,7 +8,7 @@ import { useDb, useLookups } from "@/store/db-store";
 
 type View = "piutang" | "utang" | "refund";
 
-const docRoute = (i: OpenItem) => (i.doc === "sale" ? `/penjualan/${i.id}` : i.doc === "rental" ? `/sewa/${i.id}` : `/pembelian/${i.id}`);
+const docRoute = (i: OpenItem) => (i.doc === "sale" ? `/sales/${i.id}` : i.doc === "rental" ? `/rentals/${i.id}` : `/purchases/${i.id}`);
 
 export default function FinancePage() {
   const db = useDb();
@@ -28,31 +28,31 @@ export default function FinancePage() {
   const aging = view === "utang" ? data.apAging : data.arAging;
 
   const columns: Column<OpenItem>[] = [
-    { key: "code", header: "Dokumen", isRowHeader: true, cell: (i) => <Link href={docRoute(i)}><Code>{i.code}</Code></Link> },
-    { key: "who", header: view === "utang" ? "Pemasok" : "Pelanggan", cell: (i) => partnerName(i.partnerId) },
-    { key: "due", header: "Jatuh tempo", className: "whitespace-nowrap", cell: (i) => <span className="num">{formatDate(i.dueDate)}</span> },
+    { key: "code", header: "Document", isRowHeader: true, cell: (i) => <Link href={docRoute(i)}><Code>{i.code}</Code></Link> },
+    { key: "who", header: view === "utang" ? "Supplier" : "Customer", cell: (i) => partnerName(i.partnerId) },
+    { key: "due", header: "Due date", className: "whitespace-nowrap", cell: (i) => <span className="num">{formatDate(i.dueDate)}</span> },
     {
       key: "age",
       header: "Status",
       cell: (i) =>
         view === "refund" ? (
-          <StatusChip tone="warning">kembalikan deposit</StatusChip>
+          <StatusChip tone="warning">return deposit</StatusChip>
         ) : i.overdueDays > 0 ? (
-          <StatusChip tone="danger">telat {i.overdueDays} hari</StatusChip>
+          <StatusChip tone="danger">{i.overdueDays} days overdue</StatusChip>
         ) : (
-          <StatusChip tone="default">{i.overdueDays === 0 ? "jatuh tempo hari ini" : `${-i.overdueDays} hari lagi`}</StatusChip>
+          <StatusChip tone="default">{i.overdueDays === 0 ? "due today" : `due in ${-i.overdueDays} days`}</StatusChip>
         ),
     },
-    { key: "billed", header: "Tagihan", align: "end", cell: (i) => formatMoney(i.billed, i.currency) },
-    { key: "bal", header: view === "refund" ? "Dikembalikan" : "Sisa", align: "end", cell: (i) => <b>{formatMoney(Math.abs(i.balance), i.currency)}</b> },
-    { key: "idr", header: "Setara IDR", align: "end", cell: (i) => (i.currency === "IDR" ? "—" : formatIDR(i.balanceIdr)) },
+    { key: "billed", header: "Billed", align: "end", cell: (i) => formatMoney(i.billed, i.currency) },
+    { key: "bal", header: view === "refund" ? "To refund" : "Balance", align: "end", cell: (i) => <b>{formatMoney(Math.abs(i.balance), i.currency)}</b> },
+    { key: "idr", header: "IDR equivalent", align: "end", cell: (i) => (i.currency === "IDR" ? "—" : formatIDR(i.balanceIdr)) },
     {
       key: "act",
       header: "",
       align: "end",
       cell: (i) => (
         <Button size="sm" variant="secondary" onPress={() => setPaying(i)}>
-          {view === "refund" ? "Catat refund" : "Catat bayar"}
+          {view === "refund" ? "Record refund" : "Record payment"}
         </Button>
       ),
     },
@@ -60,33 +60,33 @@ export default function FinancePage() {
 
   return (
     <>
-      <PageHeader title="Piutang & utang" description="Uang yang belum masuk dan belum keluar, diurutkan dari yang paling lama lewat tempo." />
+      <PageHeader title="Receivables & payables" description="Money not yet received or paid out, sorted by the longest overdue first." />
       <MetricStrip
         className="mb-5"
         items={[
-          ...aging.map((a) => ({ label: a.label, value: formatIDRCompact(a.amount), hint: `${a.count} dokumen`, tone: a.key !== "belum" && a.amount > 0 ? ("danger" as const) : ("default" as const) })),
+          ...aging.map((a) => ({ label: a.label, value: formatIDRCompact(a.amount), hint: `${a.count} documents`, tone: a.key !== "belum" && a.amount > 0 ? ("danger" as const) : ("default" as const) })),
         ]}
       />
       <Tabs selectedKey={view} onSelectionChange={(k: Key) => setView(k as View)} className="mb-4">
         <Tabs.ListContainer>
-          <Tabs.List aria-label="Jenis">
+          <Tabs.List aria-label="Type">
             <Tabs.Tab id="piutang">
-              Piutang <span className="num ml-1 text-muted">{data.ar.length}</span>
+              Receivables <span className="num ml-1 text-muted">{data.ar.length}</span>
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="utang">
-              Utang pemasok <span className="num ml-1 text-muted">{data.ap.length}</span>
+              Supplier payables <span className="num ml-1 text-muted">{data.ap.length}</span>
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="refund">
-              Refund deposit <span className="num ml-1 text-muted">{data.refunds.length}</span>
+              Deposit refunds <span className="num ml-1 text-muted">{data.refunds.length}</span>
               <Tabs.Indicator />
             </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
       </Tabs>
       <div className="rounded-md bg-surface shadow-[var(--surface-shadow)]">
-        <DataTable label="Daftar tagihan" columns={columns} rows={rows} dependencies={[view]} empty={<EmptyBlock title="Buku bersih" description="Tidak ada tagihan yang masih terbuka di daftar ini." />} />
+        <DataTable label="Open bills" columns={columns} rows={rows} dependencies={[view]} empty={<EmptyBlock title="All clear" description="No open bills in this list." />} />
       </div>
       {paying && <PaymentDialog doc={paying.doc} id={paying.id} isOpen onOpenChange={(o) => !o && setPaying(null)} />}
     </>

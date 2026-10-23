@@ -6,9 +6,9 @@ export function lotLabel(lot: Lot, item?: Item) {
   const parts = [
     lot.code,
     item ? formatQty(lot.qty, item.uom) : String(lot.qty),
-    `HPP ${formatIDR(lot.unitCost)}`,
+    `unit cost ${formatIDR(lot.unitCost)}`,
     lot.status !== "tersedia" ? LOT_STATUS[lot.status].label : "",
-    lot.isRemnant ? "SISA" : "",
+    lot.isRemnant ? "OFFCUT" : "",
     lot.dimensions ? formatDims(lot.dimensions) : "",
   ];
   return parts.filter(Boolean).join(" · ");

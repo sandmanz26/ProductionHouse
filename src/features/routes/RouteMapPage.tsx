@@ -44,30 +44,30 @@ export default function RouteMapPage() {
 
   const picker = (
     <div className="w-full sm:w-80">
-      <ItemPicker value={id ?? null} onChange={(v) => v && navigate(`/jalur/${v}`)} aria-label="Pilih barang" />
+      <ItemPicker value={id ?? null} onChange={(v) => v && navigate(`/routes/${v}`)} aria-label="Choose an item" />
     </div>
   );
 
   if (!it || !graph || !history) {
     return (
       <>
-        <PageHeader title="Jalur produksi" description="Pilih satu barang untuk melihat semua jalan menuju barang itu: dibuat dari bahan baru, dari bahan olahan hasil bongkaran, dari komponen yang dibeli, atau dibeli jadi." actions={picker} />
-        <Section title="Barang dengan lebih dari satu jalur" bodyClassName="p-0">
+        <PageHeader title="Production routes" description="Choose an item to see every way to get it: made from new materials, from processed material recovered by dismantling, from bought components, or bought ready-made." actions={picker} />
+        <Section title="Items with more than one route" bodyClassName="p-0">
           {suggestions.length ? (
             <ul className="grid grid-cols-1 divide-y divide-[var(--rule)] sm:grid-cols-3 sm:divide-y-0">
               {suggestions.map(({ item: i, routes: rs }) => (
                 <li key={i.id} className="sm:border-r sm:border-b sm:border-[var(--rule)]">
-                  <button type="button" onClick={() => navigate(`/jalur/${i.id}`)} className="w-full px-4 py-3 text-left transition-colors hover:bg-default/40 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none">
+                  <button type="button" onClick={() => navigate(`/routes/${i.id}`)} className="w-full px-4 py-3 text-left transition-colors hover:bg-default/40 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none">
                     <p className="text-sm font-medium">{i.name}</p>
                     <p className="mt-0.5 text-xs text-muted">
-                      {rs.length} jalur · {[...new Set(rs.map((r) => ROUTE_TAG[r.kind].tag.toLowerCase()))].join(", ")}
+                      {rs.length} routes · {[...new Set(rs.map((r) => ROUTE_TAG[r.kind].tag.toLowerCase()))].join(", ")}
                     </p>
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <EmptyBlock icon={<GitFork className="size-5" />} title="Belum ada barang dengan jalur alternatif" description="Tulis resep kedua untuk sebuah produk, atau catat pembelian komponen yang biasanya dibuat sendiri." />
+            <EmptyBlock icon={<GitFork className="size-5" />} title="No items with alternative routes yet" description="Write a second recipe for a product, or record a purchase of a component you usually make in-house." />
           )}
         </Section>
       </>
@@ -76,16 +76,16 @@ export default function RouteMapPage() {
 
   const uom = UOM_LABEL[it.uom];
   const followRoute = (r: ProductionRoute) => {
-    if (r.recipeId) navigate(`/produksi/baru?resep=${r.recipeId}`);
-    else if (r.kind === "bom") navigate(`/produksi/baru?barang=${it.id}`);
-    else if (r.kind === "beli") navigate(`/pembelian/baru?barang=${it.id}`);
-    else navigate(`/produksi/baru?jenis=${r.processType ?? "konversi"}`);
+    if (r.recipeId) navigate(`/work-orders/new?recipe=${r.recipeId}`);
+    else if (r.kind === "bom") navigate(`/work-orders/new?item=${it.id}`);
+    else if (r.kind === "beli") navigate(`/purchases/new?item=${it.id}`);
+    else navigate(`/work-orders/new?type=${r.processType ?? "konversi"}`);
   };
 
   const columns: Column<ProductionRoute>[] = [
     {
       key: "route",
-      header: "Jalur",
+      header: "Route",
       isRowHeader: true,
       cell: (r) => (
         <div className="sm:min-w-48">
@@ -93,29 +93,29 @@ export default function RouteMapPage() {
             <span className="text-[11px] font-semibold tracking-wide" style={{ color: ROUTE_TAG[r.kind].color }}>
               {ROUTE_TAG[r.kind].tag}
             </span>{" "}
-            {r.recipeId ? <Link href={`/resep/${r.recipeId}`}>{r.label}</Link> : <span className="font-medium">{r.label}</span>}
+            {r.recipeId ? <Link href={`/recipes/${r.recipeId}`}>{r.label}</Link> : <span className="font-medium">{r.label}</span>}
           </p>
           <p className="text-xs text-muted">
-            {r.processType ? WO_TYPE[r.processType].short : "Pembelian"}
-            {r.byProduct ? " · hasil sampingan" : ""}
-            {r.coOutputs?.length ? ` · juga menghasilkan ${r.coOutputs.map((c) => item(c)?.name).join(", ")}` : ""}
+            {r.processType ? WO_TYPE[r.processType].short : "Purchase"}
+            {r.byProduct ? " · by-product" : ""}
+            {r.coOutputs?.length ? ` · also yields ${r.coOutputs.map((c) => item(c)?.name).join(", ")}` : ""}
           </p>
         </div>
       ),
     },
     {
       key: "inputs",
-      header: `Bahan per ${uom}`,
+      header: `Materials per ${uom}`,
       cell: (r) =>
         r.kind === "beli" ? (
-          <span className="text-[13px] text-muted">{r.suppliers?.length ? r.suppliers.map((s) => `${s.name} (${s.count}×)`).join(", ") : "Belum pernah dibeli"}</span>
+          <span className="text-[13px] text-muted">{r.suppliers?.length ? r.suppliers.map((s) => `${s.name} (${s.count}×)`).join(", ") : "Never bought"}</span>
         ) : (
           <ul className="text-[13px]">
             {r.inputs
               .filter((i) => showAux || !isAuxiliary(item(i.itemId) ?? { kind: "product", category: "lainnya" }))
               .map((i) => (
                 <li key={i.itemId}>
-                  <Link href={`/jalur/${i.itemId}`}>{item(i.itemId)?.name}</Link>{" "}
+                  <Link href={`/routes/${i.itemId}`}>{item(i.itemId)?.name}</Link>{" "}
                   <span className="num text-muted">
                     {formatQty(i.qty)} {UOM_LABEL[item(i.itemId)?.uom ?? "pcs"]}
                   </span>
@@ -126,24 +126,24 @@ export default function RouteMapPage() {
     },
     {
       key: "cost",
-      header: `HPP / ${uom}`,
+      header: `Unit cost / ${uom}`,
       align: "end",
       cell: (r) => (
         <div>
           <p>{r.unitCost ? formatIDR(r.unitCost) : "—"}</p>
-          {best?.id === r.id && <p className="text-xs font-medium text-success">termurah</p>}
+          {best?.id === r.id && <p className="text-xs font-medium text-success">cheapest</p>}
           {best && best.id !== r.id && r.unitCost > 0 && !r.byProduct && <p className="num text-xs text-muted">+{formatIDR(r.unitCost - best.unitCost)}</p>}
         </div>
       ),
     },
     {
       key: "used",
-      header: "Riwayat",
+      header: "History",
       align: "end",
       cell: (r) => (
         <div className="text-[13px]">
-          <p>{r.uses ? `${r.uses}× · ${formatQty(r.qtyMade)} ${uom}` : <span className="text-muted">belum dipakai</span>}</p>
-          {r.inProgress > 0 && <p className="text-xs text-accent">{r.inProgress} sedang berjalan</p>}
+          <p>{r.uses ? `${r.uses}× · ${formatQty(r.qtyMade)} ${uom}` : <span className="text-muted">not used yet</span>}</p>
+          {r.inProgress > 0 && <p className="text-xs text-accent">{r.inProgress} in progress</p>}
         </div>
       ),
     },
@@ -154,7 +154,7 @@ export default function RouteMapPage() {
       cell: (r) =>
         r.byProduct ? null : (
           <Button size="sm" variant="secondary" onPress={() => followRoute(r)}>
-            {r.kind === "beli" ? "Beli" : "Buat"}
+            {r.kind === "beli" ? "Buy" : "Make"}
           </Button>
         ),
     },
@@ -163,18 +163,18 @@ export default function RouteMapPage() {
   return (
     <>
       <PageHeader
-        back="/jalur"
+        back="/routes"
         title={it.name}
-        description={`Jalur produksi · ${routes.length} cara mendapatkan ${it.name.toLowerCase()} · klik barang mana pun di peta untuk memetakan barang itu`}
+        description={`Production routes · ${routes.length} ways to get ${it.name.toLowerCase()} · click any item on the map to map that item`}
         actions={picker}
       />
 
       <Section
-        title="Peta jalur"
-        description="Dari kiri ke kanan: bahan dasar → jalur yang mengubahnya → barang ini. Beberapa jalur menuju satu barang berarti pilihan (atau). Garis putus-putus: hasil sampingan atau siklus."
+        title="Route map"
+        description="Left to right: base materials → the routes that turn them → this item. Several routes into one item mean a choice (or). Dashed lines: by-products or cycles."
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <div role="radiogroup" aria-label="Kedalaman" className="flex gap-1 text-[13px]">
+            <div role="radiogroup" aria-label="Depth" className="flex gap-1 text-[13px]">
               {DEPTHS.map((d) => (
                 <button
                   key={d}
@@ -184,25 +184,25 @@ export default function RouteMapPage() {
                   onClick={() => setDepth(d)}
                   className={`rounded-sm border px-2 py-0.5 ${depth === d ? "border-accent bg-surface font-medium" : "border-[var(--rule)] text-muted hover:text-foreground"}`}
                 >
-                  {d} tingkat
+                  {d} {d === 1 ? "level" : "levels"}
                 </button>
               ))}
             </div>
-            <SwitchInput isSelected={showAux} onChange={setShowAux} label="Bahan pembantu" />
+            <SwitchInput isSelected={showAux} onChange={setShowAux} label="Auxiliary materials" />
           </div>
         }
         className="mb-6"
         bodyClassName="p-0"
       >
-        <RouteMap graph={graph} rootId={`item:${it.id}`} label={`Peta jalur ${it.name}`} />
+        <RouteMap graph={graph} rootId={`item:${it.id}`} label={`Route map ${it.name}`} />
       </Section>
 
-      <Section title="Perbandingan jalur" description="HPP standar per unit dari harga bahan & tarif saat ini; pembelian memakai harga pokok terakhir (termasuk ongkir)." className="mb-6" bodyClassName="p-0">
-        <DataTable label="Perbandingan jalur" columns={columns} rows={routes} dependencies={[showAux, best]} empty={<EmptyBlock title="Belum ada jalur" description="Barang ini belum punya BOM, resep, atau riwayat pembelian." />} />
+      <Section title="Route comparison" description="Standard unit cost from current material costs & rates; purchases use the last unit cost (shipping included)." className="mb-6" bodyClassName="p-0">
+        <DataTable label="Route comparison" columns={columns} rows={routes} dependencies={[showAux, best]} empty={<EmptyBlock title="No routes yet" description="This item has no BOM, recipe or purchase history yet." />} />
       </Section>
 
-      <Section title="Riwayat nyata" description="Dari mana saja stok barang ini pernah datang, dan ke mana perginya — terjual ke siapa, menjadi produk apa, atau masih di gudang. Lebar = nilai rupiah." bodyClassName="p-0">
-        <FlowDiagram graph={history} label={`Riwayat ${it.name}`} empty="Barang ini belum pernah masuk stok." />
+      <Section title="Actual history" description="Where this item's stock has come from, and where it went — sold to whom, made into which product, or still in the warehouse. Width = rupiah value." bodyClassName="p-0">
+        <FlowDiagram graph={history} label={`History ${it.name}`} empty="This item has never been in stock." />
       </Section>
     </>
   );

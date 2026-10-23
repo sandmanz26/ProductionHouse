@@ -208,7 +208,7 @@ describe("production costing", () => {
           returns: [{ itemId: ply.id, kind: "sisa", qty: 3.5 }],
         }),
       ),
-    ).toThrow(/melebihi/);
+    ).toThrow(/more than/);
     expect(JSON.stringify(db)).toBe(before);
   });
 
@@ -327,13 +327,13 @@ describe("sales", () => {
     expect(wos[0]!.plannedOutputs[0]!.qty).toBe(2);
     expect(wos[0]!.salesOrderId).toBe(so.id);
 
-    expect(() => transact(db, (d) => deliverSalesOrder(d, so.id, [{ itemId: cabinet.id, qty: 4 }]))).toThrow(/tidak cukup/);
+    expect(() => transact(db, (d) => deliverSalesOrder(d, so.id, [{ itemId: cabinet.id, qty: 4 }]))).toThrow(/Not enough/);
     deliverSalesOrder(db, so.id, [{ itemId: cabinet.id, qty: 3 }]);
     expect(so.status).toBe("dikirim_sebagian");
     const t = salesTotals(db, so);
     expect(t.cogs).toBe(3_600_000);
     expect(t.totalIdr).toBe(5 * 150 * 16_000);
-    expect(() => transact(db, (d) => deliverSalesOrder(d, so.id, [{ itemId: cabinet.id, qty: 3 }]))).toThrow(/melebihi/);
+    expect(() => transact(db, (d) => deliverSalesOrder(d, so.id, [{ itemId: cabinet.id, qty: 3 }]))).toThrow(/more than/);
     expectLedgerConsistent(db);
   });
 });
@@ -434,7 +434,7 @@ describe("persistence", () => {
     const { db } = setup();
     const restored = parseBackup(serializeBackup(db));
     expect(restored.items.length).toBe(db.items.length);
-    expect(() => migrate({ ...db, schemaVersion: 999 })).toThrow(/lebih baru/);
+    expect(() => migrate({ ...db, schemaVersion: 999 })).toThrow(/newer version/);
     expect(() => parseBackup("not json")).toThrow();
     const partial = migrate({ items: [] as Item[] });
     expect(partial.lots).toEqual([]);

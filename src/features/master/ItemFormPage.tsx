@@ -31,7 +31,7 @@ export default function ItemFormPage() {
   const { id } = useParams();
   const db = useDb();
   const it = id ? db.items.find((i) => i.id === id) : undefined;
-  if (id && !it) return <RecordNotFound what="Item" back="/master/item" />;
+  if (id && !it) return <RecordNotFound what="Item" back="/items" />;
   return <ItemForm key={id ?? "new"} existing={it} />;
 }
 
@@ -49,7 +49,7 @@ function ItemForm({ existing }: { existing?: Item }) {
   const { item } = useLookups();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const kind: ItemKind = existing?.kind ?? (params.get("jenis") === "material" ? "material" : "product");
+  const kind: ItemKind = existing?.kind ?? (params.get("type") === "material" ? "material" : "product");
   const isProduct = kind === "product";
 
   const [name, setName] = useState(existing?.name ?? "");
@@ -106,8 +106,8 @@ function ItemForm({ existing }: { existing?: Item }) {
   const save = () => {
     // Products keep their BOM-based standard cost in sync on every save.
     const data = isProduct || (producible && !standardCost) ? { ...input, standardCost: stdCost } : input;
-    const r = run((d) => (existing ? updateItem(d, existing.id, data) : createItem(d, data)), (x) => `${x.name} disimpan`);
-    if (r) navigate(`/master/item?jenis=${kind}`, { replace: true });
+    const r = run((d) => (existing ? updateItem(d, existing.id, data) : createItem(d, data)), (x) => `${x.name} saved`);
+    if (r) navigate(`/items?type=${kind}`, { replace: true });
   };
 
   const categories = isProduct ? PRODUCT_CATEGORY : MATERIAL_CATEGORY;
@@ -115,36 +115,36 @@ function ItemForm({ existing }: { existing?: Item }) {
   return (
     <>
       <PageHeader
-        title={existing ? existing.name : isProduct ? "Produk baru" : "Material baru"}
-        description={existing ? `${existing.sku} · ${isProduct ? "Produk" : "Material"}` : undefined}
-        back={`/master/item?jenis=${kind}`}
+        title={existing ? existing.name : isProduct ? "New product" : "New material"}
+        description={existing ? `${existing.sku} · ${isProduct ? "Product" : "Material"}` : undefined}
+        back={`/items?type=${kind}`}
         actions={
           existing && (
             <>
-              <Button variant="secondary" onPress={() => navigate(`/jalur/${existing.id}`)}>
-                <GitFork className="size-4" /> Jalur produksi
+              <Button variant="secondary" onPress={() => navigate(`/routes/${existing.id}`)}>
+                <GitFork className="size-4" /> Production routes
               </Button>
               {existing.archived ? (
-                <Button variant="secondary" onPress={() => run((d) => restoreItem(d, existing.id), "Item dipulihkan")}>
-                  <RotateCcw className="size-4" /> Pulihkan
+                <Button variant="secondary" onPress={() => run((d) => restoreItem(d, existing.id), "Item restored")}>
+                  <RotateCcw className="size-4" /> Restore
                 </Button>
               ) : (
                 <ConfirmButton
                   variant="danger-soft"
                   danger
-                  title={isItemReferenced(db, existing.id) ? "Arsipkan item?" : "Hapus item?"}
+                  title={isItemReferenced(db, existing.id) ? "Archive item?" : "Delete item?"}
                   description={
                     isItemReferenced(db, existing.id)
-                      ? "Item sudah dipakai di transaksi, jadi akan diarsipkan (riwayat tetap utuh) dan disembunyikan dari pilihan."
-                      : "Item belum pernah dipakai dan akan dihapus permanen."
+                      ? "The item is used in transactions, so it will be archived (history stays intact) and hidden from pickers."
+                      : "The item has never been used and will be deleted permanently."
                   }
-                  confirmLabel="Lanjutkan"
+                  confirmLabel="Continue"
                   onConfirm={() => {
-                    const r = run((d) => removeItem(d, existing.id), (x) => (x === "archived" ? "Item diarsipkan" : "Item dihapus"));
-                    if (r) navigate(`/master/item?jenis=${kind}`);
+                    const r = run((d) => removeItem(d, existing.id), (x) => (x === "archived" ? "Item archived" : "Item deleted"));
+                    if (r) navigate(`/items?type=${kind}`);
                   }}
                 >
-                  <Archive className="size-4" /> {isItemReferenced(db, existing.id) ? "Arsipkan" : "Hapus"}
+                  <Archive className="size-4" /> {isItemReferenced(db, existing.id) ? "Archive" : "Delete"}
                 </ConfirmButton>
               )}
             </>
@@ -153,60 +153,60 @@ function ItemForm({ existing }: { existing?: Item }) {
       />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
-          <Section title="Identitas">
+          <Section title="Identity">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <TextInput label="Nama" value={name} onChange={setName} isRequired className="sm:col-span-2" />
-              <TextInput label="Kode / SKU" value={sku} onChange={setSku} placeholder="Otomatis bila kosong" />
-              <SelectInput label="Kategori" value={category} onChange={setCategory} options={Object.entries(categories).map(([id, label]) => ({ id, label }))} />
+              <TextInput label="Name" value={name} onChange={setName} isRequired className="sm:col-span-2" />
+              <TextInput label="Code / SKU" value={sku} onChange={setSku} placeholder="Automatic if empty" />
+              <SelectInput label="Category" value={category} onChange={setCategory} options={Object.entries(categories).map(([id, label]) => ({ id, label }))} />
               <SelectInput
-                label="Satuan"
+                label="Unit"
                 value={uom}
                 onChange={(v) => setUom(v as Uom)}
                 options={(Object.keys(UOM_LABEL) as Uom[]).map((u) => ({ id: u, label: UOM_LABEL[u] }))}
                 isDisabled={!!existing && db.lots.some((l) => l.itemId === existing.id)}
-                description={existing && db.lots.some((l) => l.itemId === existing.id) ? "Tidak bisa diubah karena sudah ada stok." : undefined}
+                description={existing && db.lots.some((l) => l.itemId === existing.id) ? "Cannot be changed because stock exists." : undefined}
               />
               <SelectInput
-                label="Metode biaya"
+                label="Costing method"
                 value={costing}
                 onChange={(v) => setCosting(v as CostingMethod | "default")}
                 options={[
-                  { id: "default", label: `Ikuti pengaturan (${COSTING_LABEL[db.settings.costingMethod]})` },
+                  { id: "default", label: `Follow settings (${COSTING_LABEL[db.settings.costingMethod]})` },
                   ...COSTING_METHODS.map((m) => ({ id: m, label: COSTING_LABEL[m] })),
                 ]}
-                description={costing === "default" ? "Sama dengan metode perusahaan." : COSTING_HINT[costing]}
+                description={costing === "default" ? "Same as the company method." : COSTING_HINT[costing]}
                 className="sm:col-span-2"
               />
               {!isProduct && (
                 <NumberInput
-                  label={`Harga standar per ${UOM_LABEL[uom]}`}
+                  label={`Standard cost per ${UOM_LABEL[uom]}`}
                   value={standardCost}
                   onChange={setStandardCost}
                   money
-                  description="Diperbarui otomatis dari harga pembelian terakhir."
+                  description="Updated automatically from the last purchase price."
                 />
               )}
             </div>
           </Section>
 
           {!isProduct && (
-            <Section title="Stok & sisa">
+            <Section title="Stock & offcuts">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <NumberInput label="Titik pesan ulang" value={reorderPoint} onChange={setReorderPoint} suffix={UOM_LABEL[uom]} description="Sistem mengingatkan bila stok bebas di bawah angka ini." />
+                <NumberInput label="Reorder point" value={reorderPoint} onChange={setReorderPoint} suffix={UOM_LABEL[uom]} description="You get a reminder when free stock drops below this." />
                 <div className="flex flex-col gap-3">
-                  <SwitchInput isSelected={trackRemnant} onChange={setTrackRemnant} label="Lacak sisa material" description="Potongan sisa produksi disimpan sebagai lot sisa yang diprioritaskan." />
+                  <SwitchInput isSelected={trackRemnant} onChange={setTrackRemnant} label="Track offcuts" description="Production offcuts are kept as offcut lots and used first." />
                   {trackRemnant && (
-                    <NumberInput label="Ukuran sisa minimum" value={minRemnantQty} onChange={setMinRemnantQty} suffix={UOM_LABEL[uom]} description="Di bawah ini sebaiknya dianggap limbah." />
+                    <NumberInput label="Minimum offcut size" value={minRemnantQty} onChange={setMinRemnantQty} suffix={UOM_LABEL[uom]} description="Anything smaller is best treated as waste." />
                   )}
                 </div>
-                <TextInput label="Satuan beli dari pemasok" value={puLabel} onChange={setPuLabel} placeholder="mis. roll, dus, ikat" description="Kosongkan bila sama dengan satuan stok." />
-                <NumberInput label={`Isi per satuan beli (${UOM_LABEL[uom]})`} value={puFactor} onChange={setPuFactor} isDisabled={!puLabel.trim()} description={puLabel.trim() && puFactor ? `1 ${puLabel} = ${puFactor} ${UOM_LABEL[uom]}` : undefined} />
+                <TextInput label="Supplier purchase unit" value={puLabel} onChange={setPuLabel} placeholder="e.g. roll, box, bundle" description="Leave empty if it is the same as the stock unit." />
+                <NumberInput label={`Contents per purchase unit (${UOM_LABEL[uom]})`} value={puFactor} onChange={setPuFactor} isDisabled={!puLabel.trim()} description={puLabel.trim() && puFactor ? `1 ${puLabel} = ${puFactor} ${UOM_LABEL[uom]}` : undefined} />
                 <div className="sm:col-span-2">
                   <SwitchInput
                     isSelected={producible}
                     onChange={setProducible}
-                    label="Diproduksi sendiri"
-                    description="Komponen setengah jadi (rangka, dudukan) atau bahan olahan (kayu KD). Punya resep bahan dan bisa dibuat lewat perintah kerja."
+                    label="Made in-house"
+                    description="A semi-finished component (frame, seat base) or processed material (kiln-dried timber). It has a bill of materials and can be made through a work order."
                   />
                 </div>
               </div>
@@ -214,7 +214,7 @@ function ItemForm({ existing }: { existing?: Item }) {
           )}
 
           {hasBom && (
-            <Section title="Resep bahan (BOM)" description={`Kebutuhan bahan untuk 1 ${UOM_LABEL[uom]}. Boleh berisi komponen yang juga diproduksi sendiri.`}>
+            <Section title="Bill of materials (BOM)" description={`Materials needed for 1 ${UOM_LABEL[uom]}. It may include components that are also made in-house.`}>
               <div className="flex flex-col gap-2">
                 {bom.map((b) => {
                   const m = item(b.materialId ?? undefined);
@@ -222,7 +222,7 @@ function ItemForm({ existing }: { existing?: Item }) {
                     <div key={b.key} className="grid grid-cols-[1fr_8rem_auto] items-end gap-2">
                       <ItemPicker kind="material" value={b.materialId} onChange={(materialId) => setBom(bom.map((x) => (x.key === b.key ? { ...x, materialId } : x)))} aria-label="Material" />
                       <NumberInput aria-label="Qty per unit" value={b.qty} onChange={(qty) => setBom(bom.map((x) => (x.key === b.key ? { ...x, qty } : x)))} suffix={m ? UOM_LABEL[m.uom] : undefined} />
-                      <Button isIconOnly variant="ghost" aria-label="Hapus bahan" onPress={() => setBom(bom.filter((x) => x.key !== b.key))}>
+                      <Button isIconOnly variant="ghost" aria-label="Remove material" onPress={() => setBom(bom.filter((x) => x.key !== b.key))}>
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
@@ -230,71 +230,71 @@ function ItemForm({ existing }: { existing?: Item }) {
                 })}
                 <div>
                   <Button size="sm" variant="tertiary" onPress={() => setBom([...bom, { key: k(), materialId: null, qty: 1 }])}>
-                    <Plus className="size-4" /> Tambah bahan
+                    <Plus className="size-4" /> Add material
                   </Button>
                 </div>
                 <div className="mt-2 grid grid-cols-1 gap-3 border-t border-[var(--rule)] pt-3 sm:grid-cols-[1fr_12rem]">
                   <TextInput
-                    label="Rute tahapan"
+                    label="Stage route"
                     value={stagesText}
                     onChange={setStagesText}
                     placeholder={db.settings.defaultStages.join(", ")}
-                    description="Pisahkan dengan koma. Kosong = rute default di Pengaturan."
+                    description="Separate with commas. Empty = the default route in Settings."
                   />
-                  {!isProduct && <NumberInput label="Jam kerja standar" value={laborHours} onChange={setLaborHours} suffix="jam" />}
+                  {!isProduct && <NumberInput label="Standard labour hours" value={laborHours} onChange={setLaborHours} suffix="h" />}
                 </div>
               </div>
             </Section>
           )}
 
           {isProduct && (
-            <Section title="Harga & sewa">
+            <Section title="Price & rental">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <NumberInput label="Jam kerja standar / unit" value={laborHours} onChange={setLaborHours} suffix="jam" />
-                <NumberInput label="Harga jual" value={salePrice} onChange={setSalePrice} money />
-                <NumberInput label="Tarif sewa / hari" value={rentalRate} onChange={setRentalRate} money description="Kosongkan bila tidak disewakan." />
+                <NumberInput label="Standard labour hours / unit" value={laborHours} onChange={setLaborHours} suffix="h" />
+                <NumberInput label="Sale price" value={salePrice} onChange={setSalePrice} money />
+                <NumberInput label="Rental rate / day" value={rentalRate} onChange={setRentalRate} money description="Leave empty if not for rent." />
               </div>
             </Section>
           )}
 
           {isProduct && (
-            <Section title="Ekspor & kemasan" description="Untuk proforma invoice, packing list, dan estimasi isi kontainer.">
+            <Section title="Export & packaging" description="For the proforma invoice, packing list and container fill estimate.">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <TextInput label="HS Code" value={hsCode} onChange={setHsCode} placeholder="mis. 9403.60" />
-                <NumberInput label="Karton per unit" value={packing.cartonsPerUnit} onChange={(cartonsPerUnit) => setPacking({ ...packing, cartonsPerUnit })} minValue={1} maximumFractionDigits={0} />
+                <TextInput label="HS Code" value={hsCode} onChange={setHsCode} placeholder="e.g. 9403.60" />
+                <NumberInput label="Cartons per unit" value={packing.cartonsPerUnit} onChange={(cartonsPerUnit) => setPacking({ ...packing, cartonsPerUnit })} minValue={1} maximumFractionDigits={0} />
                 <div />
-                <NumberInput label="Panjang karton (cm)" value={packing.length} onChange={(length) => setPacking({ ...packing, length })} />
-                <NumberInput label="Lebar karton (cm)" value={packing.width} onChange={(width) => setPacking({ ...packing, width })} />
-                <NumberInput label="Tinggi karton (cm)" value={packing.height} onChange={(height) => setPacking({ ...packing, height })} />
-                <NumberInput label="Berat kotor / unit (kg)" value={packing.grossWeightKg} onChange={(grossWeightKg) => setPacking({ ...packing, grossWeightKg })} />
-                <NumberInput label="Berat bersih / unit (kg)" value={packing.netWeightKg} onChange={(netWeightKg) => setPacking({ ...packing, netWeightKg })} />
+                <NumberInput label="Carton length (cm)" value={packing.length} onChange={(length) => setPacking({ ...packing, length })} />
+                <NumberInput label="Carton width (cm)" value={packing.width} onChange={(width) => setPacking({ ...packing, width })} />
+                <NumberInput label="Carton height (cm)" value={packing.height} onChange={(height) => setPacking({ ...packing, height })} />
+                <NumberInput label="Gross weight / unit (kg)" value={packing.grossWeightKg} onChange={(grossWeightKg) => setPacking({ ...packing, grossWeightKg })} />
+                <NumberInput label="Net weight / unit (kg)" value={packing.netWeightKg} onChange={(netWeightKg) => setPacking({ ...packing, netWeightKg })} />
               </div>
-              {cbm > 0 && <p className="mt-3 text-sm text-muted">Volume per unit ±{cbm.toLocaleString("id-ID", { maximumFractionDigits: 3 })} CBM → ±{Math.floor(68 / cbm)} unit per kontainer 40' HC.</p>}
+              {cbm > 0 && <p className="mt-3 text-sm text-muted">Volume per unit ±{cbm.toLocaleString("en-GB", { maximumFractionDigits: 3 })} CBM → ±{Math.floor(68 / cbm)} units per 40' HC container.</p>}
             </Section>
           )}
 
-          <Section title="Catatan">
-            <TextAreaInput aria-label="Catatan" value={note} onChange={setNote} rows={2} />
+          <Section title="Note">
+            <TextAreaInput aria-label="Note" value={note} onChange={setNote} rows={2} />
           </Section>
         </div>
 
         <div className="xl:sticky xl:top-20 xl:self-start">
           <Card>
             <Card.Header>
-              <Card.Title className="text-base">{hasBom ? "HPP standar" : "Ringkasan"}</Card.Title>
-              {hasBom && <Card.Description>Estimasi dari BOM × harga standar + jam × (tarif + overhead).</Card.Description>}
+              <Card.Title className="text-base">{hasBom ? "Standard cost" : "Summary"}</Card.Title>
+              {hasBom && <Card.Description>Estimated from BOM × standard cost + hours × (rate + overhead).</Card.Description>}
             </Card.Header>
             <Card.Content>
               {hasBom ? (
                 <>
-                  <Row label="Bahan" value={formatIDR(materialCost)} />
-                  <Row label="Tenaga kerja + overhead" value={formatIDR(stdCost - materialCost)} />
+                  <Row label="Materials" value={formatIDR(materialCost)} />
+                  <Row label="Labour + overhead" value={formatIDR(stdCost - materialCost)} />
                   <div className="my-2 border-t border-[var(--rule)]" />
-                  <Row label="HPP standar / unit" value={formatIDR(stdCost)} strong />
-                  {!isProduct && standardCost > 0 && <Row label="Harga standar tercatat" value={formatIDR(standardCost)} muted />}
+                  <Row label="Standard cost / unit" value={formatIDR(stdCost)} strong />
+                  {!isProduct && standardCost > 0 && <Row label="Recorded standard cost" value={formatIDR(standardCost)} muted />}
                   {isProduct && salePrice > 0 && (
                     <Row
-                      label="Margin standar"
+                      label="Standard margin"
                       value={`${Math.round(((salePrice - stdCost) / salePrice) * 100)}%`}
                       tone={(salePrice - stdCost) / salePrice < 0.2 ? "danger" : "success"}
                     />
@@ -302,14 +302,14 @@ function ItemForm({ existing }: { existing?: Item }) {
                 </>
               ) : (
                 <>
-                  <Row label="Satuan" value={UOM_LABEL[uom]} />
-                  <Row label="Harga standar" value={formatIDR(standardCost)} />
+                  <Row label="Unit" value={UOM_LABEL[uom]} />
+                  <Row label="Standard cost" value={formatIDR(standardCost)} />
                 </>
               )}
             </Card.Content>
             <Card.Footer>
               <Button onPress={save} isDisabled={!name.trim()} fullWidth>
-                Simpan
+                Save
               </Button>
             </Card.Footer>
           </Card>

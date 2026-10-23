@@ -1,4 +1,4 @@
-import { Button, SearchField, Tabs, type Key } from "@heroui/react";
+import { Button, Tabs, type Key } from "@heroui/react";
 import { Plus, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createPartner, deletePartner, updatePartner, type Partner, type PartnerInput, type PartnerRole } from "@/domain";
@@ -9,7 +9,6 @@ import { useDb, useRun } from "@/store/db-store";
 export default function PartnersPage() {
   const db = useDb();
   const [role, setRole] = useState<PartnerRole>("customer");
-  const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Partner | "new" | null>(null);
 
   const usage = useMemo(() => {
@@ -22,17 +21,15 @@ export default function PartnersPage() {
   }, [db]);
 
   const rows = useMemo(() => {
-    const term = q.trim().toLowerCase();
     return db.partners
       .filter((p) => p.role === role)
-      .filter((p) => !term || [p.name, p.contact, p.phone, p.email, p.address].some((v) => v?.toLowerCase().includes(term)))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [db.partners, role, q]);
+  }, [db.partners, role]);
 
   const columns: Column<Partner>[] = [
     {
       key: "name",
-      header: "Nama",
+      header: "Name",
       isRowHeader: true,
       cell: (p) => (
         <div className="min-w-44">
@@ -41,58 +38,52 @@ export default function PartnersPage() {
         </div>
       ),
     },
-    { key: "phone", header: "Telepon", className: "whitespace-nowrap", cell: (p) => p.phone || "—" },
+    { key: "phone", header: "Phone", className: "whitespace-nowrap", cell: (p) => p.phone || "—" },
     { key: "email", header: "Email", cell: (p) => p.email || "—" },
-    { key: "addr", header: "Alamat", cell: (p) => <span className="line-clamp-2 text-sm">{[p.address, p.country].filter(Boolean).join(", ") || "—"}</span> },
-    { key: "tx", header: "Transaksi", align: "end", cell: (p) => usage.get(p.id) ?? 0 },
+    { key: "addr", header: "Address", cell: (p) => <span className="line-clamp-2 text-sm">{[p.address, p.country].filter(Boolean).join(", ") || "—"}</span> },
+    { key: "tx", header: "Transactions", align: "end", cell: (p) => usage.get(p.id) ?? 0 },
   ];
 
   return (
     <>
       <PageHeader
-        title="Pelanggan & Pemasok"
+        title="Customers & suppliers"
         actions={
           <Button onPress={() => setEditing("new")}>
-            <Plus className="size-4" /> {role === "customer" ? "Pelanggan baru" : "Pemasok baru"}
+            <Plus className="size-4" /> {role === "customer" ? "New customer" : "New supplier"}
           </Button>
         }
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs selectedKey={role} onSelectionChange={(k: Key) => setRole(k as PartnerRole)}>
           <Tabs.ListContainer>
-            <Tabs.List aria-label="Jenis relasi">
+            <Tabs.List aria-label="Contact type">
               <Tabs.Tab id="customer">
-                Pelanggan
+                Customers
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab id="supplier">
-                Pemasok
+                Suppliers
                 <Tabs.Indicator />
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
         </Tabs>
-        <SearchField value={q} onChange={setQ} aria-label="Cari relasi" className="sm:w-72">
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Cari nama, kontak, alamat…" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
       </div>
       <DataTable
-        label="Daftar relasi"
+        toolbar searchText={(p) => [p.name, p.contact, p.phone, p.email, p.address, p.country].filter(Boolean).join(" ")}
+        label="Contact list"
         columns={columns}
         rows={rows}
         dependencies={[usage]}
         onRowAction={(p) => setEditing(p)}
-        empty={<EmptyBlock icon={<Users className="size-5" />} title="Belum ada relasi" description="Pemasok kayu, toko hardware, buyer ekspor, penyewa — semua tercatat di sini." action={<Button onPress={() => setEditing("new")}>Tambah</Button>} />}
+        empty={<EmptyBlock icon={<Users className="size-5" />} title="No contacts yet" description="Timber suppliers, hardware shops, export buyers, renters — all recorded here." action={<Button onPress={() => setEditing("new")}>Add</Button>} />}
       />
       <TaskModal
         isOpen={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         size="md"
-        title={editing === "new" ? (role === "customer" ? "Pelanggan baru" : "Pemasok baru") : (editing?.name ?? "")}
+        title={editing === "new" ? (role === "customer" ? "New customer" : "New supplier") : (editing?.name ?? "")}
       >
         {editing !== null && <PartnerForm key={editing === "new" ? "new" : editing.id} role={role} existing={editing === "new" ? undefined : editing} onDone={() => setEditing(null)} used={editing !== "new" && (usage.get(editing.id) ?? 0) > 0} />}
       </TaskModal>
@@ -108,41 +99,41 @@ function PartnerForm({ role, existing, onDone, used }: { role: PartnerRole; exis
   const set = (key: keyof PartnerInput) => (value: string) => setV({ ...v, [key]: value });
   return (
     <div className="flex flex-col gap-3">
-      <TextInput label="Nama" value={v.name} onChange={set("name")} isRequired autoFocus />
+      <TextInput label="Name" value={v.name} onChange={set("name")} isRequired autoFocus />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <TextInput label="Kontak (PIC)" value={v.contact ?? ""} onChange={set("contact")} />
-        <TextInput label="Telepon" type="tel" value={v.phone ?? ""} onChange={set("phone")} />
+        <TextInput label="Contact person" value={v.contact ?? ""} onChange={set("contact")} />
+        <TextInput label="Phone" type="tel" value={v.phone ?? ""} onChange={set("phone")} />
         <TextInput label="Email" type="email" value={v.email ?? ""} onChange={set("email")} />
-        <TextInput label="Negara" value={v.country ?? ""} onChange={set("country")} />
+        <TextInput label="Country" value={v.country ?? ""} onChange={set("country")} />
       </div>
-      <TextAreaInput label="Alamat" value={v.address ?? ""} onChange={set("address")} rows={2} />
-      <TextAreaInput label="Catatan" value={v.note ?? ""} onChange={set("note")} rows={2} />
+      <TextAreaInput label="Address" value={v.address ?? ""} onChange={set("address")} rows={2} />
+      <TextAreaInput label="Note" value={v.note ?? ""} onChange={set("note")} rows={2} />
       <div className="mt-2 flex flex-wrap justify-between gap-2">
         {existing && !used ? (
           <ConfirmButton
             variant="danger-soft"
             danger
-            title={`Hapus ${existing.name}?`}
-            confirmLabel="Hapus"
-            onConfirm={() => run((d) => deletePartner(d, existing.id), "Relasi dihapus") !== undefined && onDone()}
+            title={`Delete ${existing.name}?`}
+            confirmLabel="Delete"
+            onConfirm={() => run((d) => deletePartner(d, existing.id), "Contact deleted") !== undefined && onDone()}
           >
-            <Trash2 className="size-4" /> Hapus
+            <Trash2 className="size-4" /> Delete
           </ConfirmButton>
         ) : (
           <span />
         )}
         <div className="flex gap-2">
           <Button variant="tertiary" onPress={onDone}>
-            Batal
+            Cancel
           </Button>
           <Button
             isDisabled={!v.name.trim()}
             onPress={() => {
-              const r = run((d) => (existing ? updatePartner(d, existing.id, v) : createPartner(d, v)), (p) => `${p.name} disimpan`);
+              const r = run((d) => (existing ? updatePartner(d, existing.id, v) : createPartner(d, v)), (p) => `${p.name} saved`);
               if (r) onDone();
             }}
           >
-            Simpan
+            Save
           </Button>
         </div>
       </div>

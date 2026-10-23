@@ -69,7 +69,7 @@ export function productionRoutes(db: Db, itemId: ID): ProductionRoute[] {
       id: `bom:${itemId}`,
       kind: "bom",
       processType: "produksi",
-      label: "BOM standar",
+      label: "Standard BOM",
       inputs: item.bom.map((b) => ({ itemId: b.materialId, qty: b.qty })),
       unitCost: standardProductCost(db, item),
       laborHours: item.laborHours,
@@ -120,7 +120,7 @@ export function productionRoutes(db: Db, itemId: ID): ProductionRoute[] {
       id: `riwayat:${key}`,
       kind: type === "dekonstruksi" ? "bongkar" : "riwayat",
       processType: type,
-      label: `${type === "konversi" ? "Konversi" : type === "gabung" ? "Gabung" : "Bongkar"}${main ? ` dari ${main.name}` : ""}`,
+      label: `${type === "konversi" ? "Conversion" : type === "gabung" ? "Merge" : "Dismantle"}${main ? ` from ${main.name}` : ""}`,
       inputs: [...totals].map(([id, q]) => ({ itemId: id, qty: roundQty(q / made) })),
       unitCost: roundMoney(cost / made),
       uses: runs.length,
@@ -140,7 +140,7 @@ export function productionRoutes(db: Db, itemId: ID): ProductionRoute[] {
     if (!lines.length) continue;
     receipts += 1;
     const lot = db.lots.find((l) => p.lotIds?.includes(l.id) && l.itemId === itemId);
-    const name = db.partners.find((x) => x.id === p.supplierId)?.name ?? "Pemasok umum";
+    const name = db.partners.find((x) => x.id === p.supplierId)?.name ?? "General supplier";
     const cur = bought.get(name) ?? { partnerId: p.supplierId, name, count: 0, lastUnitCost: 0 };
     cur.count += 1;
     cur.lastUnitCost = lot?.unitCost ?? lines[0]!.unitPrice;
@@ -153,7 +153,7 @@ export function productionRoutes(db: Db, itemId: ID): ProductionRoute[] {
     routes.push({
       id: `beli:${itemId}`,
       kind: "beli",
-      label: suppliers.length ? `Beli · ${suppliers[0]!.name}${suppliers.length > 1 ? ` +${suppliers.length - 1}` : ""}` : "Beli dari pemasok",
+      label: suppliers.length ? `Buy · ${suppliers[0]!.name}${suppliers.length > 1 ? ` +${suppliers.length - 1}` : ""}` : "Buy from a supplier",
       inputs: [],
       unitCost: suppliers[0]?.lastUnitCost ?? item.standardCost,
       uses: receipts,

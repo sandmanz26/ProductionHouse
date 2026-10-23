@@ -8,8 +8,8 @@ import type { Db, ID, ISODate, Item, Lot } from "./types";
 
 const UOM_SYMBOL: Record<string, string> = { m2: "m²", m3: "m³" };
 const q = (n: number, uom?: string) =>
-  `${n.toLocaleString("id-ID", { maximumFractionDigits: 3 })}${uom ? ` ${UOM_SYMBOL[uom] ?? uom}` : ""}`;
-const rupiah = (n: number) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
+  `${n.toLocaleString("en-GB", { maximumFractionDigits: 3 })}${uom ? ` ${UOM_SYMBOL[uom] ?? uom}` : ""}`;
+const rupiah = (n: number) => `Rp ${Math.round(n).toLocaleString("en-GB")}`;
 
 export function inventoryValuation(db: Db) {
   const kindOf = new Map(db.items.map((i) => [i.id, i.kind]));
@@ -95,7 +95,7 @@ export interface ProductCostRow {
   marginPct?: number;
 }
 
-/** Actual HPP per product from completed work orders. */
+/** Actual unit cost per product from completed work orders. */
 export function productCostRows(db: Db, standardCost: (item: Item) => number): ProductCostRow[] {
   const acc = new Map<ID, { qty: number; value: number; last?: number; lastAt?: string }>();
   for (const wo of db.workOrders) {
@@ -170,18 +170,18 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `rental-late-${r.id}`,
         severity: "danger",
-        title: `${r.code} terlambat ${late} hari`,
-        detail: `${r.project} — denda berjalan ${rupiah(ch.lateFee)}.`,
-        to: `/sewa/${r.id}`,
-        action: "Terima kembali",
+        title: `${r.code} is ${late} ${late === 1 ? "day" : "days"} late`,
+        detail: `${r.project} — late fee so far ${rupiah(ch.lateFee)}.`,
+        to: `/rentals/${r.id}`,
+        action: "Take back",
       });
     } else if (-late <= db.settings.rentalReminderDays) {
       out.push({
         id: `rental-due-${r.id}`,
         severity: "warning",
-        title: `${r.code} kembali ${late === 0 ? "hari ini" : `${-late} hari lagi`}`,
-        detail: `${r.project} — siapkan penjemputan unit.`,
-        to: `/sewa/${r.id}`,
+        title: `${r.code} comes back ${late === 0 ? "today" : `in ${-late} ${late === -1 ? "day" : "days"}`}`,
+        detail: `${r.project} — arrange pickup of the units.`,
+        to: `/rentals/${r.id}`,
       });
     }
   }
@@ -190,10 +190,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `rental-pickup-${r.id}`,
         severity: "warning",
-        title: `${r.code} harus diserahkan`,
-        detail: `${r.project} mulai ${r.startDate}. Unit belum diserahkan.`,
-        to: `/sewa/${r.id}`,
-        action: "Serahkan unit",
+        title: `${r.code} is due for hand-over`,
+        detail: `${r.project} starts ${r.startDate}. Units not handed over yet.`,
+        to: `/rentals/${r.id}`,
+        action: "Hand over units",
       });
     }
   }
@@ -205,10 +205,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `wo-short-${wo.id}`,
         severity: "danger",
-        title: `${wo.code}: bahan kurang`,
-        detail: short.map((s) => `${name(s.itemId)} kurang ${q(s.shortage, items.get(s.itemId)?.uom)}`).join(", "),
-        to: `/produksi/${wo.id}`,
-        action: "Buat pembelian",
+        title: `${wo.code}: materials short`,
+        detail: short.map((s) => `${name(s.itemId)} short ${q(s.shortage, items.get(s.itemId)?.uom)}`).join(", "),
+        to: `/work-orders/${wo.id}`,
+        action: "Create purchase",
       });
     }
     const useRemnant = requirements(db, wo).filter((r) => r.remaining > EPS && r.freeRemnant > EPS);
@@ -216,21 +216,21 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `wo-remnant-${wo.id}`,
         severity: "accent",
-        title: `${wo.code}: ada sisa material yang bisa dipakai`,
+        title: `${wo.code}: offcuts available to use`,
         detail: useRemnant
           .map((r) => `${name(r.itemId)} ${q(Math.min(r.freeRemnant, r.remaining), items.get(r.itemId)?.uom)}`)
           .join(", "),
-        to: `/produksi/${wo.id}`,
-        action: "Ambil bahan",
+        to: `/work-orders/${wo.id}`,
+        action: "Issue materials",
       });
     }
     if (wo.dueDate && wo.dueDate < asOf) {
       out.push({
         id: `wo-late-${wo.id}`,
         severity: "warning",
-        title: `${wo.code} melewati target`,
-        detail: `${wo.title} — target ${wo.dueDate}.`,
-        to: `/produksi/${wo.id}`,
+        title: `${wo.code} is past its due date`,
+        detail: `${wo.title} — due ${wo.dueDate}.`,
+        to: `/work-orders/${wo.id}`,
       });
     }
   }
@@ -242,10 +242,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `wo-comp-${wo.id}`,
         severity: "accent",
-        title: `${wo.code}: komponen bisa diproduksi sendiri`,
+        title: `${wo.code}: components can be made in-house`,
         detail: comps.map((c) => `${name(c.itemId)} ${q(c.shortage - c.inComponentOrders, items.get(c.itemId)?.uom)}`).join(", "),
-        to: `/produksi/${wo.id}`,
-        action: "Buat perintah komponen",
+        to: `/work-orders/${wo.id}`,
+        action: "Create component work order",
       });
     }
   }
@@ -258,10 +258,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `dp-${so.id}`,
         severity: "warning",
-        title: `${so.code}: DP ${so.dpPercent}% belum diterima`,
-        detail: `Kurang ${rupiah((dp.required - dp.received) * so.exchangeRate)} — pertimbangkan menahan produksi.`,
-        to: `/penjualan/${so.id}`,
-        action: "Catat pembayaran",
+        title: `${so.code}: ${so.dpPercent}% down payment not received`,
+        detail: `${rupiah((dp.required - dp.received) * so.exchangeRate)} still due — consider holding production.`,
+        to: `/sales/${so.id}`,
+        action: "Record payment",
       });
     }
   }
@@ -270,10 +270,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
     out.push({
       id: "ar-overdue",
       severity: "danger",
-      title: `${ar.length} tagihan lewat jatuh tempo`,
-      detail: `Total ${rupiah(sum(ar.map((r) => r.balanceIdr)))} — terlama ${Math.max(...ar.map((r) => r.overdueDays))} hari (${ar[0]!.code}).`,
-      to: "/keuangan",
-      action: "Lihat piutang",
+      title: `${ar.length} ${ar.length === 1 ? "invoice" : "invoices"} overdue`,
+      detail: `Total ${rupiah(sum(ar.map((r) => r.balanceIdr)))} — oldest ${Math.max(...ar.map((r) => r.overdueDays))} days (${ar[0]!.code}).`,
+      to: "/finance",
+      action: "View receivables",
     });
   }
   const ap = payables(db, asOf).filter((p) => p.overdueDays >= -3);
@@ -281,10 +281,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
     out.push({
       id: "ap-due",
       severity: "warning",
-      title: `${ap.length} utang pemasok jatuh tempo ≤ 3 hari`,
+      title: `${ap.length} supplier ${ap.length === 1 ? "bill" : "bills"} due within 3 days`,
       detail: `Total ${rupiah(sum(ap.map((p) => p.balanceIdr)))}.`,
-      to: "/keuangan",
-      action: "Lihat utang",
+      to: "/finance",
+      action: "View payables",
     });
   }
   const refunds = refundsDue(db);
@@ -292,10 +292,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
     out.push({
       id: "refunds",
       severity: "warning",
-      title: `${refunds.length} deposit sewa harus dikembalikan`,
+      title: `${refunds.length} rental ${refunds.length === 1 ? "deposit" : "deposits"} to refund`,
       detail: refunds.map((r) => `${r.code} ${rupiah(-r.balanceIdr)}`).join(", "),
-      to: `/sewa/${refunds[0]!.id}`,
-      action: "Catat refund",
+      to: `/rentals/${refunds[0]!.id}`,
+      action: "Record refund",
     });
   }
 
@@ -305,13 +305,13 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
     out.push({
       id: "reorder",
       severity: "warning",
-      title: `${reorder.length} material perlu dibeli`,
+      title: `${reorder.length} ${reorder.length === 1 ? "material needs" : "materials need"} buying`,
       detail: reorder
         .slice(0, 3)
         .map((r) => `${r.item.name} ±${q(r.suggested, r.item.uom)}`)
         .join(", ") + (reorder.length > 3 ? ", …" : ""),
-      to: "/pembelian/baru?dari=saran",
-      action: "Buat pembelian",
+      to: "/purchases/new?from=suggestions",
+      action: "Create purchase",
     });
   }
 
@@ -321,10 +321,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
     out.push({
       id: "damaged",
       severity: "warning",
-      title: `${sum(damaged.map((l) => l.qty))} unit rusak menunggu perbaikan`,
+      title: `${sum(damaged.map((l) => l.qty))} damaged units waiting for repair`,
       detail: [...new Set(damaged.map((l) => name(l.itemId)))].join(", "),
-      to: "/stok/produk",
-      action: "Buat perintah perbaikan",
+      to: "/stock/products",
+      action: "Create repair work order",
     });
   }
 
@@ -334,9 +334,9 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
     out.push({
       id: "remnant-aging",
       severity: "accent",
-      title: `${aging.length} sisa material berumur > ${db.settings.remnantAgingDays} hari`,
-      detail: `Nilai ${rupiah(sum(aging.map((a) => a.value)))} tertahan. Pakai untuk produk kecil atau jual.`,
-      to: "/stok/sisa",
+      title: `${aging.length} ${aging.length === 1 ? "offcut" : "offcuts"} older than ${db.settings.remnantAgingDays} days`,
+      detail: `${rupiah(sum(aging.map((a) => a.value)))} tied up. Use them for small products or sell them.`,
+      to: "/stock/offcuts",
     });
   }
 
@@ -352,10 +352,10 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `leftover-${wo.id}`,
         severity: "success",
-        title: `Sisa pembelian ${wo.code} kini stok bebas`,
+        title: `Leftover purchase for ${wo.code} is now free stock`,
         detail: leftover.map((l) => `${name(l.itemId)} ${q(l.qty, items.get(l.itemId)?.uom)}`).join(", ") +
-          " — tercatat dengan harga beli aslinya untuk produksi berikutnya.",
-        to: "/stok/material",
+          " — kept at its original purchase price for the next job.",
+        to: "/stock/materials",
       });
     }
   }
@@ -368,9 +368,9 @@ export function insights(db: Db, asOf: ISODate = today()): Insight[] {
       out.push({
         id: `export-${so.id}`,
         severity: "warning",
-        title: `${so.code}: dokumen ekspor belum lengkap`,
-        detail: w[0]! + (w.length > 1 ? ` (+${w.length - 1} lainnya)` : ""),
-        to: `/penjualan/${so.id}`,
+        title: `${so.code}: export documents incomplete`,
+        detail: w[0]! + (w.length > 1 ? ` (+${w.length - 1} more)` : ""),
+        to: `/sales/${so.id}`,
       });
     }
   }
@@ -401,9 +401,9 @@ export function stageBoard(db: Db, asOf: ISODate = today()): StageColumn[] {
   for (const n of db.settings.defaultStages) col(n);
   for (const wo of db.workOrders.filter(isOpenWo)) {
     const stage = wo.status === "rencana" ? undefined : currentStage(wo);
-    const c = col(wo.status === "rencana" ? "Antre" : (stage?.name ?? "Siap ditutup"));
+    const c = col(wo.status === "rencana" ? "Queued" : (stage?.name ?? "Ready to close"));
     c.workOrders.push({ id: wo.id, code: wo.code, title: wo.title, dueDate: wo.dueDate, late: !!wo.dueDate && wo.dueDate < asOf, status: wo.status });
   }
-  const names = ["Antre", ...order.filter((n) => n !== "Antre" && n !== "Siap ditutup"), "Siap ditutup"];
+  const names = ["Queued", ...order.filter((n) => n !== "Queued" && n !== "Ready to close"), "Ready to close"];
   return names.filter((n) => columns.has(n)).map((n) => columns.get(n)!);
 }

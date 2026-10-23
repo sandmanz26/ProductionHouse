@@ -14,7 +14,7 @@ export function StagesPanel({ wo }: { wo: WorkOrder }) {
   const open = isOpenWo(wo);
   if (!wo.stages.length) return null;
   return (
-    <Section title="Tahapan" description="Tandai tahap yang sedang dan sudah dikerjakan." bodyClassName="p-0">
+    <Section title="Stages" description="Mark the stages in progress and done." bodyClassName="p-0">
       <ol className="divide-y divide-[var(--rule)]">
         {wo.stages.map((s, i) => {
           const hours = wo.laborLogs.filter((l) => l.stageId === s.id).reduce((a, l) => a + l.hours, 0);
@@ -24,25 +24,25 @@ export function StagesPanel({ wo }: { wo: WorkOrder }) {
               <span className="num w-5 text-xs text-muted">{i + 1}</span>
               <span className="min-w-28 flex-1 text-sm font-medium">{s.name}</span>
               <span className="num text-xs text-muted">
-                {hours > 0 && `${formatNumber(hours, 1)} jam`}
+                {hours > 0 && `${formatNumber(hours, 1)} h`}
                 {hours > 0 && pieces > 0 && " · "}
-                {pieces > 0 && `${formatNumber(pieces)} unit borongan`}
+                {pieces > 0 && `${formatNumber(pieces)} units piece rate`}
               </span>
               <StatusChip tone={STAGE_STATUS[s.status].tone}>{STAGE_STATUS[s.status].label}</StatusChip>
               {open && (
                 <span className="flex gap-1">
                   {s.status === "menunggu" && (
-                    <Button size="sm" variant="ghost" onPress={() => run((d) => setStageStatus(d, wo.id, s.id, "proses"), `${s.name} mulai dikerjakan`)}>
-                      Mulai
+                    <Button size="sm" variant="ghost" onPress={() => run((d) => setStageStatus(d, wo.id, s.id, "proses"), `${s.name} started`)}>
+                      Start
                     </Button>
                   )}
                   {s.status !== "selesai" && (
-                    <Button size="sm" variant="secondary" onPress={() => run((d) => setStageStatus(d, wo.id, s.id, "selesai"), `${s.name} selesai`)}>
-                      <Check className="size-3.5" /> Selesai
+                    <Button size="sm" variant="secondary" onPress={() => run((d) => setStageStatus(d, wo.id, s.id, "selesai"), `${s.name} done`)}>
+                      <Check className="size-3.5" /> Done
                     </Button>
                   )}
                   {s.status !== "menunggu" && (
-                    <Button size="sm" isIconOnly variant="ghost" aria-label={`Ulang ${s.name}`} onPress={() => run((d) => setStageStatus(d, wo.id, s.id, "menunggu"))}>
+                    <Button size="sm" isIconOnly variant="ghost" aria-label={`Reset ${s.name}`} onPress={() => run((d) => setStageStatus(d, wo.id, s.id, "menunggu"))}>
                       <RotateCcw className="size-3.5" />
                     </Button>
                   )}
@@ -56,7 +56,7 @@ export function StagesPanel({ wo }: { wo: WorkOrder }) {
   );
 }
 
-/** Labour booked against the order: harian (hours) or borongan (pieces). */
+/** Labour booked against the order: daily (hours) or piece rate (pieces). */
 export function LaborPanel({ wo }: { wo: WorkOrder }) {
   const run = useRun();
   const [adding, setAdding] = useState(false);
@@ -65,16 +65,16 @@ export function LaborPanel({ wo }: { wo: WorkOrder }) {
   const stageName = (id?: ID) => wo.stages.find((s) => s.id === id)?.name ?? "—";
   return (
     <Section
-      title="Catatan kerja"
+      title="Labour log"
       description={
         wo.laborLogs.length
-          ? `Biaya tenaga kerja dihitung dari catatan ini: ${formatIDR(total.amount)}`
-          : `Belum ada catatan — HPP memakai rencana ${formatNumber(wo.laborHours, 1)} jam × ${formatIDR(wo.laborRate)}`
+          ? `Labour cost comes from this log: ${formatIDR(total.amount)}`
+          : `No entries yet — the cost uses the plan of ${formatNumber(wo.laborHours, 1)} h × ${formatIDR(wo.laborRate)}`
       }
       actions={
         open && (
           <Button size="sm" variant="secondary" onPress={() => setAdding(true)}>
-            <Plus className="size-3.5" /> Catat kerja
+            <Plus className="size-3.5" /> Log labour
           </Button>
         )
       }
@@ -90,13 +90,13 @@ export function LaborPanel({ wo }: { wo: WorkOrder }) {
                 </p>
                 <p className="num text-xs text-muted">
                   {formatDateTime(l.at)}
-                  {l.hours > 0 && ` · ${formatNumber(l.hours, 1)} j × ${formatIDR(l.rate)}`}
-                  {l.pieces > 0 && ` · ${formatNumber(l.pieces)} unit × ${formatIDR(l.pieceRate)}`}
+                  {l.hours > 0 && ` · ${formatNumber(l.hours, 1)} h × ${formatIDR(l.rate)}`}
+                  {l.pieces > 0 && ` · ${formatNumber(l.pieces)} units × ${formatIDR(l.pieceRate)}`}
                 </p>
               </div>
               <span className="num text-sm">{formatIDR(laborLogCost(l))}</span>
               {open ? (
-                <Button size="sm" isIconOnly variant="ghost" aria-label="Hapus catatan" onPress={() => run((d) => removeLaborLog(d, wo.id, l.id), "Catatan dihapus")}>
+                <Button size="sm" isIconOnly variant="ghost" aria-label="Delete entry" onPress={() => run((d) => removeLaborLog(d, wo.id, l.id), "Entry deleted")}>
                   <Trash2 className="size-3.5" />
                 </Button>
               ) : (
@@ -113,7 +113,7 @@ export function LaborPanel({ wo }: { wo: WorkOrder }) {
 
 function LaborDialog({ wo, isOpen, onOpenChange }: { wo: WorkOrder; isOpen: boolean; onOpenChange: (o: boolean) => void }) {
   return (
-    <TaskModal isOpen={isOpen} onOpenChange={onOpenChange} size="md" title="Catat kerja" description="Harian: jam × tarif. Borongan: jumlah unit × tarif per unit.">
+    <TaskModal isOpen={isOpen} onOpenChange={onOpenChange} size="md" title="Log labour" description="Daily: hours × rate. Piece rate: units × rate per unit.">
       {isOpen && <LaborForm wo={wo} onDone={() => onOpenChange(false)} />}
     </TaskModal>
   );
@@ -142,15 +142,15 @@ function LaborForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
           const v = [...keys][0];
           if (v) setMode(v as "harian" | "borongan");
         }}
-        aria-label="Cara bayar"
+        aria-label="Pay basis"
       >
-        <ToggleButton id="harian">Harian (jam)</ToggleButton>
-        <ToggleButton id="borongan">Borongan (per unit)</ToggleButton>
+        <ToggleButton id="harian">Daily (hours)</ToggleButton>
+        <ToggleButton id="borongan">Piece rate (per unit)</ToggleButton>
       </ToggleButtonGroup>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <TextInput label="Pekerja / tim" value={worker} onChange={setWorker} placeholder="mis. Tim Pak Darto" isRequired />
+        <TextInput label="Worker / team" value={worker} onChange={setWorker} placeholder="e.g. Pak Darto's team" isRequired />
         {wo.stages.length > 0 && (
-          <SelectInput label="Tahap" value={stageId} onChange={setStageId} options={wo.stages.map((s) => ({ id: s.id, label: s.name }))} />
+          <SelectInput label="Stage" value={stageId} onChange={setStageId} options={wo.stages.map((s) => ({ id: s.id, label: s.name }))} />
         )}
       </div>
       {recentWorkers.length > 0 && (
@@ -164,21 +164,21 @@ function LaborForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
       )}
       {mode === "harian" ? (
         <div className="grid grid-cols-2 gap-3">
-          <NumberInput label="Jam" value={hours} onChange={setHours} suffix="jam" />
-          <NumberInput label="Tarif per jam" value={rate} onChange={setRate} money />
+          <NumberInput label="Hours" value={hours} onChange={setHours} suffix="h" />
+          <NumberInput label="Hourly rate" value={rate} onChange={setRate} money />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <NumberInput label="Unit selesai" value={pieces} onChange={setPieces} maximumFractionDigits={0} />
-          <NumberInput label="Tarif per unit" value={pieceRate} onChange={setPieceRate} money />
+          <NumberInput label="Units done" value={pieces} onChange={setPieces} maximumFractionDigits={0} />
+          <NumberInput label="Rate per unit" value={pieceRate} onChange={setPieceRate} money />
         </div>
       )}
-      <TextInput label="Catatan" value={note} onChange={setNote} />
+      <TextInput label="Note" value={note} onChange={setNote} />
       <div className="flex items-center justify-between gap-3 border-t border-[var(--rule)] pt-3">
         <span className="num text-sm">{formatIDR(amount)}</span>
         <div className="flex gap-2">
           <Button variant="tertiary" onPress={onDone}>
-            Batal
+            Cancel
           </Button>
           <Button
             onPress={() => {
@@ -190,12 +190,12 @@ function LaborForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                     note: note || undefined,
                     ...(mode === "harian" ? { hours, rate } : { pieces, pieceRate }),
                   }),
-                "Kerja tercatat",
+                "Labour logged",
               );
               if (ok) onDone();
             }}
           >
-            Simpan
+            Save
           </Button>
         </div>
       </div>

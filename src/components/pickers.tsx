@@ -8,7 +8,7 @@ export function ItemPicker({
   value,
   onChange,
   kind,
-  label = kind === "product" ? "Produk" : kind === "material" ? "Material" : "Item",
+  label = kind === "product" ? "Product" : kind === "material" ? "Material" : "Item",
   exclude,
   filter,
   isRequired,
@@ -38,7 +38,7 @@ export function ItemPicker({
           return {
             id: i.id,
             label: i.name,
-            description: `${i.sku} · stok ${formatQty(s?.available ?? 0, i.uom)}${s?.remnant ? ` (sisa ${formatQty(s.remnant, i.uom)})` : ""}`,
+            description: `${i.sku} · stock ${formatQty(s?.available ?? 0, i.uom)}${s?.remnant ? ` (offcuts ${formatQty(s.remnant, i.uom)})` : ""}`,
           };
         }),
     [db.items, kind, stock, value, exclude, filter],
@@ -50,7 +50,7 @@ export function ItemPicker({
       value={value}
       onChange={onChange}
       options={options}
-      placeholder="Ketik nama atau kode…"
+      placeholder="Type a name or code…"
       isRequired={isRequired}
       className={className}
     />
@@ -61,7 +61,7 @@ export function PartnerPicker({
   value,
   onChange,
   role,
-  label = role === "customer" ? "Pelanggan" : "Pemasok",
+  label = role === "customer" ? "Customer" : "Supplier",
 }: {
   value: ID | null;
   onChange: (id: ID | null) => void;
@@ -77,5 +77,5 @@ export function PartnerPicker({
         .map((p) => ({ id: p.id, label: p.name, description: [p.contact, p.country ?? p.address].filter(Boolean).join(" · ") })),
     [db.partners, role],
   );
-  return <SearchPicker label={label} value={value} onChange={onChange} options={options} placeholder="Cari nama…" />;
+  return <SearchPicker label={label} value={value} onChange={onChange} options={options} placeholder="Search name…" />;
 }

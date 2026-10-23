@@ -24,7 +24,7 @@ export default function RecipesPage() {
   const columns: Column<Recipe>[] = [
     {
       key: "name",
-      header: "Resep",
+      header: "Recipe",
       isRowHeader: true,
       cell: (r) => (
         <div className="sm:min-w-44">
@@ -33,10 +33,10 @@ export default function RecipesPage() {
         </div>
       ),
     },
-    { key: "type", header: "Jenis", cell: (r) => <Tag>{WO_TYPE[r.type].short}</Tag> },
+    { key: "type", header: "Type", cell: (r) => <Tag>{WO_TYPE[r.type].short}</Tag> },
     {
       key: "flow",
-      header: "Masuk → hasil",
+      header: "In → output",
       cell: (r) => (
         <p className="text-[13px] break-words sm:min-w-56">
           <span className="text-muted">{r.inputs.map((l) => item(l.itemId)?.name).join(" + ")}</span>
@@ -47,43 +47,43 @@ export default function RecipesPage() {
     },
     {
       key: "cost",
-      header: "HPP standar / unit",
+      header: "Standard cost / unit",
       align: "end",
       cell: (r) => {
         const main = recipeCost(db, r).outputs[0];
         return main ? formatIDR(main.unitCost) : "—";
       },
     },
-    { key: "uses", header: "Dipakai", align: "end", cell: (r) => (uses.get(r.id) ? `${uses.get(r.id)}×` : <span className="text-muted">—</span>) },
-    { key: "status", header: "", cell: (r) => (r.archived ? <StatusChip tone="default">Diarsipkan</StatusChip> : null) },
+    { key: "uses", header: "In use", align: "end", cell: (r) => (uses.get(r.id) ? `${uses.get(r.id)}×` : <span className="text-muted">—</span>) },
+    { key: "status", header: "", cell: (r) => (r.archived ? <StatusChip tone="default">Archived</StatusChip> : null) },
   ];
 
   return (
     <>
       <PageHeader
-        title="Resep proses"
-        description="Cara membuat sesuatu, sekali ditulis dan dipakai berulang: bahan, hasil (boleh lebih dari satu), jam kerja, tahapan, dan sisa yang biasanya jatuh."
+        title="Recipes"
+        description="How to make something, written once and used again: materials, output (more than one is fine), labour hours, stages and the offcuts it usually leaves."
         actions={
-          <Button onPress={() => navigate("/resep/baru")}>
-            <Plus className="size-4" /> Resep baru
+          <Button onPress={() => navigate("/recipes/new")}>
+            <Plus className="size-4" /> New recipe
           </Button>
         }
       />
       <div className="mb-3 flex justify-end">
-        <SwitchInput isSelected={showArchived} onChange={setShowArchived} label="Tampilkan yang diarsipkan" />
+        <SwitchInput isSelected={showArchived} onChange={setShowArchived} label="Show archived" />
       </div>
       <DataTable
-        label="Resep proses"
+        label="Recipes"
         columns={columns}
         rows={rows}
-        onRowAction={(r) => navigate(`/resep/${r.id}`)}
+        onRowAction={(r) => navigate(`/recipes/${r.id}`)}
         dependencies={[uses]}
         empty={
           <EmptyBlock
             icon={<BookOpen className="size-5" />}
-            title="Belum ada resep"
-            description="Mulai dari proses yang paling sering diulang: satu jenis kursi, laminasi panel dari potongan sisa, atau set meja makan."
-            action={<Button onPress={() => navigate("/resep/baru")}>Tulis resep pertama</Button>}
+            title="No recipes yet"
+            description="Start with the process you repeat most: one chair model, panels laminated from offcuts, or a dining set."
+            action={<Button onPress={() => navigate("/recipes/new")}>Write the first recipe</Button>}
           />
         }
       />

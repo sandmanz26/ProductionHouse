@@ -7,8 +7,8 @@ export { COSTING_METHODS, costingMethodOf, isCostingMethod, layerOrder } from ".
 export const COSTING_LABEL: Record<CostingMethod, string> = {
   fifo: "FIFO",
   lifo: "LIFO",
-  rata_rata: "Rata-rata bergerak",
-  identifikasi: "Identifikasi khusus",
+  rata_rata: "Moving average",
+  identifikasi: "Specific identification",
 };
 
 /** Where each formula may be used in Indonesia. */
@@ -49,7 +49,7 @@ export function assertCostOrder(db: Db, lotId: ID) {
   const first = db.lots.filter((l) => l.itemId === lot.itemId && isOrderedLot(l)).sort(layerOrder(method))[0];
   assert(
     !first || first.id === lot.id,
-    `Metode ${COSTING_LABEL[method]}: habiskan dulu ${first?.code} (${first?.location}, sisa ${roundQty(first?.qty ?? 0)} ${item.uom}) sebelum mengambil ${lot.code}.`,
+    `${COSTING_LABEL[method]}: use up ${first?.code} first (${first?.location}, ${roundQty(first?.qty ?? 0)} ${item.uom} left) before taking ${lot.code}.`,
   );
 }
 
@@ -58,7 +58,7 @@ export function setCostingMethod(db: Db, method: CostingMethod | null, opts: { i
   const at = opts.at ?? nowIso();
   if (opts.itemId) {
     const item = getItem(db, opts.itemId);
-    assert(method === null || isCostingMethod(method), "Metode biaya tidak dikenal.");
+    assert(method === null || isCostingMethod(method), "Unknown costing method — pick one from the list.");
     const from = costingMethodOf(db, item);
     item.costingMethod = method ?? undefined;
     const to = costingMethodOf(db, item);
@@ -68,7 +68,7 @@ export function setCostingMethod(db: Db, method: CostingMethod | null, opts: { i
     }
     return to;
   }
-  assert(method && isCostingMethod(method), "Metode biaya tidak dikenal.");
+  assert(method && isCostingMethod(method), "Unknown costing method — pick one from the list.");
   const from = db.settings.costingMethod;
   if (from === method) return method;
   db.settings.costingMethod = method;

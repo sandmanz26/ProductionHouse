@@ -56,7 +56,7 @@ function layout(g: RouteGraph) {
 
 /**
  * Left to right: raw materials → the routes that turn them into things → the item you clicked.
- * Several routes into one item are alternatives ("atau"). Click any item to re-centre on it.
+ * Several routes into one item are alternatives ("or"). Click any item to re-centre on it.
  */
 export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: string; label: string }) {
   const navigate = useNavigate();
@@ -111,9 +111,9 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
   const sortedIncoming = (id: string) => (incoming.get(id) ?? []).slice().sort((a, b) => (boxes.get(a)?.y ?? 0) - (boxes.get(b)?.y ?? 0));
 
   const go = (n: Box) => {
-    if (n.type === "item" && n.itemId && n.id !== rootId) navigate(`/jalur/${n.itemId}`);
-    else if (n.type === "cycle" && n.itemId) navigate(`/jalur/${n.itemId}`);
-    else if (n.type === "route" && n.route?.recipeId) navigate(`/resep/${n.route.recipeId}`);
+    if (n.type === "item" && n.itemId && n.id !== rootId) navigate(`/routes/${n.itemId}`);
+    else if (n.type === "cycle" && n.itemId) navigate(`/routes/${n.itemId}`);
+    else if (n.type === "route" && n.route?.recipeId) navigate(`/recipes/${n.route.recipeId}`);
   };
   const clickable = (n: Box) => (n.type === "item" && n.id !== rootId) || n.type === "cycle" || !!n.route?.recipeId;
   const onKey = (n: Box) => (e: KeyboardEvent) => {
@@ -136,7 +136,7 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
   return (
     <figure className="m-0" aria-label={label}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 pt-3">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Keterangan jalur">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Route key">
           {legend.map(([text, color]) => (
             <li key={text} className="inline-flex items-center gap-1.5">
               <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: color }} />
@@ -144,14 +144,14 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
             </li>
           ))}
           <li className="inline-flex items-center gap-1.5">
-            <span aria-hidden>↺</span> kembali ke barang di hilir (siklus)
+            <span aria-hidden>↺</span> loops back to a downstream item (cycle)
           </li>
         </ul>
         <div className="flex items-center gap-3">
-          {narrow && !asTable && <span className="text-xs text-muted">← Geser untuk melihat bahan lebih hulu</span>}
+          {narrow && !asTable && <span className="text-xs text-muted">← Scroll to see materials further upstream</span>}
           <Button size="sm" variant="ghost" onPress={() => setAsTable((v) => !v)} aria-pressed={asTable}>
             {asTable ? <Workflow className="size-4" /> : <Table2 className="size-4" />}
-            {asTable ? "Peta" : "Tabel"}
+            {asTable ? "Map" : "Table"}
           </Button>
         </div>
       </div>
@@ -162,8 +162,8 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
             <caption className="sr-only">{label}</caption>
             <thead>
               <tr className="border-b border-[var(--rule)] text-left text-xs text-muted">
-                <th className="py-2 font-medium">Bahan / jalur</th>
-                <th className="py-2 font-medium">Masuk ke</th>
+                <th className="py-2 font-medium">Material / route</th>
+                <th className="py-2 font-medium">Goes into</th>
                 <th className="py-2 text-right font-medium">Per unit</th>
               </tr>
             </thead>
@@ -171,7 +171,7 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
               {graph.edges.map((e, i) => {
                 const from = boxes.get(e.from)!;
                 const to = boxes.get(e.to)!;
-                const fromLabel = from.type === "route" ? `${ROUTE_TAG[from.route!.kind].tag} · ${from.route!.label}` : `${name(from.itemId)}${from.type === "cycle" ? " (siklus)" : ""}`;
+                const fromLabel = from.type === "route" ? `${ROUTE_TAG[from.route!.kind].tag} · ${from.route!.label}` : `${name(from.itemId)}${from.type === "cycle" ? " (cycle)" : ""}`;
                 const toLabel = to.type === "route" ? `${ROUTE_TAG[to.route!.kind].tag} · ${to.route!.label}` : name(to.itemId);
                 return (
                   <tr key={i} className="border-b border-[var(--rule)] last:border-0">
@@ -186,7 +186,7 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
         </div>
       ) : (
         <div ref={wrap} className="relative overflow-x-auto px-4 pb-3" onMouseLeave={() => setHover(null)}>
-          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: ${graph.nodes.filter((n) => n.type === "route").length} jalur`} className="block">
+          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: ${graph.nodes.filter((n) => n.type === "route").length} routes`} className="block">
             <g fill="none">
               {graph.edges.map((e, i) => {
                 const a = boxes.get(e.from)!;
@@ -227,7 +227,7 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
               if (n.type === "route") {
                 const r = n.route!;
                 const t = ROUTE_TAG[r.kind];
-                const line2 = [`${formatIDRCompact(r.unitCost)}/${uom(graph.nodes.find((x) => x.id === graph.edges.find((e) => e.from === n.id)?.to)?.itemId)}`, r.uses ? `dipakai ${r.uses}×` : "belum dipakai", n.hiddenAux ? `+${n.hiddenAux} pembantu` : ""].filter(Boolean).join(" · ");
+                const line2 = [`${formatIDRCompact(r.unitCost)}/${uom(graph.nodes.find((x) => x.id === graph.edges.find((e) => e.from === n.id)?.to)?.itemId)}`, r.uses ? `used ${r.uses}×` : "not used yet", n.hiddenAux ? `+${n.hiddenAux} auxiliary` : ""].filter(Boolean).join(" · ");
                 return (
                   <g key={n.id} {...common} aria-label={`${t.tag} ${r.label}`}>
                     <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={n.h / 2} fill="var(--surface)" stroke={t.color} strokeWidth={1.5} strokeDasharray={r.byProduct ? "5 3" : undefined} />
@@ -245,7 +245,7 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
               }
               if (n.type === "cycle") {
                 return (
-                  <g key={n.id} {...common} aria-label={`Siklus ke ${name(n.itemId)}`}>
+                  <g key={n.id} {...common} aria-label={`Cycle to ${name(n.itemId)}`}>
                     <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={4} fill="var(--background)" stroke="var(--rule)" strokeDasharray="4 3" />
                     <text x={n.x + 12} y={n.y + n.h / 2} dominantBaseline="middle" className="fill-muted text-[11px]">
                       ↺ {clip(name(n.itemId), 24)}
@@ -256,16 +256,16 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
               const it = item(n.itemId);
               const s = n.itemId ? stock.get(n.itemId) : undefined;
               const stripe = it?.kind === "product" ? "var(--flow-produk)" : "var(--flow-bahan)";
-              const line3 = n.buyOnly ? `dibeli · ${n.buyOnly.suppliers?.[0]?.name ?? "pemasok"}` : n.more ? "jalur lebih jauh — klik →" : isRoot ? "barang yang dipetakan" : "";
+              const line3 = n.buyOnly ? `bought · ${n.buyOnly.suppliers?.[0]?.name ?? "supplier"}` : n.more ? "more routes — click →" : isRoot ? "item being mapped" : "";
               return (
-                <g key={n.id} {...common} aria-label={`${it?.name ?? "?"}${n.buyOnly ? ", dibeli" : ""}`}>
+                <g key={n.id} {...common} aria-label={`${it?.name ?? "?"}${n.buyOnly ? ", bought" : ""}`}>
                   <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={4} fill="var(--surface)" stroke={isRoot ? "var(--accent)" : "var(--rule)"} strokeWidth={isRoot ? 2 : 1} />
                   <rect x={n.x} y={n.y} width={4} height={n.h} rx={2} fill={stripe} />
                   <text x={n.x + 14} y={n.y + 19} className="fill-foreground text-[12px] font-medium">
                     {clip(it?.name ?? "?", 26)}
                   </text>
                   <text x={n.x + 14} y={n.y + 36} className="num fill-muted text-[10px]">
-                    {clip(`stok ${formatQty(s?.available ?? 0, it?.uom)} · ${formatIDRCompact(it?.standardCost ?? 0)}`, 34)}
+                    {clip(`stock ${formatQty(s?.available ?? 0, it?.uom)} · ${formatIDRCompact(it?.standardCost ?? 0)}`, 34)}
                   </text>
                   {line3 && (
                     <text x={n.x + 14} y={n.y + 52} className="text-[10px]" style={{ fill: n.buyOnly ? ROUTE_TAG.beli.color : "var(--ink-soft)" }}>
@@ -301,12 +301,12 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
                   )}
                   {hovered.route.suppliers?.map((sp) => (
                     <p key={sp.name} className="mt-0.5">
-                      {sp.name} · {sp.count}× · terakhir {formatIDRCompact(sp.lastUnitCost)}
+                      {sp.name} · {sp.count}× · last {formatIDRCompact(sp.lastUnitCost)}
                     </p>
                   ))}
                   <p className="mt-1 text-muted">
-                    {hovered.route.byProduct ? "Hasil sampingan saat membongkar. " : ""}
-                    {hovered.route.recipeId ? "Klik untuk membuka resep." : ""}
+                    {hovered.route.byProduct ? "By-product of dismantling. " : ""}
+                    {hovered.route.recipeId ? "Click to open the recipe." : ""}
                   </p>
                 </>
               ) : (
@@ -314,12 +314,12 @@ export function RouteMap({ graph, rootId, label }: { graph: RouteGraph; rootId: 
                   <p className="font-medium">{name(hovered.itemId)}</p>
                   <p className="text-muted">
                     {hovered.type === "cycle"
-                      ? "Barang ini sudah ada di hilir — jalurnya berputar kembali."
+                      ? "This item is already downstream — the route loops back."
                       : hovered.buyOnly
-                        ? `Hanya dibeli${hovered.buyOnly.suppliers?.length ? `: ${hovered.buyOnly.suppliers.map((x) => x.name).join(", ")}` : ""}.`
+                        ? `Only bought${hovered.buyOnly.suppliers?.length ? `: ${hovered.buyOnly.suppliers.map((x) => x.name).join(", ")}` : ""}.`
                         : hovered.id === rootId
-                          ? "Barang yang sedang dipetakan."
-                          : "Klik untuk memetakan barang ini."}
+                          ? "The item being mapped."
+                          : "Click to map this item."}
                   </p>
                 </>
               )}

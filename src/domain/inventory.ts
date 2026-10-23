@@ -1,4 +1,4 @@
-import { assert, assertAmount, assertDimensions, assertLocation, createLot, EPS, getItem, getLot, nextCode, recordMove, roundQty, splitLot, takeFromLot } from "./core";
+import { assert, assertAmount, assertDimensions, assertLocation, createLot, EPS, getItem, getLot, LOT_STATE, nextCode, recordMove, roundQty, splitLot, takeFromLot } from "./core";
 import type { Db, Dimensions, DocRef, ID } from "./types";
 
 export interface OpeningStockInput {
@@ -38,27 +38,27 @@ export function addOpeningStock(db: Db, input: OpeningStockInput) {
   return lot;
 }
 
-/** Stock opname: sets a lot to the physically counted quantity. */
+/** Stock count: sets a lot to the physically counted quantity. */
 export function adjustLotQty(db: Db, lotId: ID, countedQty: number, note?: string) {
   const lot = getLot(db, lotId);
-  assertAmount(countedQty, "Qty hitung fisik");
-  assert(lot.status !== "disewa", `Lot ${lot.code} sedang disewa — hitung ulang setelah unit kembali.`);
+  assertAmount(countedQty, "Counted qty");
+  assert(lot.status !== "disewa", `Lot ${lot.code} is on rent — count it again after the unit comes back.`);
   const diff = roundQty(countedQty - lot.qty);
   if (Math.abs(diff) < EPS) return lot;
   const ref = adjustmentRef(db);
   lot.qty = roundQty(countedQty);
-  recordMove(db, { lot, qty: diff, type: "penyesuaian", ref, note: note || "Stok opname" });
+  recordMove(db, { lot, qty: diff, type: "penyesuaian", ref, note: note || "Stock count" });
   return lot;
 }
 
 /** Writes a remnant (or any available lot) off as waste. */
 export function scrapLot(db: Db, lotId: ID, note?: string) {
   const lot = getLot(db, lotId);
-  assert(lot.status !== "disewa", `Lot ${lot.code} sedang disewa dan tidak bisa dibuang.`);
-  assert(lot.qty > EPS, "Lot sudah kosong.");
+  assert(lot.status !== "disewa", `Lot ${lot.code} is on rent and cannot be scrapped — take it back first.`);
+  assert(lot.qty > EPS, "Lot is already empty.");
   const ref = adjustmentRef(db);
   return takeFromLot(db, lotId, lot.qty, "limbah", ref, {
-    note: note || "Dibuang sebagai limbah",
+    note: note || "Scrapped as waste",
     allowStatus: ["tersedia", "rusak"],
   });
 }
@@ -73,7 +73,7 @@ export function updateLotInfo(
   assertDimensions(patch.dimensions);
   if (patch.reservedForWo) {
     const wo = db.workOrders.find((w) => w.id === patch.reservedForWo);
-    assert(wo && (wo.status === "rencana" || wo.status === "berjalan"), "Perintah kerja untuk cadangan tidak aktif.");
+    assert(wo && (wo.status === "rencana" || wo.status === "berjalan"), "The work order to reserve for is not active — pick a planned or in-progress one.");
   }
   if (patch.location !== undefined) lot.location = patch.location;
   if (patch.dimensions !== undefined) lot.dimensions = patch.dimensions ?? undefined;
@@ -85,24 +85,24 @@ export function updateLotInfo(
 /** Re-labels a damaged unit as usable without a repair order (e.g. minor clean-up). */
 export function markLotUsable(db: Db, lotId: ID, note?: string) {
   const lot = getLot(db, lotId);
-  assert(lot.status === "rusak", "Hanya unit rusak yang bisa ditandai layak.");
+  assert(lot.status === "rusak", "Only damaged units can be marked usable.");
   lot.status = "tersedia";
-  recordMove(db, { lot, qty: 0, type: "penyesuaian", ref: adjustmentRef(db), note: note || "Ditandai layak pakai" });
+  recordMove(db, { lot, qty: 0, type: "penyesuaian", ref: adjustmentRef(db), note: note || "Marked usable" });
   return lot;
 }
 
 /** Moves part (or all) of a lot to another location, keeping its cost. */
 export function transferLot(db: Db, lotId: ID, qty: number, toLocation: string, note?: string) {
   const lot = getLot(db, lotId);
-  assert(lot.status === "tersedia", `Lot ${lot.code} tidak bisa dipindah karena berstatus ${lot.status}.`);
-  assert(toLocation.trim(), "Pilih lokasi tujuan.");
-  assert(toLocation !== lot.location, "Lokasi tujuan sama dengan lokasi sekarang.");
+  assert(lot.status === "tersedia", `Lot ${lot.code} is ${LOT_STATE[lot.status]} and cannot be transferred.`);
+  assert(toLocation.trim(), "Choose a destination location.");
+  assert(toLocation !== lot.location, "Destination is the same as the current location — choose another.");
   assertLocation(db, toLocation);
-  assert(Number.isFinite(qty) && qty > EPS && qty <= lot.qty + EPS, `Qty pindah melebihi stok lot ${lot.code}.`);
+  assert(Number.isFinite(qty) && qty > EPS && qty <= lot.qty + EPS, `Transfer qty is more than lot ${lot.code} holds.`);
   const ref = adjustmentRef(db);
   const moved = splitLot(db, lot.id, qty, "transfer", ref);
   moved.location = toLocation;
-  recordMove(db, { lot: moved, qty: 0, type: "transfer", ref, note: note || `Pindah ke ${toLocation}` });
+  recordMove(db, { lot: moved, qty: 0, type: "transfer", ref, note: note || `Transferred to ${toLocation}` });
   return moved;
 }
 
@@ -113,16 +113,16 @@ export function transferLot(db: Db, lotId: ID, qty: number, toLocation: string, 
  */
 export function mergeLots(db: Db, lotIds: ID[], opts: { location?: string; dimensions?: Dimensions; note?: string } = {}) {
   const ids = [...new Set(lotIds)];
-  assert(ids.length >= 2, "Pilih minimal dua lot untuk digabung.");
+  assert(ids.length >= 2, "Choose at least two lots to merge.");
   const lots = ids.map((id) => getLot(db, id));
   const first = lots[0]!;
   const item = getItem(db, first.itemId);
   for (const l of lots) {
-    assert(l.itemId === first.itemId, "Hanya lot dari barang yang sama yang bisa digabung.");
-    assert(l.status === "tersedia", `Lot ${l.code} berstatus ${l.status} dan tidak bisa digabung.`);
-    assert(l.qty > EPS, `Lot ${l.code} sudah kosong.`);
-    assert(l.isRemnant === first.isRemnant, "Sisa material tidak bisa digabung dengan stok biasa.");
-    assert((l.reservedForWo ?? null) === (first.reservedForWo ?? null), "Lot yang dicadangkan untuk pekerjaan berbeda tidak bisa digabung.");
+    assert(l.itemId === first.itemId, "Only lots of the same item can be merged.");
+    assert(l.status === "tersedia", `Lot ${l.code} is ${LOT_STATE[l.status]} and cannot be merged.`);
+    assert(l.qty > EPS, `Lot ${l.code} is already empty.`);
+    assert(l.isRemnant === first.isRemnant, "Offcuts cannot be merged with regular stock.");
+    assert((l.reservedForWo ?? null) === (first.reservedForWo ?? null), "Lots reserved for different work orders cannot be merged.");
   }
   const location = opts.location || first.location;
   assertLocation(db, location);
@@ -134,7 +134,7 @@ export function mergeLots(db: Db, lotIds: ID[], opts: { location?: string; dimen
   const oldest = lots.map((l) => l.createdAt).sort()[0]!;
   const codes = lots.map((l) => l.code).join(", ");
   for (const l of lots) {
-    takeFromLot(db, l.id, l.qty, "gabung", ref, { at, note: "Digabung", allowStatus: ["tersedia"] });
+    takeFromLot(db, l.id, l.qty, "gabung", ref, { at, note: "Merged", allowStatus: ["tersedia"] });
   }
   const merged = createLot(db, {
     itemId: item.id,
@@ -149,8 +149,8 @@ export function mergeLots(db: Db, lotIds: ID[], opts: { location?: string; dimen
     status: "tersedia",
     createdAt: oldest,
     mergedFrom: lots.map((l) => l.id),
-    note: opts.note || `Gabungan ${codes}`,
+    note: opts.note || `Merged from ${codes}`,
   });
-  recordMove(db, { lot: merged, qty, type: "gabung", ref, at, note: `Dari ${codes}` });
+  recordMove(db, { lot: merged, qty, type: "gabung", ref, at, note: `From ${codes}` });
   return merged;
 }

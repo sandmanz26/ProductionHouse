@@ -24,6 +24,8 @@ import { WO_STATUS } from "@/lib/labels";
 import { useDb, useLookups } from "@/store/db-store";
 import { FirstSteps } from "./FirstSteps";
 
+const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+
 const SEVERITY_BAR: Record<InsightSeverity, string> = {
   danger: "bg-danger",
   warning: "bg-warning",
@@ -61,7 +63,7 @@ export default function DashboardPage() {
     };
   }, [db, t]);
 
-  const dateTitle = new Date(`${t}T00:00:00`).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateTitle = new Date(`${t}T00:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <>
@@ -69,15 +71,15 @@ export default function DashboardPage() {
 
       <MetricStrip
         items={[
-          { label: "Nilai stok", value: formatIDRCompact(data.valuation.total), hint: `sisa ${formatIDRCompact(data.valuation.remnants)}`, onPress: () => navigate("/stok/material") },
-          { label: "Produksi aktif", value: data.openWos.length, hint: `${data.openWos.filter((w) => w.dueDate && w.dueDate < t).length} lewat target`, onPress: () => navigate("/produksi/papan") },
-          { label: "Unit di klien", value: data.unitsOut, hint: data.lateRentals ? `${data.lateRentals} sewa terlambat` : "tepat waktu", tone: data.lateRentals ? "danger" : "default", onPress: () => navigate("/sewa") },
-          { label: "Piutang", value: formatIDRCompact(data.ar), hint: data.arOverdue ? `${formatIDRCompact(data.arOverdue)} lewat tempo` : "tidak ada yang lewat tempo", tone: data.arOverdue ? "danger" : "default", onPress: () => navigate("/keuangan") },
+          { label: "Stock value", value: formatIDRCompact(data.valuation.total), hint: `offcuts ${formatIDRCompact(data.valuation.remnants)}`, onPress: () => navigate("/stock/materials") },
+          { label: "Active production", value: data.openWos.length, hint: `${data.openWos.filter((w) => w.dueDate && w.dueDate < t).length} past target`, onPress: () => navigate("/board") },
+          { label: "Units with clients", value: data.unitsOut, hint: data.lateRentals ? `${data.lateRentals} rental${data.lateRentals === 1 ? "" : "s"} late` : "on time", tone: data.lateRentals ? "danger" : "default", onPress: () => navigate("/rentals") },
+          { label: "Receivables", value: formatIDRCompact(data.ar), hint: data.arOverdue ? `${formatIDRCompact(data.arOverdue)} overdue` : "nothing overdue", tone: data.arOverdue ? "danger" : "default", onPress: () => navigate("/finance") },
           {
-            label: "Penjualan bulan ini",
+            label: "Sales this month",
             value: formatIDRCompact(data.sales.revenueIdr),
-            hint: data.sales.revenueIdr ? `margin ${formatPct(data.sales.margin / data.sales.revenueIdr, 0)}` : `${data.sales.count} order`,
-            onPress: () => navigate("/penjualan"),
+            hint: data.sales.revenueIdr ? `margin ${formatPct(data.sales.margin / data.sales.revenueIdr, 0)}` : `${data.sales.count} order${data.sales.count === 1 ? "" : "s"}`,
+            onPress: () => navigate("/sales"),
           },
         ]}
       />
@@ -87,9 +89,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <Section title="Perlu tindakan" description={`${data.insights.length} hal, diurutkan dari yang paling mendesak`} bodyClassName="p-0">
+        <Section title="Needs attention" description={`${data.insights.length} item${data.insights.length === 1 ? "" : "s"}, most urgent first`} bodyClassName="p-0">
           {data.insights.length === 0 ? (
-            <EmptyBlock title="Semua beres" description="Tidak ada sewa telat, bahan kurang, atau tagihan lewat tempo." />
+            <EmptyBlock title="All clear" description="No late rentals, material shortages or overdue invoices." />
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {data.insights.slice(0, 10).map((ins) => (
@@ -101,7 +103,7 @@ export default function DashboardPage() {
                   </div>
                   {ins.to && (
                     <Link href={ins.to} className="shrink-0 text-[13px] font-medium whitespace-nowrap text-accent">
-                      {ins.action ?? "Buka"} →
+                      {ins.action ?? "Open"} →
                     </Link>
                   )}
                 </li>
@@ -112,17 +114,17 @@ export default function DashboardPage() {
 
         <Section
           className="xl:self-start"
-          title="Lantai produksi"
-          description="Pekerjaan aktif per tahap saat ini"
+          title="Shop floor"
+          description="Active work orders by current stage"
           actions={
-            <Button size="sm" variant="ghost" onPress={() => navigate("/produksi/papan")}>
-              Papan <ArrowRight className="size-3.5" />
+            <Button size="sm" variant="ghost" onPress={() => navigate("/board")}>
+              Board <ArrowRight className="size-3.5" />
             </Button>
           }
           bodyClassName="p-0"
         >
           {data.openWos.length === 0 ? (
-            <EmptyBlock title="Lantai produksi kosong" action={<Button size="sm" onPress={() => navigate("/produksi/baru")}>Buat perintah kerja</Button>} />
+            <EmptyBlock title="The shop floor is empty" action={<Button size="sm" onPress={() => navigate("/work-orders/new")}>Create a work order</Button>} />
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {data.board
@@ -132,7 +134,7 @@ export default function DashboardPage() {
                     <span className="text-sm">{c.name}</span>
                     <span className="flex flex-wrap justify-end gap-x-2 gap-y-0.5">
                       {c.workOrders.map((w) => (
-                        <Link key={w.id} href={`/produksi/${w.id}`} className={`num text-[13px] ${w.late ? "text-danger" : "text-foreground"}`}>
+                        <Link key={w.id} href={`/work-orders/${w.id}`} className={`num text-[13px] ${w.late ? "text-danger" : "text-foreground"}`}>
                           {w.code}
                         </Link>
                       ))}
@@ -145,9 +147,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Section title="Produksi aktif" bodyClassName="p-0">
+        <Section title="Active production" bodyClassName="p-0">
           {data.openWos.length === 0 ? (
-            <EmptyBlock title="Belum ada" />
+            <EmptyBlock title="None yet" />
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {data.openWos.slice(0, 7).map((wo) => {
@@ -155,7 +157,7 @@ export default function DashboardPage() {
                 const p = stageProgress(wo);
                 return (
                   <li key={wo.id}>
-                    <button type="button" onClick={() => navigate(`/produksi/${wo.id}`)} className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left hover:bg-default/40">
+                    <button type="button" onClick={() => navigate(`/work-orders/${wo.id}`)} className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left hover:bg-default/40">
                       <Code>{wo.code}</Code>
                       <div className="min-w-0">
                         <p className="truncate text-sm">{wo.title}</p>
@@ -163,7 +165,7 @@ export default function DashboardPage() {
                           <div className="h-1 flex-1 overflow-hidden rounded-full bg-default">
                             <div className={`h-full ${late ? "bg-danger" : "bg-accent"}`} style={{ width: `${Math.round(p * 100)}%` }} />
                           </div>
-                          <span className="text-xs text-muted">{wo.status === "rencana" ? WO_STATUS.rencana.label : (currentStage(wo)?.name ?? "Siap ditutup")}</span>
+                          <span className="text-xs text-muted">{wo.status === "rencana" ? WO_STATUS.rencana.label : (currentStage(wo)?.name ?? "Ready to close")}</span>
                         </div>
                       </div>
                       <span className={`num text-xs ${late ? "text-danger" : "text-muted"}`}>{wo.dueDate ? formatDate(wo.dueDate) : "—"}</span>
@@ -175,19 +177,19 @@ export default function DashboardPage() {
           )}
         </Section>
 
-        <Section title="Jadwal sewa & pinjam" bodyClassName="p-0">
+        <Section title="Rental & loan schedule" bodyClassName="p-0">
           {data.schedule.length === 0 ? (
-            <EmptyBlock title="Tidak ada jadwal" />
+            <EmptyBlock title="Nothing scheduled" />
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {data.schedule.map(({ r, ref }) => {
                 const out = r.status === "berjalan";
                 const d = diffDays(t, ref);
                 const late = out && d < 0;
-                const label = out ? (late ? `telat ${-d} hari` : d === 0 ? "kembali hari ini" : `kembali ${d} hari lagi`) : d <= 0 ? "serahkan hari ini" : `mulai ${d} hari lagi`;
+                const label = out ? (late ? `${days(-d)} late` : d === 0 ? "back today" : `back in ${days(d)}`) : d <= 0 ? "hand over today" : `starts in ${days(d)}`;
                 return (
                   <li key={r.id}>
-                    <button type="button" onClick={() => navigate(`/sewa/${r.id}`)} className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left hover:bg-default/40">
+                    <button type="button" onClick={() => navigate(`/rentals/${r.id}`)} className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left hover:bg-default/40">
                       <span className="num text-[13px]">{formatDate(ref).replace(/ \d{4}$/, "")}</span>
                       <div className="min-w-0">
                         <p className="truncate text-sm">{r.project}</p>

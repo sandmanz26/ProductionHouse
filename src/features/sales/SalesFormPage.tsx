@@ -39,8 +39,8 @@ export default function SalesFormPage() {
   const { id } = useParams();
   const db = useDb();
   const so = id ? db.sales.find((s) => s.id === id) : undefined;
-  if (id && !so) return <RecordNotFound what="Order" back="/penjualan" />;
-  if (so && so.deliveries.length > 0) return <RecordNotFound what="Order yang belum dikirim" back={`/penjualan/${so.id}`} />;
+  if (id && !so) return <RecordNotFound what="Order" back="/sales" />;
+  if (so && so.deliveries.length > 0) return <RecordNotFound what="Unshipped order" back={`/sales/${so.id}`} />;
   return <SalesForm key={id ?? "new"} existingId={so?.id} />;
 }
 
@@ -107,17 +107,17 @@ function SalesForm({ existingId }: { existingId?: ID }) {
   const margin = subtotal * input.exchangeRate - estCost;
 
   const save = () => {
-    const r = run((d) => (existing ? updateSalesOrder(d, existing.id, input) : createSalesOrder(d, input)), (s) => `Order ${s.code} disimpan`);
-    if (r) navigate(`/penjualan/${r.id}`, { replace: true });
+    const r = run((d) => (existing ? updateSalesOrder(d, existing.id, input) : createSalesOrder(d, input)), (s) => `Order ${s.code} saved`);
+    if (r) navigate(`/sales/${r.id}`, { replace: true });
   };
   const update = (key: string, patch: Partial<Line>) => setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   return (
     <>
-      <PageHeader title={existing ? `Ubah ${existing.code}` : "Order penjualan baru"} back={existing ? `/penjualan/${existing.id}` : "/penjualan"} />
+      <PageHeader title={existing ? `Edit ${existing.code}` : "New sales order"} back={existing ? `/sales/${existing.id}` : "/sales"} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
-          <Section title="Pelanggan & jalur">
+          <Section title="Customer & channel">
             <div className="flex flex-col gap-4">
               <ToggleButtonGroup
                 selectionMode="single"
@@ -127,26 +127,26 @@ function SalesForm({ existingId }: { existingId?: ID }) {
                   const v = [...keys][0];
                   if (v) changeChannel(v as SalesChannel);
                 }}
-                aria-label="Jalur penjualan"
+                aria-label="Sales channel"
               >
-                <ToggleButton id="supply">Supply domestik</ToggleButton>
-                <ToggleButton id="ekspor">Ekspor</ToggleButton>
+                <ToggleButton id="supply">Domestic supply</ToggleButton>
+                <ToggleButton id="ekspor">Export</ToggleButton>
               </ToggleButtonGroup>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <PartnerPicker role="customer" value={customerId} onChange={setCustomerId} />
                 <div className="grid grid-cols-2 gap-3">
-                  <DateInput label="Tanggal order" value={date} onChange={setDate} />
-                  <DateInput label="Target kirim" value={dueDate} onChange={setDueDate} />
+                  <DateInput label="Order date" value={date} onChange={setDate} />
+                  <DateInput label="Ship by" value={dueDate} onChange={setDueDate} />
                 </div>
-                <SelectInput label="Mata uang" value={currency} onChange={(v) => changeCurrency(v as Currency)} options={CURRENCIES.map((c) => ({ id: c, label: c }))} />
+                <SelectInput label="Currency" value={currency} onChange={(v) => changeCurrency(v as Currency)} options={CURRENCIES.map((c) => ({ id: c, label: c }))} />
                 {currency !== "IDR" && (
-                  <NumberInput label={`Kurs (Rp per 1 ${currency})`} value={rate} onChange={setRate} money description="Default dari Pengaturan; sesuaikan dengan kurs kontrak." />
+                  <NumberInput label={`Exchange rate (Rp per 1 ${currency})`} value={rate} onChange={setRate} money description="Default from Settings; match it to the contract rate." />
                 )}
               </div>
             </div>
           </Section>
 
-          <Section title="Barang" description="Produk, atau material (mis. jual sisa/limbah bernilai).">
+          <Section title="Items" description="Products, or materials (e.g. selling offcuts or waste with value).">
             <div className="flex flex-col gap-3">
               {lines.map((l) => {
                 const it = item(l.itemId ?? undefined);
@@ -162,27 +162,27 @@ function SalesForm({ existingId }: { existingId?: ID }) {
                             unitPrice: l.unitPrice || Math.round(((item(itemId ?? undefined)?.salePrice ?? 0) / (currency === "IDR" ? 1 : rate)) * 100) / 100,
                           })
                         }
-                        aria-label="Barang"
+                        aria-label="Item"
                       />
                       <NumberInput aria-label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix={it ? UOM_LABEL[it.uom] : undefined} maximumFractionDigits={it?.kind === "product" ? 0 : 3} />
-                      <NumberInput aria-label={`Harga (${currency})`} value={l.unitPrice} onChange={(unitPrice) => update(l.key, { unitPrice })} money={currency === "IDR"} suffix={currency !== "IDR" ? currency : undefined} maximumFractionDigits={2} />
-                      <Button isIconOnly variant="ghost" aria-label="Hapus" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
+                      <NumberInput aria-label={`Price (${currency})`} value={l.unitPrice} onChange={(unitPrice) => update(l.key, { unitPrice })} money={currency === "IDR"} suffix={currency !== "IDR" ? currency : undefined} maximumFractionDigits={2} />
+                      <Button isIconOnly variant="ghost" aria-label="Remove" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
                     {it?.kind === "product" && (
                       <TextInput
-                        aria-label="Spesifikasi custom"
+                        aria-label="Custom spec"
                         className="mt-2"
                         value={l.spec}
                         onChange={(spec) => update(l.key, { spec })}
-                        placeholder="Spesifikasi custom (opsional): ukuran, finishing, kain…"
+                        placeholder="Custom spec (optional): size, finishing, fabric…"
                       />
                     )}
                     {it && (
                       <p className={`mt-1 text-xs ${free < l.qty ? "text-warning" : "text-muted"}`}>
-                        Stok siap kirim {formatQty(free, it.uom)}
-                        {free < l.qty && ` — kurang ${formatQty(l.qty - free, it.uom)}, bisa dibuatkan perintah produksi setelah order disimpan`}
+                        Ready to ship {formatQty(free, it.uom)}
+                        {free < l.qty && ` — short by ${formatQty(l.qty - free, it.uom)}; you can create a work order once the order is saved`}
                       </p>
                     )}
                   </div>
@@ -190,48 +190,48 @@ function SalesForm({ existingId }: { existingId?: ID }) {
               })}
               <div>
                 <Button size="sm" variant="tertiary" onPress={() => setLines([...lines, { key: k(), itemId: null, qty: 1, unitPrice: 0, spec: "" }])}>
-                  <Plus className="size-4" /> Tambah produk
+                  <Plus className="size-4" /> Add product
                 </Button>
               </div>
             </div>
           </Section>
 
           {channel === "ekspor" && (
-            <Section title="Data ekspor" description="Dipakai untuk proforma invoice, packing list, dan pengecekan kelengkapan dokumen.">
+            <Section title="Export details" description="Used for the proforma invoice, packing list and the document completeness check.">
               <ExportFields value={exp} onChange={setExp} />
             </Section>
           )}
 
-          <Section title="Lainnya">
+          <Section title="Other">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <NumberInput label={`Diskon (${currency})`} value={discount} onChange={setDiscount} money={currency === "IDR"} maximumFractionDigits={2} />
-              <NumberInput label={`Ongkir ditagihkan (${currency})`} value={shipping} onChange={setShipping} money={currency === "IDR"} maximumFractionDigits={2} />
-              <NumberInput label="DP diminta" value={dpPercent} onChange={setDpPercent} suffix="%" maxValue={100} description="mis. 30% di depan, sisanya sebelum kirim." />
-              <DateInput label="Jatuh tempo pelunasan" value={paymentDueDate} onChange={setPaymentDueDate} />
-              <TextAreaInput className="sm:col-span-2" label="Catatan" value={note} onChange={setNote} rows={2} />
+              <NumberInput label={`Discount (${currency})`} value={discount} onChange={setDiscount} money={currency === "IDR"} maximumFractionDigits={2} />
+              <NumberInput label={`Shipping charged (${currency})`} value={shipping} onChange={setShipping} money={currency === "IDR"} maximumFractionDigits={2} />
+              <NumberInput label="Down payment required" value={dpPercent} onChange={setDpPercent} suffix="%" maxValue={100} description="e.g. 30% up front, the rest before shipping." />
+              <DateInput label="Final payment due date" value={paymentDueDate} onChange={setPaymentDueDate} />
+              <TextAreaInput className="sm:col-span-2" label="Note" value={note} onChange={setNote} rows={2} />
             </div>
           </Section>
         </div>
         <div className="xl:sticky xl:top-20 xl:self-start">
           <Card>
             <Card.Header>
-              <Card.Title className="text-base">Ringkasan</Card.Title>
+              <Card.Title className="text-base">Summary</Card.Title>
             </Card.Header>
             <Card.Content>
               <Row label="Subtotal" value={formatMoney(subtotal, currency)} />
-              {discount > 0 && <Row label="Diskon" value={`− ${formatMoney(discount, currency)}`} />}
-              {shipping > 0 && <Row label="Ongkir" value={formatMoney(shipping, currency)} />}
+              {discount > 0 && <Row label="Discount" value={`− ${formatMoney(discount, currency)}`} />}
+              {shipping > 0 && <Row label="Shipping" value={formatMoney(shipping, currency)} />}
               <div className="my-2 border-t border-[var(--rule)]" />
               <Row label="Total" value={formatMoney(total, currency)} strong />
-              {currency !== "IDR" && <Row label="Setara" value={formatIDR(total * rate)} muted />}
+              {currency !== "IDR" && <Row label="Equivalent" value={formatIDR(total * rate)} muted />}
               <div className="mt-3 rounded-md bg-default/60 p-3">
-                <Row label="Estimasi HPP" value={formatIDR(estCost)} />
-                <Row label="Estimasi margin kotor" value={`${formatIDR(margin)} · ${subtotal ? formatPct(margin / (subtotal * input.exchangeRate)) : "—"}`} tone={margin < 0 ? "danger" : "success"} />
+                <Row label="Estimated COGS" value={formatIDR(estCost)} />
+                <Row label="Estimated gross margin" value={`${formatIDR(margin)} · ${subtotal ? formatPct(margin / (subtotal * input.exchangeRate)) : "—"}`} tone={margin < 0 ? "danger" : "success"} />
               </div>
             </Card.Content>
             <Card.Footer>
               <Button onPress={save} isDisabled={input.lines.length === 0} fullWidth>
-                Simpan order
+                Save order
               </Button>
             </Card.Footer>
           </Card>

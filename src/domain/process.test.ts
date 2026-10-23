@@ -87,16 +87,16 @@ describe("recipes", () => {
   it("rejects recipes that cannot work", () => {
     const ctx = setup();
     const { db } = ctx;
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [] }), /bahan masuk/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), outputs: [] }), /hasil/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [{ itemId: ctx.wood.id, qty: Number.NaN }] }), /lebih dari 0/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [{ itemId: ctx.wood.id, qty: 1 }, { itemId: ctx.wood.id, qty: 2 }] }), /dua kali/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [{ itemId: ctx.chair.id, qty: 1 }] }), /bahan sekaligus hasil/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [] }), /input material/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), outputs: [] }), /at least one output/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [{ itemId: ctx.wood.id, qty: Number.NaN }] }), /more than 0/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [{ itemId: ctx.wood.id, qty: 1 }, { itemId: ctx.wood.id, qty: 2 }] }), /twice/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), inputs: [{ itemId: ctx.chair.id, qty: 1 }] }), /both an input and an output/);
     rejects(db, (d) => createRecipe(d, { ...base(ctx), outputs: [{ itemId: ctx.chair.id, qty: 1, sharePct: 60 }, { itemId: ctx.stool.id, qty: 1, sharePct: 30 }] }), /100%/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), outputs: [{ itemId: ctx.chair.id, qty: 1, sharePct: 100 }, { itemId: ctx.stool.id, qty: 1 }] }), /semua hasil/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), expectedRemnantPct: 60, expectedWastePct: 40 }), /di bawah 100%/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), type: "gabung", outputs: [{ itemId: ctx.chair.id, qty: 1 }, { itemId: ctx.stool.id, qty: 1 }] }), /tepat satu/);
-    rejects(db, (d) => createRecipe(d, { ...base(ctx), name: " " }), /Nama/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), outputs: [{ itemId: ctx.chair.id, qty: 1, sharePct: 100 }, { itemId: ctx.stool.id, qty: 1 }] }), /set it for every output/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), expectedRemnantPct: 60, expectedWastePct: 40 }), /must be under 100%/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), type: "gabung", outputs: [{ itemId: ctx.chair.id, qty: 1 }, { itemId: ctx.stool.id, qty: 1 }] }), /exactly one/);
+    rejects(db, (d) => createRecipe(d, { ...base(ctx), name: " " }), /name/i);
   });
 
   it("replaces the BOM and scales by batch", () => {
@@ -179,7 +179,7 @@ describe("merge", () => {
       laborHours: 1,
       overhead: 0,
     });
-    expect(wo.stages.map((s) => s.name)).toEqual(["Siapkan bagian", "Gabung", "QC"]);
+    expect(wo.stages.map((s) => s.name)).toEqual(["Prepare parts", "Join", "QC"]);
     issueAll(db, wo);
     completeWorkOrder(db, wo.id, { outputs: [{ itemId: set.id, qty: 1 }], returns: [] });
     const setLot = db.lots.find((l) => l.itemId === set.id)!;
@@ -192,10 +192,10 @@ describe("merge", () => {
     const { db, chair, table, set, stool } = ctx;
     const plan = (o: { itemId: ID; qty: number }[], i: { itemId: ID; qty: number }[]) => (d: Db) =>
       createWorkOrder(d, { type: "gabung", title: "x", plannedOutputs: o, plannedInputs: i });
-    rejects(db, plan([{ itemId: set.id, qty: 1 }, { itemId: stool.id, qty: 1 }], [{ itemId: table.id, qty: 1 }, { itemId: chair.id, qty: 1 }]), /tepat satu/);
-    rejects(db, plan([{ itemId: set.id, qty: 1 }], [{ itemId: table.id, qty: 1 }]), /minimal dua/);
-    rejects(db, plan([{ itemId: set.id, qty: 1 }], [{ itemId: set.id, qty: 1 }, { itemId: chair.id, qty: 1 }]), /bahannya sendiri/);
-    rejects(db, plan([{ itemId: set.id, qty: 1 }], []), /barang asal/);
+    rejects(db, plan([{ itemId: set.id, qty: 1 }, { itemId: stool.id, qty: 1 }], [{ itemId: table.id, qty: 1 }, { itemId: chair.id, qty: 1 }]), /exactly one/);
+    rejects(db, plan([{ itemId: set.id, qty: 1 }], [{ itemId: table.id, qty: 1 }]), /at least two/);
+    rejects(db, plan([{ itemId: set.id, qty: 1 }], [{ itemId: set.id, qty: 1 }, { itemId: chair.id, qty: 1 }]), /its own/);
+    rejects(db, plan([{ itemId: set.id, qty: 1 }], []), /source item/);
   });
 
   it("merges offcut lots into one at weighted cost, keeping the ledger whole", () => {
@@ -219,11 +219,11 @@ describe("merge", () => {
     const r2 = addOpeningStock(db, { itemId: wood.id, qty: 0.01, unitCost: 1, isRemnant: true });
     const regular = db.lots.find((l) => l.itemId === wood.id && !l.isRemnant)!;
     const glueLot = db.lots.find((l) => l.itemId === glue.id)!;
-    rejects(db, (d) => mergeLots(d, [r1.id]), /minimal dua/);
-    rejects(db, (d) => mergeLots(d, [r1.id, r1.id]), /minimal dua/);
-    rejects(db, (d) => mergeLots(d, [r1.id, glueLot.id]), /barang yang sama/);
-    rejects(db, (d) => mergeLots(d, [r1.id, regular.id]), /Sisa material/);
-    rejects(db, (d) => mergeLots(d, [r1.id, r2.id], { location: "Loteng" }), /tidak dikenal/);
+    rejects(db, (d) => mergeLots(d, [r1.id]), /at least two/);
+    rejects(db, (d) => mergeLots(d, [r1.id, r1.id]), /at least two/);
+    rejects(db, (d) => mergeLots(d, [r1.id, glueLot.id]), /same item/);
+    rejects(db, (d) => mergeLots(d, [r1.id, regular.id]), /Offcuts cannot/);
+    rejects(db, (d) => mergeLots(d, [r1.id, r2.id], { location: "Loteng" }), /unknown/i);
   });
 });
 
@@ -245,7 +245,7 @@ describe("process maps", () => {
     expect(g.nodes.find((n) => n.id === `sisa:${wood.id}`)?.kind).toBe("sisa");
     expect(g.estimated).toBeFalsy();
     // Opening stock (6 chairs) sells first under FIFO, so these chairs are still in the warehouse.
-    expect(g.nodes.some((n) => n.label === "Masih di gudang")).toBe(true);
+    expect(g.nodes.some((n) => n.label === "In stock")).toBe(true);
     expect(Math.max(...g.nodes.map((n) => n.column))).toBe(3);
   });
 

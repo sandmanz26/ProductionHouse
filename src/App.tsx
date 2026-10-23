@@ -41,9 +41,9 @@ function RouteError() {
   return (
     <AppShell>
       <BrandedState
-        code={notFound ? "404" : "Galat"}
-        title={notFound ? "Halaman ini tidak ada di buku kerja." : "Ada yang patah saat halaman ini dibuka."}
-        body={notFound ? "Tautannya mungkin salah ketik, atau datanya sudah dihapus." : error instanceof Error ? error.message : String(error)}
+        code={notFound ? "404" : "Error"}
+        title={notFound ? "This page is not in the workbook." : "Something broke while opening this page."}
+        body={notFound ? "The link may have a typo, or the record has been deleted." : error instanceof Error ? error.message : String(error)}
       />
     </AppShell>
   );
@@ -56,43 +56,44 @@ const router = createHashRouter([
     hydrateFallbackElement: <PageLoading />,
     children: [
       { index: true, lazy: page(() => import("./features/dashboard/DashboardPage")) },
-      { path: "produksi", lazy: page(() => import("./features/production/WorkOrdersPage")) },
-      { path: "produksi/baru", lazy: page(() => import("./features/production/WorkOrderNewPage")) },
-      { path: "produksi/papan", lazy: page(() => import("./features/production/BoardPage")) },
-      { path: "produksi/:id", lazy: page(() => import("./features/production/WorkOrderDetailPage")) },
-      { path: "pembelian", lazy: page(() => import("./features/purchasing/PurchasesPage")) },
-      { path: "pembelian/baru", lazy: page(() => import("./features/purchasing/PurchaseFormPage")) },
-      { path: "pembelian/:id", lazy: page(() => import("./features/purchasing/PurchaseDetailPage")) },
-      { path: "pembelian/:id/ubah", lazy: page(() => import("./features/purchasing/PurchaseFormPage")) },
-      { path: "penjualan", lazy: page(() => import("./features/sales/SalesPage")) },
-      { path: "penjualan/baru", lazy: page(() => import("./features/sales/SalesFormPage")) },
-      { path: "penjualan/:id", lazy: page(() => import("./features/sales/SalesDetailPage")) },
-      { path: "penjualan/:id/ubah", lazy: page(() => import("./features/sales/SalesFormPage")) },
-      { path: "penjualan/:id/dokumen", lazy: page(() => import("./features/sales/ExportDocsPage")) },
-      { path: "sewa", lazy: page(() => import("./features/rentals/RentalsPage")) },
-      { path: "sewa/baru", lazy: page(() => import("./features/rentals/RentalFormPage")) },
-      { path: "sewa/:id", lazy: page(() => import("./features/rentals/RentalDetailPage")) },
-      { path: "sewa/:id/ubah", lazy: page(() => import("./features/rentals/RentalFormPage")) },
-      { path: "keuangan", lazy: page(() => import("./features/finance/FinancePage")) },
-      { path: "stok/material", lazy: page(() => import("./features/inventory/MaterialStockPage")) },
-      { path: "stok/sisa", lazy: page(() => import("./features/inventory/RemnantsPage")) },
-      { path: "stok/produk", lazy: page(() => import("./features/inventory/ProductStockPage")) },
-      { path: "stok/mutasi", lazy: page(() => import("./features/inventory/MovesPage")) },
-      { path: "stok/item/:id", lazy: page(() => import("./features/inventory/ItemStockPage")) },
-      { path: "stok/lot/:id", lazy: page(() => import("./features/inventory/LotTracePage")) },
-      { path: "resep", lazy: page(() => import("./features/recipes/RecipesPage")) },
-      { path: "resep/baru", lazy: page(() => import("./features/recipes/RecipeFormPage")) },
-      { path: "resep/:id", lazy: page(() => import("./features/recipes/RecipeDetailPage")) },
-      { path: "resep/:id/ubah", lazy: page(() => import("./features/recipes/RecipeFormPage")) },
-      { path: "peta", lazy: page(() => import("./features/map/PlantMapPage")) },
-      { path: "jalur", lazy: page(() => import("./features/routes/RouteMapPage")) },
-      { path: "jalur/:id", lazy: page(() => import("./features/routes/RouteMapPage")) },
-      { path: "laporan", lazy: page(() => import("./features/reports/HppReportPage")) },
-      { path: "master/item", lazy: page(() => import("./features/master/ItemsPage")) },
-      { path: "master/item/baru", lazy: page(() => import("./features/master/ItemFormPage")) },
-      { path: "master/item/:id", lazy: page(() => import("./features/master/ItemFormPage")) },
-      { path: "master/relasi", lazy: page(() => import("./features/master/PartnersPage")) },
-      { path: "pengaturan", lazy: page(() => import("./features/settings/SettingsPage")) },
+      { path: "work-orders", lazy: page(() => import("./features/production/WorkOrdersPage")) },
+      { path: "work-orders/new", lazy: page(() => import("./features/production/WorkOrderNewPage")) },
+      { path: "board", lazy: page(() => import("./features/production/BoardPage")) },
+      { path: "work-orders/:id", lazy: page(() => import("./features/production/WorkOrderDetailPage")) },
+      { path: "purchases", lazy: page(() => import("./features/purchasing/PurchasesPage")) },
+      { path: "purchases/new", lazy: page(() => import("./features/purchasing/PurchaseFormPage")) },
+      { path: "purchases/:id", lazy: page(() => import("./features/purchasing/PurchaseDetailPage")) },
+      { path: "purchases/:id/edit", lazy: page(() => import("./features/purchasing/PurchaseFormPage")) },
+      { path: "sales", lazy: page(() => import("./features/sales/SalesPage")) },
+      { path: "sales/new", lazy: page(() => import("./features/sales/SalesFormPage")) },
+      { path: "sales/:id", lazy: page(() => import("./features/sales/SalesDetailPage")) },
+      { path: "sales/:id/edit", lazy: page(() => import("./features/sales/SalesFormPage")) },
+      { path: "sales/:id/documents", lazy: page(() => import("./features/sales/ExportDocsPage")) },
+      { path: "rentals", lazy: page(() => import("./features/rentals/RentalsPage")) },
+      { path: "rentals/new", lazy: page(() => import("./features/rentals/RentalFormPage")) },
+      { path: "rentals/:id", lazy: page(() => import("./features/rentals/RentalDetailPage")) },
+      { path: "rentals/:id/edit", lazy: page(() => import("./features/rentals/RentalFormPage")) },
+      { path: "finance", lazy: page(() => import("./features/finance/FinancePage")) },
+      { path: "stock/materials", lazy: page(() => import("./features/inventory/MaterialStockPage")) },
+      { path: "stock/offcuts", lazy: page(() => import("./features/inventory/RemnantsPage")) },
+      { path: "stock/products", lazy: page(() => import("./features/inventory/ProductStockPage")) },
+      { path: "stock/movements", lazy: page(() => import("./features/inventory/MovesPage")) },
+      { path: "stock/items/:id", lazy: page(() => import("./features/inventory/ItemStockPage")) },
+      { path: "stock/lots/:id", lazy: page(() => import("./features/inventory/LotTracePage")) },
+      { path: "recipes", lazy: page(() => import("./features/recipes/RecipesPage")) },
+      { path: "recipes/new", lazy: page(() => import("./features/recipes/RecipeFormPage")) },
+      { path: "recipes/:id", lazy: page(() => import("./features/recipes/RecipeDetailPage")) },
+      { path: "recipes/:id/edit", lazy: page(() => import("./features/recipes/RecipeFormPage")) },
+      { path: "flow-map", lazy: page(() => import("./features/map/PlantMapPage")) },
+      { path: "routes", lazy: page(() => import("./features/routes/RouteMapPage")) },
+      { path: "routes/:id", lazy: page(() => import("./features/routes/RouteMapPage")) },
+      { path: "reports", lazy: page(() => import("./features/reports/HppReportPage")) },
+      { path: "items", lazy: page(() => import("./features/master/ItemsPage")) },
+      { path: "items/new", lazy: page(() => import("./features/master/ItemFormPage")) },
+      { path: "items/:id", lazy: page(() => import("./features/master/ItemFormPage")) },
+      { path: "contacts", lazy: page(() => import("./features/master/PartnersPage")) },
+      { path: "help", lazy: page(() => import("./help/HelpPage")) },
+      { path: "settings", lazy: page(() => import("./features/settings/SettingsPage")) },
       { path: "*", lazy: page(() => import("./features/NotFoundPage")) },
     ],
   },
@@ -100,7 +101,7 @@ const router = createHashRouter([
 
 export function App() {
   return (
-    <I18nProvider locale="id-ID">
+    <I18nProvider locale="en-GB">
       <Toast.Provider placement="bottom end" />
       <RouterProvider router={router} />
     </I18nProvider>

@@ -7,9 +7,9 @@ export function RecordNotFound({ what, back }: { what: string; back: string }) {
   const navigate = useNavigate();
   return (
     <EmptyBlock
-      title={`${what} tidak ditemukan`}
-      description="Data mungkin sudah dihapus atau tautan tidak valid."
-      action={<Button onPress={() => navigate(back)}>Kembali</Button>}
+      title={`${what} not found`}
+      description="The record may have been deleted, or the link is not valid."
+      action={<Button onPress={() => navigate(back)}>Back</Button>}
     />
   );
 }

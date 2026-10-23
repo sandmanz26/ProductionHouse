@@ -48,32 +48,32 @@ export default function RemnantsPage() {
         </div>
       ),
     },
-    { key: "dims", header: "Ukuran", cell: (r) => <span className="whitespace-nowrap">{formatDims(r.lot.dimensions) || <span className="text-muted">—</span>}</span> },
+    { key: "dims", header: "Dimensions", cell: (r) => <span className="whitespace-nowrap">{formatDims(r.lot.dimensions) || <span className="text-muted">—</span>}</span> },
     { key: "qty", header: "Qty", align: "end", cell: (r) => formatQty(r.lot.qty, r.item.uom) },
-    { key: "value", header: "Nilai", align: "end", cell: (r) => formatIDR(r.value) },
+    { key: "value", header: "Value", align: "end", cell: (r) => formatIDR(r.value) },
     {
       key: "age",
-      header: "Umur",
+      header: "Age",
       className: "whitespace-nowrap",
-      cell: (r) => <StatusChip tone={r.aging ? "warning" : "default"}>{r.ageDays} hari</StatusChip>,
+      cell: (r) => <StatusChip tone={r.aging ? "warning" : "default"}>{r.ageDays} days</StatusChip>,
     },
     {
       key: "origin",
-      header: "Dari",
+      header: "From",
       cell: (r) => {
         const route = r.lot.originRef ? docRoute(r.lot.originRef) : undefined;
         return route ? (
           <Link href={route}>{r.lot.originRef!.code}</Link>
         ) : (
           <span className="line-clamp-2 max-w-36 text-xs text-muted" title={r.lot.note}>
-            {r.lot.note ?? "Saldo awal"}
+            {r.lot.note ?? "Opening stock"}
           </span>
         );
       },
     },
     {
       key: "fit",
-      header: "Cukup untuk",
+      header: "Enough for",
       cell: (r) => {
         const fits = fitsFor(products, r.lot);
         return fits.length ? (
@@ -96,16 +96,16 @@ export default function RemnantsPage() {
       cell: (r) => (
         <div className="flex justify-end gap-1">
           <Button size="sm" variant="ghost" onPress={() => setAdjusting(r.lot)}>
-            Opname
+            Count
           </Button>
           <ConfirmButton
             size="sm"
             variant="ghost"
             danger
-            title={`Buang ${r.lot.code} sebagai limbah?`}
-            description={`Nilai ${formatIDR(r.value)} dicatat sebagai limbah dan keluar dari stok.`}
-            confirmLabel="Jadikan limbah"
-            onConfirm={() => run((d) => scrapLot(d, r.lot.id), `${r.lot.code} dicatat sebagai limbah`)}
+            title={`Scrap ${r.lot.code} as waste?`}
+            description={`Value ${formatIDR(r.value)} is recorded as waste and leaves stock.`}
+            confirmLabel="Scrap as waste"
+            onConfirm={() => run((d) => scrapLot(d, r.lot.id), `${r.lot.code} recorded as waste`)}
           >
             <Trash2 className="size-4" />
           </ConfirmButton>
@@ -119,23 +119,23 @@ export default function RemnantsPage() {
   return (
     <>
       <PageHeader
-        title="Sisa Material"
-        description="Potongan layak pakai. Disarankan lebih dulu saat ambil bahan."
+        title="Offcuts"
+        description="Usable offcuts. Suggested first when materials are issued."
         actions={
-          <Button variant="secondary" onPress={() => navigate("/produksi/baru")}>
-            <Hammer className="size-4" /> Produksi dari sisa
+          <Button variant="secondary" onPress={() => navigate("/work-orders/new")}>
+            <Hammer className="size-4" /> Make from offcuts
           </Button>
         }
       />
       <MetricStrip
         className="mb-5"
         items={[
-          { label: "Nilai sisa tersedia", value: formatIDRCompact(sum(all.map((r) => r.value))) },
-          { label: "Jumlah potongan", value: all.length, hint: `${materials.length} jenis material` },
+          { label: "Available offcut value", value: formatIDRCompact(sum(all.map((r) => r.value))) },
+          { label: "Offcut count", value: all.length, hint: `${materials.length} materials` },
           {
-            label: `Berumur > ${db.settings.remnantAgingDays} hari`,
+            label: `Older than ${db.settings.remnantAgingDays} days`,
             value: formatIDRCompact(sum(aging.map((r) => r.value))),
-            hint: `${aging.length} potongan — pakai atau jual`,
+            hint: `${aging.length} offcuts — use or sell them`,
             tone: aging.length ? "warning" : "default",
           },
         ]}
@@ -146,15 +146,15 @@ export default function RemnantsPage() {
           className="sm:w-72"
           value={material}
           onChange={setMaterial}
-          options={[{ id: "semua", label: "Semua material" }, ...materials.map((m) => ({ id: m.id, label: m.name }))]}
+          options={[{ id: "semua", label: "All materials" }, ...materials.map((m) => ({ id: m.id, label: m.name }))]}
         />
       </div>
       <DataTable
-        label="Sisa material"
+        label="Offcuts"
         columns={columns}
         rows={rows.map((r) => ({ ...r, id: r.lot.id }))}
         dependencies={[products]}
-        empty={<EmptyBlock icon={<Recycle className="size-5" />} title="Belum ada sisa material" description="Potongan layak pakai tercatat saat perintah kerja ditutup — lengkap dengan ukuran dan harganya sendiri." />}
+        empty={<EmptyBlock icon={<Recycle className="size-5" />} title="No offcuts yet" description="Usable offcuts are recorded when a work order is completed — each with its own size and cost." />}
       />
       <LotAdjustDialog lot={adjusting} onClose={() => setAdjusting(null)} />
     </>

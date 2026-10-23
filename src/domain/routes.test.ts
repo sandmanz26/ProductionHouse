@@ -75,7 +75,7 @@ describe("production routes", () => {
     const ctx = setup();
     const routes = productionRoutes(ctx.db, ctx.chair.id);
     expect(routes.map((r) => [r.kind, r.label])).toEqual([
-      ["bom", "BOM standar"],
+      ["bom", "Standard BOM"],
       ["resep", "Kursi dari reclaimed"],
     ]);
     expect(routes[0]!.unitCost).toBe(0.03 * 14_000_000 + 10 * 100 + 4 * 10_000);
@@ -98,7 +98,7 @@ describe("production routes", () => {
     receivePurchase(ctx.db, p.id);
     const routes = productionRoutes(ctx.db, ctx.frame.id);
     expect(routes.map((r) => r.kind)).toEqual(["bom", "beli"]);
-    expect(routes[1]).toMatchObject({ uses: 1, qtyMade: 4, unitCost: 250_000, label: "Beli · UD Rangka" });
+    expect(routes[1]).toMatchObject({ uses: 1, qtyMade: 4, unitCost: 250_000, label: "Buy · UD Rangka" });
     expect(routes[1]!.suppliers![0]).toMatchObject({ name: "UD Rangka", count: 1 });
   });
 
@@ -125,7 +125,7 @@ describe("production routes", () => {
     const wo = createWorkOrder(ctx.db, { type: "konversi", title: "Kursi → meja", plannedOutputs: [{ itemId: desk.id, qty: 1 }], plannedInputs: [{ itemId: ctx.chair.id, qty: 2 }, { itemId: ctx.teak.id, qty: 0.01 }], laborHours: 0 });
     run(ctx.db, wo);
     const [route] = productionRoutes(ctx.db, desk.id);
-    expect(route).toMatchObject({ kind: "riwayat", processType: "konversi", label: "Konversi dari Kursi", uses: 1, qtyMade: 1 });
+    expect(route).toMatchObject({ kind: "riwayat", processType: "konversi", label: "Conversion from Kursi", uses: 1, qtyMade: 1 });
     expect(route!.inputs.find((i) => i.itemId === ctx.chair.id)?.qty).toBe(2);
     expect(route!.unitCost).toBe(2 * 600_000 + 140_000);
   });
@@ -178,8 +178,8 @@ describe("item history", () => {
     const center = `item:${ctx.teak.id}`;
     const into = sum(g.links.filter((l) => l.target === center).map((l) => l.value));
     const out = sum(g.links.filter((l) => l.source === center).map((l) => l.value));
-    expect(g.nodes.find((n) => n.label === "Beli · UD Rangka")).toBeTruthy();
-    expect(g.nodes.find((n) => n.label === "Jadi Kursi")).toBeTruthy();
+    expect(g.nodes.find((n) => n.label === "Buy · UD Rangka")).toBeTruthy();
+    expect(g.nodes.find((n) => n.label === "Made into Kursi")).toBeTruthy();
     expect(out).toBeCloseTo(into, 0);
   });
 });

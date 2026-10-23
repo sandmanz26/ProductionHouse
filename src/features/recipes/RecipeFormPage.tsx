@@ -27,7 +27,7 @@ export default function RecipeFormPage() {
   const { id } = useParams();
   const db = useDb();
   const r = id ? db.recipes.find((x) => x.id === id) : undefined;
-  if (id && !r) return <RecordNotFound what="Resep" back="/resep" />;
+  if (id && !r) return <RecordNotFound what="Recipe" back="/recipes" />;
   return <RecipeForm key={id ?? "new"} existing={r} />;
 }
 
@@ -64,7 +64,7 @@ function RecipeForm({ existing }: { existing?: Recipe }) {
   const preview = useMemo(() => {
     const draft = { ...(JSON.parse(inputKey) as RecipeInput) };
     if (!draft.inputs.length || !draft.outputs.length) return null;
-    draft.name = draft.name.trim() || "Pratinjau";
+    draft.name = draft.name.trim() || "Preview";
     try {
       return transact(db, (d) => {
         const r = existing ? updateRecipe(d, existing.id, draft) : createRecipe(d, draft);
@@ -76,19 +76,19 @@ function RecipeForm({ existing }: { existing?: Recipe }) {
   }, [db, inputKey, existing]);
 
   const save = () => {
-    const saved = run((d) => (existing ? updateRecipe(d, existing.id, input) : createRecipe(d, input)), (r) => `Resep ${r.code} disimpan`);
-    if (saved) navigate(`/resep/${saved.id}`, { replace: true });
+    const saved = run((d) => (existing ? updateRecipe(d, existing.id, input) : createRecipe(d, input)), (r) => `Recipe ${r.code} saved`);
+    if (saved) navigate(`/recipes/${saved.id}`, { replace: true });
   };
 
   return (
     <>
-      <PageHeader back={existing ? `/resep/${existing.id}` : "/resep"} title={existing ? `Ubah ${existing.name}` : "Resep baru"} description="Jumlah ditulis per satu batch. Saat dipakai, perintah kerja mengalikannya." />
+      <PageHeader back={existing ? `/recipes/${existing.id}` : "/recipes"} title={existing ? `Edit ${existing.name}` : "New recipe"} description="Quantities are per batch. A work order multiplies them when the recipe is used." />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
-          <Section title="Identitas">
+          <Section title="Identity">
             <div className="flex flex-col gap-4">
-              <TextInput label="Nama resep" value={name} onChange={setName} placeholder="mis. Kursi Sekar — potong efisien" isRequired />
-              <div role="radiogroup" aria-label="Jenis proses" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <TextInput label="Recipe name" value={name} onChange={setName} placeholder="e.g. Sekar chair — efficient cut" isRequired />
+              <div role="radiogroup" aria-label="Process type" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {TYPES.map((t) => (
                   <button
                     key={t}
@@ -109,32 +109,32 @@ function RecipeForm({ existing }: { existing?: Recipe }) {
             </div>
           </Section>
 
-          <Section title="Bahan masuk" description={type === "gabung" ? "Barang yang disatukan — produk, komponen, sisa, atau bahan." : "Per satu batch."}>
-            <Lines lines={inputs} onChange={setInputs} addLabel="Tambah bahan" />
+          <Section title="Materials in" description={type === "gabung" ? "Items joined together — products, components, offcuts or materials." : "Per batch."}>
+            <Lines lines={inputs} onChange={setInputs} addLabel="Add material" />
           </Section>
 
           <Section
-            title="Hasil"
-            description={type === "gabung" ? "Satu jenis barang hasil gabungan." : "Boleh lebih dari satu, mis. papan → daun meja + kaki + potongan untuk laci."}
+            title="Output"
+            description={type === "gabung" ? "One merged item." : "Can be more than one, e.g. board → tabletop + legs + pieces for a drawer."}
           >
-            <Lines lines={outputs} onChange={setOutputs} addLabel="Tambah hasil" single={type === "gabung"} shares={fixedShares} />
+            <Lines lines={outputs} onChange={setOutputs} addLabel="Add output" single={type === "gabung"} shares={fixedShares} />
             {type !== "gabung" && outputs.length > 1 && (
               <label className="mt-3 flex items-center gap-2 text-[13px]">
                 <input type="checkbox" checked={fixedShares} onChange={(e) => setFixedShares(e.target.checked)} className="accent-[var(--accent)]" />
-                Bagi biaya dengan porsi tetap (%) — bila tidak, dibagi menurut harga jual / harga standar
+                Split cost by fixed shares (%) — otherwise it is split by sales price / standard cost
               </label>
             )}
           </Section>
 
-          <Section title="Proses">
+          <Section title="Process">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <NumberInput label="Jam kerja per batch" value={laborHours} onChange={setLaborHours} suffix="jam" />
-              <NumberInput label="Perkiraan sisa layak" value={remnantPct} onChange={setRemnantPct} suffix="%" maxValue={99} description="Dari nilai bahan; kembali ke gudang." />
-              <NumberInput label="Perkiraan limbah" value={wastePct} onChange={setWastePct} suffix="%" maxValue={99} description="Dari qty bahan; untuk perencanaan." />
+              <NumberInput label="Labour hours per batch" value={laborHours} onChange={setLaborHours} suffix="h" />
+              <NumberInput label="Expected usable offcuts" value={remnantPct} onChange={setRemnantPct} suffix="%" maxValue={99} description="Of material value; goes back to the warehouse." />
+              <NumberInput label="Expected waste" value={wastePct} onChange={setWastePct} suffix="%" maxValue={99} description="Of material qty; for planning." />
             </div>
             <div className="mt-3 flex flex-col gap-3">
-              <TextInput label="Tahapan" value={stages} onChange={setStages} placeholder={db.settings.defaultStages.join(", ")} description="Pisahkan dengan koma. Kosong = rute default." />
-              <TextAreaInput label="Catatan untuk tukang" value={note} onChange={setNote} rows={2} placeholder="Arah serat, toleransi ukuran, jenis lem…" />
+              <TextInput label="Stages" value={stages} onChange={setStages} placeholder={db.settings.defaultStages.join(", ")} description="Separate with commas. Empty = default route." />
+              <TextAreaInput label="Note for the craftsmen" value={note} onChange={setNote} rows={2} placeholder="Grain direction, size tolerance, glue type…" />
             </div>
           </Section>
         </div>
@@ -142,15 +142,15 @@ function RecipeForm({ existing }: { existing?: Recipe }) {
         <div className="flex flex-col gap-6 xl:sticky xl:top-20 xl:self-start">
           <Card>
             <Card.Header>
-              <Card.Title className="text-base">Biaya standar per batch</Card.Title>
-              <Card.Description>Dari harga standar bahan dan tarif di Pengaturan.</Card.Description>
+              <Card.Title className="text-base">Standard cost per batch</Card.Title>
+              <Card.Description>From standard material costs and the rates in Settings.</Card.Description>
             </Card.Header>
             <Card.Content>
               {preview && "cost" in preview ? (
                 <>
-                  <Row label="Bahan" value={formatIDR(preview.cost.material)} />
-                  {preview.cost.remnantCredit > 0 && <Row label="− perkiraan sisa" value={formatIDR(preview.cost.remnantCredit)} muted />}
-                  <Row label="Tenaga kerja" value={formatIDR(preview.cost.labor)} />
+                  <Row label="Materials" value={formatIDR(preview.cost.material)} />
+                  {preview.cost.remnantCredit > 0 && <Row label="− expected offcuts" value={formatIDR(preview.cost.remnantCredit)} muted />}
+                  <Row label="Labour" value={formatIDR(preview.cost.labor)} />
                   <Row label="Overhead" value={formatIDR(preview.cost.overhead)} />
                   <div className="my-2 border-t border-[var(--rule)]" />
                   <Row label="Total" value={formatIDR(preview.cost.total)} strong />
@@ -159,12 +159,12 @@ function RecipeForm({ existing }: { existing?: Recipe }) {
                   ))}
                 </>
               ) : (
-                <p className="text-sm text-muted">{preview && "error" in preview ? preview.error : "Isi bahan dan hasil."}</p>
+                <p className="text-sm text-muted">{preview && "error" in preview ? preview.error : "Fill in the materials and output."}</p>
               )}
             </Card.Content>
             <Card.Footer>
               <Button fullWidth onPress={save} isDisabled={!preview || "error" in preview || !name.trim()}>
-                Simpan resep
+                Save recipe
               </Button>
             </Card.Footer>
           </Card>
@@ -172,8 +172,8 @@ function RecipeForm({ existing }: { existing?: Recipe }) {
       </div>
 
       {preview && "flow" in preview && (
-        <Section title="Peta resep" description="Pratinjau satu batch pada harga standar." className="mt-6" bodyClassName="p-0">
-          <FlowDiagram graph={preview.flow} label="Pratinjau peta resep" />
+        <Section title="Recipe map" description="Preview of one batch at standard cost." className="mt-6" bodyClassName="p-0">
+          <FlowDiagram graph={preview.flow} label="Recipe map preview" />
         </Section>
       )}
     </>
@@ -187,10 +187,10 @@ function Lines({ lines, onChange, addLabel, single, shares }: { lines: Line[]; o
     <div className="flex flex-col gap-2">
       {lines.map((l) => (
         <div key={l.key} className={`grid items-end gap-2 ${shares ? "grid-cols-[1fr_7rem_6rem_auto]" : "grid-cols-[1fr_7.5rem_auto]"}`}>
-          <ItemPicker value={l.itemId} onChange={(itemId) => update(l.key, { itemId })} aria-label="Barang" />
+          <ItemPicker value={l.itemId} onChange={(itemId) => update(l.key, { itemId })} aria-label="Item" />
           <NumberInput aria-label="Qty per batch" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix={l.itemId ? UOM_LABEL[item(l.itemId)?.uom ?? "pcs"] : undefined} />
-          {shares && <NumberInput aria-label="Porsi biaya" value={l.sharePct ?? 0} onChange={(sharePct) => update(l.key, { sharePct })} suffix="%" maxValue={100} />}
-          <Button isIconOnly variant="ghost" aria-label="Hapus baris" isDisabled={lines.length === 1} onPress={() => onChange(lines.filter((x) => x.key !== l.key))}>
+          {shares && <NumberInput aria-label="Cost share" value={l.sharePct ?? 0} onChange={(sharePct) => update(l.key, { sharePct })} suffix="%" maxValue={100} />}
+          <Button isIconOnly variant="ghost" aria-label="Remove row" isDisabled={lines.length === 1} onPress={() => onChange(lines.filter((x) => x.key !== l.key))}>
             <Trash2 className="size-4" />
           </Button>
         </div>

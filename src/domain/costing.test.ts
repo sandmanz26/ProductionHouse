@@ -87,7 +87,7 @@ describe("FIFO", () => {
 
   it("refuses a newer lot while an older one is on hand, wherever it is stored", () => {
     const { db, b, wo } = setup("fifo");
-    rejects(db, (d) => issueMaterials(d, wo.id, [{ lotId: b.id, qty: 1 }]), /FIFO: habiskan dulu LOT-0001/);
+    rejects(db, (d) => issueMaterials(d, wo.id, [{ lotId: b.id, qty: 1 }]), /FIFO: use up LOT-0001 first/);
   });
 
   it("accepts a valid combination even when the newer lot is listed first", () => {
@@ -108,7 +108,7 @@ describe("FIFO", () => {
     const recent = buy(db, chair.id, 3, 400, "2026-03-01T00:00:00.000Z");
     const so = createSalesOrder(db, { channel: "supply", customerId: buyer.id, date: "2026-04-01", currency: "IDR", exchangeRate: 1, lines: [{ itemId: chair.id, qty: 4, unitPrice: 1_000 }] });
     confirmSalesOrder(db, so.id);
-    rejects(db, (d) => deliverSalesOrder(d, so.id, [{ itemId: chair.id, qty: 1, picks: [{ lotId: recent.id, qty: 1 }] }]), /habiskan dulu/);
+    rejects(db, (d) => deliverSalesOrder(d, so.id, [{ itemId: chair.id, qty: 1, picks: [{ lotId: recent.id, qty: 1 }] }]), /use up .* first/);
     deliverSalesOrder(db, so.id, [{ itemId: chair.id, qty: 4 }]);
     expect(salesTotals(db, so).cogs).toBe(3 * 300 + 1 * 400);
     expect(db.lots.find((l) => l.id === old.id)!.qty).toBe(0);
@@ -123,12 +123,12 @@ describe("LIFO", () => {
     issueMaterials(db, wo.id, s.picks);
     expect(issuedValue(db, wo.id)).toBe(10 * 200 + 5 * 100);
     expect(value(db, wood.id)).toBe(5 * 100);
-    rejects(db, (d) => issueMaterials(d, wo.id, [{ lotId: "nope", qty: 1 }]), /tidak ditemukan/);
+    rejects(db, (d) => issueMaterials(d, wo.id, [{ lotId: "nope", qty: 1 }]), /not found/);
   });
 
   it("refuses the older lot while the newer one is on hand", () => {
     const { db, a, wo } = setup("lifo");
-    rejects(db, (d) => issueMaterials(d, wo.id, [{ lotId: a.id, qty: 1 }]), /LIFO: habiskan dulu LOT-0002/);
+    rejects(db, (d) => issueMaterials(d, wo.id, [{ lotId: a.id, qty: 1 }]), /LIFO: use up LOT-0002 first/);
   });
 });
 
@@ -236,11 +236,11 @@ describe("method settings and audit trail", () => {
 
   it("rejects unknown methods, from the screen or from a backup file", () => {
     const { db, wood } = setup("fifo");
-    rejects(db, (d) => updateSettings(d, { costingMethod: "hifo" as CostingMethod }), /tidak dikenal/);
-    rejects(db, (d) => updateItem(d, wood.id, { ...wood, costingMethod: "hifo" as CostingMethod }), /tidak dikenal/);
+    rejects(db, (d) => updateSettings(d, { costingMethod: "hifo" as CostingMethod }), /unknown/i);
+    rejects(db, (d) => updateItem(d, wood.id, { ...wood, costingMethod: "hifo" as CostingMethod }), /unknown/i);
     const file = JSON.parse(serializeBackup(db));
     file.data.items[0].costingMethod = "hifo";
-    expect(() => parseBackup(JSON.stringify(file))).toThrow(/rusak/);
+    expect(() => parseBackup(JSON.stringify(file))).toThrow(/damaged/);
   });
 });
 

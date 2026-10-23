@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { EPS } from "@/domain";
 import { formatQty } from "@/lib/format";
+import { PURCHASE_STATUS, RENTAL_STATUS, SALES_STATUS, WO_STATUS } from "@/lib/labels";
 import { useDb, useLookups } from "@/store/db-store";
 
 interface Entry {
@@ -17,25 +18,25 @@ interface Entry {
 }
 
 const PAGES: { label: string; to: string; keywords?: string }[] = [
-  { label: "Beranda", to: "/" },
-  { label: "Produksi — daftar perintah kerja", to: "/produksi", keywords: "wo pk" },
-  { label: "Produksi — papan per tahap", to: "/produksi/papan", keywords: "kanban wip" },
-  { label: "Perintah kerja baru", to: "/produksi/baru" },
-  { label: "Pembelian", to: "/pembelian" },
-  { label: "Pembelian baru", to: "/pembelian/baru" },
-  { label: "Penjualan & ekspor", to: "/penjualan" },
-  { label: "Order penjualan baru", to: "/penjualan/baru" },
-  { label: "Sewa & pinjam", to: "/sewa" },
-  { label: "Booking sewa baru", to: "/sewa/baru" },
-  { label: "Keuangan — piutang & utang", to: "/keuangan", keywords: "bayar dp tagihan" },
-  { label: "Stok material", to: "/stok/material" },
-  { label: "Sisa material", to: "/stok/sisa", keywords: "remnant potongan" },
-  { label: "Stok produk", to: "/stok/produk" },
-  { label: "Mutasi stok", to: "/stok/mutasi", keywords: "ledger kartu stok" },
-  { label: "Laporan HPP", to: "/laporan" },
-  { label: "Produk & material", to: "/master/item", keywords: "bom resep" },
-  { label: "Pelanggan & pemasok", to: "/master/relasi" },
-  { label: "Pengaturan", to: "/pengaturan", keywords: "backup cadangan" },
+  { label: "Home", to: "/" },
+  { label: "Production — work order list", to: "/work-orders", keywords: "wo jobs" },
+  { label: "Production — board by stage", to: "/board", keywords: "kanban wip" },
+  { label: "New work order", to: "/work-orders/new" },
+  { label: "Purchasing", to: "/purchases", keywords: "po" },
+  { label: "New purchase order", to: "/purchases/new" },
+  { label: "Sales & export", to: "/sales", keywords: "so" },
+  { label: "New sales order", to: "/sales/new" },
+  { label: "Rental & loan", to: "/rentals", keywords: "rn" },
+  { label: "New rental booking", to: "/rentals/new" },
+  { label: "Finance — receivables & payables", to: "/finance", keywords: "pay down payment invoice" },
+  { label: "Materials stock", to: "/stock/materials" },
+  { label: "Offcuts", to: "/stock/offcuts", keywords: "remnant leftover" },
+  { label: "Products stock", to: "/stock/products" },
+  { label: "Stock movements", to: "/stock/movements", keywords: "ledger stock card" },
+  { label: "Cost report", to: "/reports", keywords: "job cost cogs" },
+  { label: "Products & materials", to: "/items", keywords: "bom recipe" },
+  { label: "Customers & suppliers", to: "/contacts", keywords: "contacts" },
+  { label: "Settings", to: "/settings", keywords: "backup" },
 ];
 
 function score(haystack: string, terms: string[]) {
@@ -53,7 +54,7 @@ export function CommandPalette({ isOpen, onOpenChange }: { isOpen: boolean; onOp
   return (
     <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Container size="md" placement="top">
-        <Modal.Dialog aria-label="Cari">{isOpen && <PaletteBody onClose={() => onOpenChange(false)} />}</Modal.Dialog>
+        <Modal.Dialog aria-label="Search">{isOpen && <PaletteBody onClose={() => onOpenChange(false)} />}</Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>
   );
@@ -68,29 +69,29 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const listRef = useRef<HTMLUListElement>(null);
 
   const entries = useMemo<Entry[]>(() => {
-    const e: Entry[] = PAGES.map((p) => ({ id: `p:${p.to}`, group: "Halaman", label: p.label, to: p.to, haystack: `${p.label} ${p.keywords ?? ""}`.toLowerCase() }));
-    for (const w of db.workOrders) e.push({ id: w.id, group: "Perintah kerja", label: `${w.code} · ${w.title}`, hint: w.status, to: `/produksi/${w.id}`, haystack: `${w.code} ${w.title}`.toLowerCase() });
+    const e: Entry[] = PAGES.map((p) => ({ id: `p:${p.to}`, group: "Pages", label: p.label, to: p.to, haystack: `${p.label} ${p.keywords ?? ""}`.toLowerCase() }));
+    for (const w of db.workOrders) e.push({ id: w.id, group: "Work orders", label: `${w.code} · ${w.title}`, hint: WO_STATUS[w.status].label, to: `/work-orders/${w.id}`, haystack: `${w.code} ${w.title}`.toLowerCase() });
     for (const s of db.sales) {
       const who = partnerName(s.customerId);
-      e.push({ id: s.id, group: "Penjualan", label: `${s.code} · ${who}`, hint: s.status, to: `/penjualan/${s.id}`, haystack: `${s.code} ${who}`.toLowerCase() });
+      e.push({ id: s.id, group: "Sales", label: `${s.code} · ${who}`, hint: SALES_STATUS[s.status].label, to: `/sales/${s.id}`, haystack: `${s.code} ${who}`.toLowerCase() });
     }
-    for (const r of db.rentals) e.push({ id: r.id, group: "Sewa", label: `${r.code} · ${r.project}`, hint: r.status, to: `/sewa/${r.id}`, haystack: `${r.code} ${r.project} ${partnerName(r.customerId)}`.toLowerCase() });
+    for (const r of db.rentals) e.push({ id: r.id, group: "Rentals", label: `${r.code} · ${r.project}`, hint: RENTAL_STATUS[r.status].label, to: `/rentals/${r.id}`, haystack: `${r.code} ${r.project} ${partnerName(r.customerId)}`.toLowerCase() });
     for (const p of db.purchases) {
       const who = partnerName(p.supplierId);
-      e.push({ id: p.id, group: "Pembelian", label: `${p.code} · ${who}`, hint: p.status, to: `/pembelian/${p.id}`, haystack: `${p.code} ${who} ${p.invoiceNo ?? ""}`.toLowerCase() });
+      e.push({ id: p.id, group: "Purchases", label: `${p.code} · ${who}`, hint: PURCHASE_STATUS[p.status].label, to: `/purchases/${p.id}`, haystack: `${p.code} ${who} ${p.invoiceNo ?? ""}`.toLowerCase() });
     }
-    for (const i of db.items) e.push({ id: i.id, group: "Item", label: i.name, hint: i.sku, to: `/stok/item/${i.id}`, haystack: `${i.sku} ${i.name}`.toLowerCase() });
+    for (const i of db.items) e.push({ id: i.id, group: "Items", label: i.name, hint: i.sku, to: `/stock/items/${i.id}`, haystack: `${i.sku} ${i.name}`.toLowerCase() });
     for (const l of db.lots) {
       if (l.qty <= EPS) continue;
       const it = item(l.itemId);
-      e.push({ id: l.id, group: "Lot", label: `${l.code} · ${it?.name ?? ""}`, hint: formatQty(l.qty, it?.uom), to: `/stok/item/${l.itemId}`, haystack: `${l.code} ${it?.name ?? ""}`.toLowerCase() });
+      e.push({ id: l.id, group: "Lots", label: `${l.code} · ${it?.name ?? ""}`, hint: formatQty(l.qty, it?.uom), to: `/stock/items/${l.itemId}`, haystack: `${l.code} ${it?.name ?? ""}`.toLowerCase() });
     }
     return e;
   }, [db, item, partnerName]);
 
   const results = useMemo(() => {
     const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (!terms.length) return entries.filter((e) => e.group === "Halaman").slice(0, 10);
+    if (!terms.length) return entries.filter((e) => e.group === "Pages").slice(0, 10);
     return entries
       .map((e) => ({ e, s: score(e.haystack, terms) }))
       .filter((x) => x.s >= 0)
@@ -132,8 +133,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               go(results[active]);
             }
           }}
-          placeholder="Ketik kode (PK-0005, SO-0002, LOT-0011), nama barang, klien…"
-          aria-label="Cari"
+          placeholder="Type a code (WO-0005, SO-0002, LOT-0011), item name, client…"
+          aria-label="Search"
           role="combobox"
           aria-expanded
           aria-controls="palette-results"
@@ -143,7 +144,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         <kbd className="num rounded-sm border border-[var(--rule)] px-1.5 text-[11px] text-muted">Esc</kbd>
       </div>
       <ul ref={listRef} id="palette-results" role="listbox" className="mt-2 overflow-y-auto">
-        {results.length === 0 && <li className="px-2 py-6 text-center text-sm text-muted">Tidak ada yang cocok.</li>}
+        {results.length === 0 && <li className="px-2 py-6 text-center text-sm text-muted">Nothing matches.</li>}
         {results.map((e, i) => {
           const header = i === 0 || results[i - 1]!.group !== e.group ? e.group : null;
           return (

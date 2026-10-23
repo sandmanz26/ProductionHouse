@@ -15,12 +15,12 @@ const regular = (l: LotRow) => !l.isRemnant && !l.reservedForWo && l.qty > 0 && 
 
 test("settings: switching to LIFO warns that it is not PSAK and logs the change", async ({ page }) => {
   await freshDemo(page);
-  await page.goto("/#/pengaturan");
+  await page.goto("/#/settings");
   await page.getByRole("radio", { name: /LIFO/ }).check();
-  await expect(page.getByText(/LIFO tidak diakui PSAK 14/)).toBeVisible();
-  await page.getByRole("button", { name: "Simpan pengaturan" }).click();
-  await expect(page.getByText("Pengaturan disimpan")).toBeVisible();
-  await expect(page.getByText("Riwayat perubahan")).toBeVisible();
+  await expect(page.getByText(/LIFO is not/)).toBeVisible();
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Settings saved")).toBeVisible();
+  await expect(page.getByText("Change history")).toBeVisible();
   const db = await readDb(page);
   expect(db.settings.costingMethod).toBe("lifo");
   expect(db.settings.costingHistory).toHaveLength(1);
@@ -36,10 +36,10 @@ test("settings: moving average gives every regular lot of an item the same cost,
   expect(itemId, "demo should hold an item bought at two prices").toBeTruthy();
   const valueOf = (ls: LotRow[]) => ls.filter((l) => l.itemId === itemId).reduce((a, l) => a + l.qty * l.unitCost, 0);
 
-  await page.goto("/#/pengaturan");
-  await page.getByRole("radio", { name: /Rata-rata bergerak/ }).check();
-  await page.getByRole("button", { name: "Simpan pengaturan" }).click();
-  await expect(page.getByText("Pengaturan disimpan")).toBeVisible();
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /Moving average/ }).check();
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Settings saved")).toBeVisible();
 
   const after = (await readDb(page)).lots as LotRow[];
   const costs = new Set(after.filter((l) => regular(l) && l.itemId === itemId).map((l) => l.unitCost));
@@ -49,19 +49,19 @@ test("settings: moving average gives every regular lot of an item the same cost,
 
 test("issuing material shows which costing method applies", async ({ page }) => {
   const db = await freshDemo(page);
-  await page.goto(`/#/produksi/${idOf(db.workOrders, "PK-0006")}`);
-  await page.getByRole("button", { name: "Ambil", exact: true }).first().click();
+  await page.goto(`/#/work-orders/${idOf(db.workOrders, "WO-0006")}`);
+  await page.getByRole("button", { name: "Issue", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText(/Metode biaya FIFO/)).toBeVisible();
+  await expect(dialog.getByText(/Costing method FIFO/)).toBeVisible();
 });
 
 test("HPP report compares FIFO, moving average and LIFO", async ({ page }) => {
   await freshDemo(page);
-  await page.goto("/#/laporan");
-  await page.getByRole("tab", { name: "Metode biaya" }).click();
-  const summary = page.getByRole("grid", { name: "Ringkasan per metode" }).or(page.getByRole("table", { name: "Ringkasan per metode" }));
-  await expect(summary.getByText("Tercatat di buku")).toBeVisible();
-  await expect(summary.getByText("Rata-rata bergerak")).toBeVisible();
-  await expect(summary.getByText("bukan PSAK")).toBeVisible();
-  await expect(summary.getByText("dipakai")).toBeVisible();
+  await page.goto("/#/reports");
+  await page.getByRole("tab", { name: "Costing methods" }).click();
+  const summary = page.getByRole("grid", { name: "Summary by method" }).or(page.getByRole("table", { name: "Summary by method" }));
+  await expect(summary.getByText("As recorded")).toBeVisible();
+  await expect(summary.getByText("Moving average")).toBeVisible();
+  await expect(summary.getByText("not PSAK")).toBeVisible();
+  await expect(summary.getByText("in use")).toBeVisible();
 });

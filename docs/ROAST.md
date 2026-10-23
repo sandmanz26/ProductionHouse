@@ -1,56 +1,56 @@
-# Roast v1 → Rencana v2
+# Roast v1 → Plan v2
 
-Kritik jujur terhadap versi pertama MebelOS, ditulis sebelum perbaikan. Tujuannya bukan membela
-apa yang sudah ada, tapi menemukan di mana sistem akan gagal di lantai produksi sungguhan.
+An honest critique of the first version of MebelOS, written before fixing it. The goal is not to
+defend what exists, but to find where the system will fail on a real production floor.
 
-## 1. UI — di mana terasa "AI slop"
+## 1. UI — where it feels like "AI slop"
 
-| Gejala di v1 | Kenapa buruk | Perbaikan v2 |
+| Symptom in v1 | Why it is bad | v2 fix |
 |---|---|---|
-| Sapaan "Selamat malam 👋" | Emoji dekoratif adalah tanda paling umum UI hasil AI; tidak membawa informasi | Header berisi tanggal & shift, tanpa emoji |
-| Deretan kartu statistik dengan ikon di kotak pastel | Pola "tiga/empat kartu + ikon kecil" identik di ribuan dashboard generik | Satu *metric strip* bergaris tipis, angka monospace, tanpa ikon hiasan |
-| Semua permukaan `rounded-3xl` + bayangan | Radius seragam di semua elemen = tidak ada hierarki | Radius kecil (6px), border 1px, tanpa bayangan; kartu hanya untuk pengelompokan |
-| Subjudul panjang di setiap halaman | Menjelaskan hal yang sudah jelas; mendorong konten ke bawah | Satu baris pendek atau tidak ada |
-| Chip berwarna berpasangan (jenis + status) di mana-mana | Warna kehilangan arti karena dipakai untuk semuanya | Warna hanya untuk status yang butuh tindakan; jenis ditulis biasa |
-| Tile "Pekerjaan cepat" | Duplikat tombol "Buat" | Dihapus; diganti papan WIP per tahap |
-| Font default | Tidak punya karakter "alat kerja" | IBM Plex Sans + Plex Mono untuk kode & angka |
-| Tabel lebar di HP harus digeser | Tukang & kepala produksi memakai HP — tabel geser = tidak dipakai | Di layar kecil baris tabel otomatis jadi kartu bertumpuk |
-| Tidak ada pencarian global | Admin harus klik 3 menu untuk menemukan "PK-0012" | Command palette `Ctrl/⌘ K` |
-| Progres "Bahan 0%" | Indikator yang menyesatkan lebih buruk dari tidak ada | Progres berdasarkan **tahap produksi** yang benar-benar dilalui |
+| Greeting "Selamat malam 👋" ("Good evening") | Decorative emoji are the most common sign of AI-generated UI; they carry no information | Header shows the date & shift, no emoji |
+| A row of stat cards with icons in pastel boxes | The "three/four cards + small icon" pattern is identical across thousands of generic dashboards | One hairline *metric strip*, monospace numbers, no decorative icons |
+| Every surface `rounded-3xl` + shadow | The same radius on every element = no hierarchy | Small radius (6px), 1px border, no shadows; cards only for grouping |
+| Long subtitles on every page | They explain the obvious and push content down | One short line or none |
+| Paired coloured chips (type + status) everywhere | Colour loses meaning when it is used for everything | Colour only for statuses that need action; type in plain text |
+| "Quick jobs" tile | Duplicates the "New" button | Removed; replaced by a WIP board per stage |
+| Default font | No "work tool" character | IBM Plex Sans + Plex Mono for codes & numbers |
+| Wide tables need side-scrolling on phones | Craftsmen & production heads use phones — a scrolling table = an unused table | On small screens, table rows turn into stacked cards automatically |
+| No global search | An admin has to click through 3 menus to find "WO-0012" | Command palette `Ctrl/⌘ K` |
+| "Materials 0%" progress | A misleading indicator is worse than none | Progress based on the **production stages** actually completed |
 
-## 2. Kemampuan — skenario lapangan yang gagal di v1
+## 2. Capabilities — field scenarios that failed in v1
 
-Disusun dari riset (lihat sumber di bawah) dan pola umum produksi mebel.
+Compiled from research (see sources below) and common furniture production patterns.
 
-| # | Skenario nyata | v1 | v2 |
+| # | Real scenario | v1 | v2 |
 |---|---|---|---|
-| S1 | Rangka kursi dibuat dulu (komponen setengah jadi), baru dirakit dengan jok | ✗ output produksi harus produk | ✓ komponen = material dengan BOM; MRP multi-level menyarankan perintah kerja komponen |
-| S2 | Kayu basah dikeringkan (KD) dan menyusut; papan dibelah jadi komponen | ✗ tidak ada olah bahan | ✓ produksi bahan → bahan, susut tercatat sebagai limbah dengan rendemen |
-| S3 | Pekerjaan melewati potong → rakit → amplas → finishing → jok → QC → packing | ✗ hanya status rencana/berjalan | ✓ tahapan per perintah kerja, papan WIP per tahap |
-| S4 | Tukang dibayar **borongan per unit**, finishing di-*maklon* ke luar | ✗ hanya jam × tarif | ✓ catatan kerja per tahap: jam × tarif **atau** unit × tarif borongan; biaya subkon per tahap |
-| S5 | 24 kursi: 12 selesai dikirim duluan, sisanya minggu depan | ✗ harus selesai semua | ✓ **terima hasil sebagian** dengan HPP sementara; saat ditutup, lot direvaluasi ke HPP aktual dan selisih atas barang yang sudah terjual dicatat sebagai **selisih HPP** |
-| S6 | QC menolak 2 unit (finishing terlalu glossy) → rework | ✗ | ✓ hasil *reject* masuk sebagai unit rusak → perintah perbaikan; tingkat reject dilaporkan |
-| S7 | Beli kayu per batang dengan ukuran (kubikasi), kain per roll 50 m | ✗ harus hitung manual | ✓ kalkulator kubikasi (T×L×P) & satuan beli dengan konversi |
-| S8 | Buyer bayar DP 30%, pelunasan sebelum kapal berangkat; supplier ditagih tempo | ✗ tidak ada pembayaran | ✓ pembayaran per order/sewa/pembelian, piutang & utang dengan umur, peringatan "kirim tapi belum lunas" |
-| S9 | Pesanan custom: ukuran 200 cm, finishing walnut | ✗ | ✓ spesifikasi per baris order, ikut ke perintah kerja |
-| S10 | Jual serbuk/potongan sisa, jual unit bekas sewa | ✗ penjualan hanya produk | ✓ penjualan boleh material (sisa/limbah bernilai) |
-| S11 | Pelanggan mengembalikan barang (cacat/batal) | ✗ | ✓ **retur penjualan** dengan kondisi baik/rusak, kembali ke stok dengan HPP asal |
-| S12 | Pindah 2 lembar plywood dari gudang ke workshop | ✗ hanya ubah lokasi seluruh lot | ✓ transfer sebagian lot antar lokasi |
-| S13 | Sewa event: ongkos antar & setting; analisa unit paling laku/utilisasi | ✗ | ✓ biaya tambahan sewa, laporan utilisasi per produk |
+| S1 | Chair frames are made first (semi-finished component), then assembled with upholstery | ✗ production output had to be a product | ✓ component = material with a BOM; multi-level MRP suggests component work orders |
+| S2 | Green wood is kiln-dried (KD) and shrinks; boards are ripped into components | ✗ no material processing | ✓ material → material production, shrinkage recorded as waste with yield |
+| S3 | A job goes through cut → assemble → sand → finish → upholster → QC → pack | ✗ only planned/in-progress status | ✓ stages per work order, WIP board per stage |
+| S4 | Craftsmen are paid **piece rate per unit**, finishing is *subcontracted* out | ✗ only hours × rate | ✓ labour log per stage: hours × rate **or** units × piece rate; subcontract cost per stage |
+| S5 | 24 chairs: 12 finished and shipped first, the rest next week | ✗ everything had to be finished | ✓ **receive partial output** at provisional cost; on close, lots are revalued to actual cost and the difference on goods already sold is booked as **cost variance** |
+| S6 | QC rejects 2 units (finish too glossy) → rework | ✗ | ✓ *reject* output comes in as damaged units → repair order; reject rate reported |
+| S7 | Buy timber by the length with dimensions (volume), fabric by the 50 m roll | ✗ manual calculation | ✓ timber volume calculator (T×W×L) & purchase units with conversion |
+| S8 | Buyer pays a 30% down payment, final payment before the ship sails; suppliers bill on terms | ✗ no payments | ✓ payments per order/rental/purchase, receivables & payables with aging, "shipped but not paid" warning |
+| S9 | Custom order: 200 cm size, walnut finish | ✗ | ✓ specification per order line, carried to the work order |
+| S10 | Sell sawdust/offcuts, sell ex-rental units | ✗ sales were products only | ✓ sales may include materials (offcuts/waste with value) |
+| S11 | A customer returns goods (defect/cancellation) | ✗ | ✓ **sales returns** with good/damaged condition, back into stock at the original cost |
+| S12 | Move 2 sheets of plywood from the warehouse to the workshop | ✗ could only change the location of the whole lot | ✓ partial lot transfer between locations |
+| S13 | Event rental: delivery & setup fees; analysis of best-renting units/utilisation | ✗ | ✓ extra rental charges, utilisation report per product |
 
-## 3. Prinsip yang tetap dipegang
+## 3. Principles we keep
 
-- Semua aturan bisnis ada di `src/domain` (TypeScript murni) dan dibuktikan dengan test skenario.
-- Setiap aksi atomik: gagal = tidak ada data yang berubah.
-- Jumlah mutasi setiap lot selalu sama dengan qty lot (diuji di setiap skenario).
+- All business rules live in `src/domain` (pure TypeScript) and are proven by scenario tests.
+- Every action is atomic: failure = no data changes.
+- The sum of movements for every lot always equals the lot qty (tested in every scenario).
 
-## Sumber
+## Sources
 
-- Tahapan produksi furnitur & tracking WIP: [Ksolves Odoo furniture](https://www.ksolves.com/industries/odoo-manufacturing/furniture), [Ecosire custom furniture](https://ecosire.com/industries/custom-furniture), [Viindoo furniture ERP](https://viindoo.com/page/furniture-erp-software)
-- Spesifikasi ukuran custom mengubah BOM & biaya: [Ecosire custom furniture production](https://ecosire.com/apps/odoo/custom-furniture-production)
-- Kubikasi kayu (T cm × L cm × P m / 10.000): [KapanLagi](https://www.kapanlagi.com/feeds/cara-menghitung-kubikasi-kayu-235da1514b.html)
-- Susut pengeringan & rendemen kayu olahan ±50%: [ULM — penyusutan volumetris](https://ppjp.ulm.ac.id/journal/index.php/jht/article/view/1586), [UNISKA](https://ojs.uniska-bjm.ac.id/index.php/AIJP/article/view/2364/1814)
-- DP 30% / pelunasan 70% sebelum kirim, inspeksi pra-pengapalan AQL: [Alibaba seller blog](https://seller.alibaba.com/blogs/2026/southeast-asia/apparel/lc-payment-quality-control-guide-alibaba-b2b), [QualityInspection.org](https://qualityinspection.org/10-inspection), [newbuyingagent](https://www.newbuyingagent.com/es/resources/buying-furniture-from-a-china-manufacturer-step-by-step-process-from-rfq-to-delivery)
-- Penyebab rework (potong, bor, perakitan, finishing glossy ditolak): [UFPB case study](https://repositorio.ufpb.br/jspui/handle/123456789/36262), [Oracle WIP example](https://docs.oracle.com/cd/A60725_05/html/comnls/us/wip/nsdj.htm), [Auditing wood machining](https://qualityinspection.org/wood-furniture-process-china/)
-- Sewa event: zona siap/cuci/rusak, utilisasi menentukan return: [Beancount event rental guide](https://beancount.io/blog/2026/08/18/event-rental-business-bookkeeping-rental-fleet-depreciation-deposits-inventory-loss-guide), [Events Partner](https://eventspartner.com.sg/why-furniture-upkeep-matters-in-event-rentals-and-why-you-can-trust-events-partner)
-- Tanda-tanda UI "AI slop": [noqta.tn](https://noqta.tn/en/blog/ai-design-slop-overused-ui-patterns-fix-2026), [SuperDesign](https://www.superdesign.dev/blog/why-ai-design-looks-generic), [Spot the slop](https://world.hey.com/kostac/spot-the-slop-a-ui-designer-s-guide-to-fixing-ai-defaults-4c448c9c)
+- Furniture production stages & WIP tracking: [Ksolves Odoo furniture](https://www.ksolves.com/industries/odoo-manufacturing/furniture), [Ecosire custom furniture](https://ecosire.com/industries/custom-furniture), [Viindoo furniture ERP](https://viindoo.com/page/furniture-erp-software)
+- Custom size specifications change the BOM & cost: [Ecosire custom furniture production](https://ecosire.com/apps/odoo/custom-furniture-production)
+- Timber volume (T cm × W cm × L m / 10,000): [KapanLagi](https://www.kapanlagi.com/feeds/cara-menghitung-kubikasi-kayu-235da1514b.html)
+- Drying shrinkage & processed timber yield of about 50%: [ULM — volumetric shrinkage](https://ppjp.ulm.ac.id/journal/index.php/jht/article/view/1586), [UNISKA](https://ojs.uniska-bjm.ac.id/index.php/AIJP/article/view/2364/1814)
+- 30% down payment / 70% final payment before shipping, AQL pre-shipment inspection: [Alibaba seller blog](https://seller.alibaba.com/blogs/2026/southeast-asia/apparel/lc-payment-quality-control-guide-alibaba-b2b), [QualityInspection.org](https://qualityinspection.org/10-inspection), [newbuyingagent](https://www.newbuyingagent.com/es/resources/buying-furniture-from-a-china-manufacturer-step-by-step-process-from-rfq-to-delivery)
+- Causes of rework (cutting, drilling, assembly, glossy finish rejected): [UFPB case study](https://repositorio.ufpb.br/jspui/handle/123456789/36262), [Oracle WIP example](https://docs.oracle.com/cd/A60725_05/html/comnls/us/wip/nsdj.htm), [Auditing wood machining](https://qualityinspection.org/wood-furniture-process-china/)
+- Event rental: ready/cleaning/damaged zones, utilisation drives returns: [Beancount event rental guide](https://beancount.io/blog/2026/08/18/event-rental-business-bookkeeping-rental-fleet-depreciation-deposits-inventory-loss-guide), [Events Partner](https://eventspartner.com.sg/why-furniture-upkeep-matters-in-event-rentals-and-why-you-can-trust-events-partner)
+- Signs of "AI slop" UI: [noqta.tn](https://noqta.tn/en/blog/ai-design-slop-overused-ui-patterns-fix-2026), [SuperDesign](https://www.superdesign.dev/blog/why-ai-design-looks-generic), [Spot the slop](https://world.hey.com/kostac/spot-the-slop-a-ui-designer-s-guide-to-fixing-ai-defaults-4c448c9c)

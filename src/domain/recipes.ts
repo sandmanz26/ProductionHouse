@@ -16,50 +16,50 @@ export interface RecipeInput {
 
 export function getRecipe(db: Db, id: ID): Recipe {
   const r = db.recipes.find((x) => x.id === id);
-  assert(r, "Resep tidak ditemukan.");
+  assert(r, "Recipe not found — it may have been deleted.");
   return r;
 }
 
 function validateRecipe(db: Db, input: RecipeInput, keep?: ReadonlySet<ID>) {
-  assert(input.name?.trim(), "Nama resep wajib diisi.");
-  assert(["produksi", "konversi", "gabung", "dekonstruksi"].includes(input.type), "Jenis resep tidak dikenal.");
-  assert(input.inputs.length > 0, "Tambahkan minimal satu bahan masuk.");
-  assert(input.outputs.length > 0, "Tambahkan minimal satu hasil.");
+  assert(input.name?.trim(), "Recipe name is required.");
+  assert(["produksi", "konversi", "gabung", "dekonstruksi"].includes(input.type), "Unknown recipe type — pick one from the list.");
+  assert(input.inputs.length > 0, "Add at least one input material.");
+  assert(input.outputs.length > 0, "Add at least one output.");
   const inIds = new Set<ID>();
   for (const l of input.inputs) {
     const item = getUsableItem(db, l.itemId, keep);
-    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty ${item.name} harus lebih dari 0.`);
-    assert(!inIds.has(l.itemId), `${item.name} tercantum dua kali di bahan masuk.`);
+    assert(Number.isFinite(l.qty) && l.qty > EPS, `Qty of ${item.name} must be more than 0.`);
+    assert(!inIds.has(l.itemId), `${item.name} is listed twice in the inputs — combine the lines.`);
     inIds.add(l.itemId);
   }
   const outIds = new Set<ID>();
   for (const o of input.outputs) {
     const item = getUsableItem(db, o.itemId, keep);
-    assert(Number.isFinite(o.qty) && o.qty > EPS, `Qty hasil ${item.name} harus lebih dari 0.`);
-    assert(!outIds.has(o.itemId), `${item.name} tercantum dua kali di hasil.`);
-    assert(!inIds.has(o.itemId), `${item.name} tidak boleh menjadi bahan sekaligus hasil.`);
+    assert(Number.isFinite(o.qty) && o.qty > EPS, `Output qty of ${item.name} must be more than 0.`);
+    assert(!outIds.has(o.itemId), `${item.name} is listed twice in the outputs — combine the lines.`);
+    assert(!inIds.has(o.itemId), `${item.name} cannot be both an input and an output.`);
     outIds.add(o.itemId);
   }
   if (input.type === "gabung") {
-    assert(input.outputs.length === 1, "Resep gabung menghasilkan tepat satu jenis barang.");
+    assert(input.outputs.length === 1, "A merge recipe must have exactly one output item.");
     assert(
       input.inputs.length >= 2 || sum(input.inputs.map((l) => l.qty)) >= 2 - EPS,
-      "Resep gabung butuh minimal dua barang (atau dua unit) yang disatukan.",
+      "A merge recipe needs at least two items (or two units) to join.",
     );
   }
   const shares = input.outputs.filter((o) => o.sharePct !== undefined);
   if (shares.length) {
-    assert(shares.length === input.outputs.length, "Bila porsi biaya diisi, semua hasil harus diisi.");
-    for (const o of shares) assertAmount(o.sharePct, "Porsi biaya");
+    assert(shares.length === input.outputs.length, "If you set a cost share, set it for every output.");
+    for (const o of shares) assertAmount(o.sharePct, "Cost share");
     const total = sum(shares.map((o) => o.sharePct ?? 0));
-    assert(Math.abs(total - 100) < 0.01, `Total porsi biaya harus 100% (sekarang ${roundQty(total)}%).`);
+    assert(Math.abs(total - 100) < 0.01, `Cost shares must total 100% (now ${roundQty(total)}%).`);
   }
   const remnant = input.expectedRemnantPct ?? 0;
   const waste = input.expectedWastePct ?? 0;
-  assertAmount(remnant, "Perkiraan sisa");
-  assertAmount(waste, "Perkiraan limbah");
-  assert(remnant + waste < 100, "Perkiraan sisa + limbah harus di bawah 100%.");
-  assertAmount(input.laborHours ?? 0, "Jam kerja");
+  assertAmount(remnant, "Expected offcuts");
+  assertAmount(waste, "Expected waste");
+  assert(remnant + waste < 100, "Expected offcuts + waste must be under 100%.");
+  assertAmount(input.laborHours ?? 0, "Labour hours");
 }
 
 function normalize(input: RecipeInput) {
@@ -115,7 +115,7 @@ export interface RecipeCost {
   outputs: { itemId: ID; qty: number; share: number; total: number; unitCost: number }[];
 }
 
-/** Unit value of an input at standard: materials at replacement cost, products at standard HPP. */
+/** Unit value of an input at standard: materials at replacement cost, products at standard cost. */
 export function standardValue(db: Db, itemId: ID): number {
   const item = getItem(db, itemId);
   if (item.standardCost > 0) return item.standardCost;
@@ -150,8 +150,8 @@ export function createWorkOrderFromRecipe(
   opts: { batches: number; title?: string; dueDate?: ISODate; salesOrderId?: ID; parentWoId?: ID; note?: string },
 ): WorkOrder {
   const r = getRecipe(db, recipeId);
-  assert(!r.archived, `Resep ${r.name} sudah diarsipkan.`);
-  assert(Number.isFinite(opts.batches) && opts.batches > EPS, "Jumlah batch harus lebih dari 0.");
+  assert(!r.archived, `Recipe ${r.name} is archived — restore it first.`);
+  assert(Number.isFinite(opts.batches) && opts.batches > EPS, "Number of batches must be more than 0.");
   const b = opts.batches;
   return createWorkOrder(db, {
     type: r.type,

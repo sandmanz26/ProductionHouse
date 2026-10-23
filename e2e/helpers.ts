@@ -8,12 +8,18 @@ interface DemoDb {
   items: { id: string; sku: string }[];
 }
 
-/** Starts every test from the bundled demo data and returns its record ids. */
-export async function freshDemo(page: Page): Promise<DemoDb> {
+/**
+ * Starts every test from the bundled demo data and returns its record ids. The first-visit tour
+ * and page tips are switched off unless `withHelp` is set (help.spec covers them).
+ */
+export async function freshDemo(page: Page, { withHelp = false } = {}): Promise<DemoDb> {
   await page.goto("/");
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate((withHelp) => {
+    localStorage.clear();
+    if (!withHelp) localStorage.setItem("serat:help", JSON.stringify({ state: { tourDone: true, seenTips: [], tipsOff: true }, version: 0 }));
+  }, withHelp);
   await page.reload();
-  await page.getByRole("button", { name: "Masuk ke bengkel contoh" }).click();
+  await page.getByRole("button", { name: "Enter the sample workshop" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   return page.evaluate(() => JSON.parse(localStorage.getItem("mebelos:db")!).state.db as DemoDb);
 }

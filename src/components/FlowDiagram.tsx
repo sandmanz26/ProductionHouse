@@ -134,7 +134,7 @@ function layout(graph: FlowGraph, width: number) {
  * Sankey-style process map. Width is money; colour is what the money is (material, product,
  * offcut, labour). Hover a band or a node for the numbers; every value is also in the table view.
  */
-export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk digambar." }: { graph: FlowGraph; label: string; empty?: string }) {
+export function FlowDiagram({ graph, label, empty = "No flows to draw yet." }: { graph: FlowGraph; label: string; empty?: string }) {
   const navigate = useNavigate();
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(MIN_WIDTH);
@@ -188,7 +188,7 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
   return (
     <figure className="m-0" aria-label={label}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 pt-3">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Keterangan warna">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Colour key">
           {kinds.map((k) => (
             <li key={k} className="inline-flex items-center gap-1.5">
               <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: COLOR[k], backgroundImage: k === "rugi" ? HATCH_CSS : undefined }} />
@@ -198,14 +198,14 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
           {hasEstimate && (
             <li className="inline-flex items-center gap-1.5">
               <span aria-hidden className="inline-block h-0 w-4 border-t border-dashed border-current" />
-              perkiraan / standar
+              estimate / standard
             </li>
           )}
         </ul>
-        {narrow && !asTable && <span className="text-xs text-muted">Geser ke samping →</span>}
+        {narrow && !asTable && <span className="text-xs text-muted">Scroll sideways →</span>}
         <Button size="sm" variant="ghost" onPress={() => setAsTable((v) => !v)} aria-pressed={asTable}>
           {asTable ? <Workflow className="size-4" /> : <Table2 className="size-4" />}
-          {asTable ? "Diagram" : "Tabel"}
+          {asTable ? "Diagram" : "Table"}
         </Button>
       </div>
 
@@ -215,9 +215,9 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
             <caption className="sr-only">{label}</caption>
             <thead>
               <tr className="border-b border-[var(--rule)] text-left text-xs text-muted">
-                <th className="py-2 font-medium">Dari</th>
-                <th className="py-2 font-medium">Ke</th>
-                <th className="py-2 text-right font-medium">Nilai</th>
+                <th className="py-2 font-medium">From</th>
+                <th className="py-2 font-medium">To</th>
+                <th className="py-2 text-right font-medium">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -227,7 +227,7 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
                   <td className="py-1.5">{b.target.label}</td>
                   <td className="num py-1.5 text-right">
                     {formatIDR(b.value)}
-                    {b.estimated && <span className="text-muted"> · perkiraan</span>}
+                    {b.estimated && <span className="text-muted"> · estimate</span>}
                   </td>
                 </tr>
               ))}
@@ -236,7 +236,7 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
         </div>
       ) : (
         <div ref={wrap} className="relative overflow-x-auto px-4 pb-3" onMouseLeave={() => setHover(null)}>
-          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: ${columns} tahap, ${bands.length} aliran`} className="block">
+          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: ${columns} stages, ${bands.length} flows`} className="block">
             <defs>
               <pattern id="flow-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <line x1="0" y1="0" x2="0" y2="6" stroke="var(--background)" strokeWidth="2" strokeOpacity="0.55" />
@@ -299,8 +299,8 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
                   </p>
                   <p className="num mt-0.5">{formatIDR(active.value)}</p>
                   <p className="mt-0.5 text-muted">
-                    {Math.round((active.value / Math.max(1, active.source.value)) * 100)}% dari {active.source.label}
-                    {active.estimated ? " · perkiraan" : ""}
+                    {Math.round((active.value / Math.max(1, active.source.value)) * 100)}% of {active.source.label}
+                    {active.estimated ? " · estimate" : ""}
                   </p>
                 </>
               ) : activeNode ? (
@@ -308,7 +308,7 @@ export function FlowDiagram({ graph, label, empty = "Belum ada aliran untuk diga
                   <p className="font-medium">{activeNode.label}</p>
                   {activeNode.sub && <p className="text-muted">{activeNode.sub}</p>}
                   <p className="num mt-0.5">{formatIDR(activeNode.value)}</p>
-                  {activeNode.to && <p className="mt-0.5 text-muted">Klik untuk membuka</p>}
+                  {activeNode.to && <p className="mt-0.5 text-muted">Click to open</p>}
                 </>
               ) : null}
             </div>

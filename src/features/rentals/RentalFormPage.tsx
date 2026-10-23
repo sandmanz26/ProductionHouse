@@ -34,8 +34,8 @@ export default function RentalFormPage() {
   const { id } = useParams();
   const db = useDb();
   const r = id ? db.rentals.find((x) => x.id === id) : undefined;
-  if (id && !r) return <RecordNotFound what="Sewa" back="/sewa" />;
-  if (r && r.status !== "dipesan") return <RecordNotFound what="Booking yang bisa diubah" back={`/sewa/${r.id}`} />;
+  if (id && !r) return <RecordNotFound what="Rental" back="/rentals" />;
+  if (r && r.status !== "dipesan") return <RecordNotFound what="Editable booking" back={`/rentals/${r.id}`} />;
   return <RentalForm key={id ?? "new"} existingId={r?.id} />;
 }
 
@@ -86,17 +86,17 @@ function RentalForm({ existingId }: { existingId?: ID }) {
   });
 
   const save = () => {
-    const r = run((d) => (existing ? updateRental(d, existing.id, input) : createRental(d, input)), (x) => `Booking ${x.code} disimpan`);
-    if (r) navigate(`/sewa/${r.id}`, { replace: true });
+    const r = run((d) => (existing ? updateRental(d, existing.id, input) : createRental(d, input)), (x) => `Booking ${x.code} saved`);
+    if (r) navigate(`/rentals/${r.id}`, { replace: true });
   };
   const update = (key: string, patch: Partial<Line>) => setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   return (
     <>
-      <PageHeader title={existing ? `Ubah ${existing.code}` : "Booking sewa / pinjam"} back={existing ? `/sewa/${existing.id}` : "/sewa"} />
+      <PageHeader title={existing ? `Edit ${existing.code}` : "Rental / loan booking"} back={existing ? `/rentals/${existing.id}` : "/rentals"} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
-          <Section title="Detail">
+          <Section title="Details">
             <div className="flex flex-col gap-4">
               <ToggleButtonGroup
                 selectionMode="single"
@@ -106,27 +106,27 @@ function RentalForm({ existingId }: { existingId?: ID }) {
                   const v = [...keys][0];
                   if (v) setKind(v as RentalKind);
                 }}
-                aria-label="Jenis"
+                aria-label="Type"
               >
-                <ToggleButton id="sewa">Sewa (berbayar)</ToggleButton>
-                <ToggleButton id="pinjam">Pinjam (tanpa biaya)</ToggleButton>
+                <ToggleButton id="sewa">Rental (paid)</ToggleButton>
+                <ToggleButton id="pinjam">Loan (free)</ToggleButton>
               </ToggleButtonGroup>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TextInput label="Nama acara / proyek" value={project} onChange={setProject} placeholder="mis. Syuting iklan, wedding, pameran" isRequired />
-                <PartnerPicker role="customer" value={customerId} onChange={setCustomerId} label="Klien" />
-                <DateInput label="Mulai" value={startDate} onChange={setStartDate} isRequired />
+                <TextInput label="Event / project name" value={project} onChange={setProject} placeholder="e.g. Ad shoot, wedding, exhibition" isRequired />
+                <PartnerPicker role="customer" value={customerId} onChange={setCustomerId} label="Customer" />
+                <DateInput label="Start" value={startDate} onChange={setStartDate} isRequired />
                 <DateInput
-                  label="Kembali"
+                  label="Return"
                   value={endDate}
                   onChange={setEndDate}
                   isRequired
-                  errorMessage={startDate && endDate && endDate < startDate ? "Tanggal kembali sebelum tanggal mulai" : undefined}
-                  description={validDates ? `${days} hari (termasuk hari mulai)` : undefined}
+                  errorMessage={startDate && endDate && endDate < startDate ? "Return date is before the start date" : undefined}
+                  description={validDates ? `${days} days (including the start day)` : undefined}
                 />
               </div>
             </div>
           </Section>
-          <Section title="Unit">
+          <Section title="Units">
             <div className="flex flex-col gap-3">
               {lines.map((l) => {
                 const a = l.itemId ? availability.get(l.itemId) : undefined;
@@ -139,19 +139,19 @@ function RentalForm({ existingId }: { existingId?: ID }) {
                         kind="product"
                         value={l.itemId}
                         onChange={(itemId) => update(l.key, { itemId, ratePerDay: l.ratePerDay || item(itemId ?? undefined)?.rentalRatePerDay || 0 })}
-                        aria-label="Produk"
+                        aria-label="Product"
                       />
-                      <NumberInput aria-label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix="unit" maximumFractionDigits={0} minValue={1} />
-                      {kind === "sewa" && <NumberInput aria-label="Tarif per hari" value={l.ratePerDay} onChange={(ratePerDay) => update(l.key, { ratePerDay })} money />}
-                      <Button isIconOnly variant="ghost" aria-label="Hapus" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
+                      <NumberInput aria-label="Qty" value={l.qty} onChange={(qty) => update(l.key, { qty })} suffix="units" maximumFractionDigits={0} minValue={1} />
+                      {kind === "sewa" && <NumberInput aria-label="Rate per day" value={l.ratePerDay} onChange={(ratePerDay) => update(l.key, { ratePerDay })} money />}
+                      <Button isIconOnly variant="ghost" aria-label="Remove" isDisabled={lines.length === 1} onPress={() => setLines(lines.filter((x) => x.key !== l.key))}>
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
                     {a && (
                       <p className={`mt-1 flex items-center gap-1 text-xs ${ok ? "text-success" : "text-danger"}`}>
                         {ok ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
-                        {a.available} dari {a.owned} unit tersedia di tanggal ini
-                        {a.held > 0 && ` (${a.held} dibooking acara lain)`}
+                        {a.available} of {a.owned} units available on these dates
+                        {a.held > 0 && ` (${a.held} booked for other events)`}
                       </p>
                     )}
                   </div>
@@ -159,49 +159,49 @@ function RentalForm({ existingId }: { existingId?: ID }) {
               })}
               <div>
                 <Button size="sm" variant="tertiary" onPress={() => setLines([...lines, { key: k(), itemId: null, qty: 1, ratePerDay: 0 }])}>
-                  <Plus className="size-4" /> Tambah unit
+                  <Plus className="size-4" /> Add unit
                 </Button>
               </div>
             </div>
           </Section>
-          <Section title="Lainnya">
+          <Section title="Other">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <NumberInput label="Deposit / jaminan" value={deposit} onChange={setDeposit} money />
-              {kind === "sewa" && <NumberInput label="Diskon" value={discount} onChange={setDiscount} money />}
+              <NumberInput label="Deposit / security" value={deposit} onChange={setDeposit} money />
+              {kind === "sewa" && <NumberInput label="Discount" value={discount} onChange={setDiscount} money />}
               <div className="flex flex-col gap-2 sm:col-span-2">
-                <p className="text-sm font-medium">Biaya tambahan</p>
+                <p className="text-sm font-medium">Extra charges</p>
                 {charges.map((c) => (
                   <div key={c.key} className="grid grid-cols-[1fr_9rem_auto] items-end gap-2">
-                    <TextInput aria-label="Keterangan" value={c.label} onChange={(label) => setCharges(charges.map((x) => (x.key === c.key ? { ...x, label } : x)))} placeholder="mis. antar-jemput, setting, cleaning" />
-                    <NumberInput aria-label="Jumlah" value={c.amount} onChange={(amount) => setCharges(charges.map((x) => (x.key === c.key ? { ...x, amount } : x)))} money />
-                    <Button isIconOnly variant="ghost" aria-label="Hapus biaya" onPress={() => setCharges(charges.filter((x) => x.key !== c.key))}>
+                    <TextInput aria-label="Description" value={c.label} onChange={(label) => setCharges(charges.map((x) => (x.key === c.key ? { ...x, label } : x)))} placeholder="e.g. delivery & pickup, setup, cleaning" />
+                    <NumberInput aria-label="Amount" value={c.amount} onChange={(amount) => setCharges(charges.map((x) => (x.key === c.key ? { ...x, amount } : x)))} money />
+                    <Button isIconOnly variant="ghost" aria-label="Remove charge" onPress={() => setCharges(charges.filter((x) => x.key !== c.key))}>
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
                 ))}
                 <div>
-                  <Button size="sm" variant="tertiary" onPress={() => setCharges([...charges, { key: k(), label: "Antar-jemput & setting", amount: 0 }])}>
-                    <Plus className="size-4" /> Biaya antar / setting
+                  <Button size="sm" variant="tertiary" onPress={() => setCharges([...charges, { key: k(), label: "Delivery, pickup & setup", amount: 0 }])}>
+                    <Plus className="size-4" /> Delivery / setup charge
                   </Button>
                 </div>
               </div>
-              <TextAreaInput className="sm:col-span-2" label="Catatan" value={note} onChange={setNote} rows={2} placeholder="Alamat lokasi, PIC lapangan, syarat khusus…" />
+              <TextAreaInput className="sm:col-span-2" label="Note" value={note} onChange={setNote} rows={2} placeholder="Venue address, on-site contact, special terms…" />
             </div>
           </Section>
         </div>
         <div className="xl:sticky xl:top-20 xl:self-start">
           <Card>
             <Card.Header>
-              <Card.Title className="text-base">Ringkasan</Card.Title>
+              <Card.Title className="text-base">Summary</Card.Title>
             </Card.Header>
             <Card.Content>
-              <Row label="Durasi" value={`${days} hari`} />
-              <Row label="Unit" value={sum(input.lines.map((l) => l.qty))} />
+              <Row label="Duration" value={`${days} days`} />
+              <Row label="Units" value={sum(input.lines.map((l) => l.qty))} />
               {kind === "sewa" && (
                 <>
-                  <Row label="Biaya sewa" value={formatIDR(base)} />
-                  {sum(charges.map((c) => c.amount)) > 0 && <Row label="Biaya tambahan" value={formatIDR(sum(charges.map((c) => c.amount)))} />}
-                  {discount > 0 && <Row label="Diskon" value={`− ${formatIDR(discount)}`} />}
+                  <Row label="Rental charge" value={formatIDR(base)} />
+                  {sum(charges.map((c) => c.amount)) > 0 && <Row label="Extra charges" value={formatIDR(sum(charges.map((c) => c.amount)))} />}
+                  {discount > 0 && <Row label="Discount" value={`− ${formatIDR(discount)}`} />}
                   <div className="my-2 border-t border-[var(--rule)]" />
                   <Row label="Total" value={formatIDR(Math.max(0, base + sum(charges.map((c) => c.amount)) - discount))} strong />
                 </>
@@ -209,13 +209,13 @@ function RentalForm({ existingId }: { existingId?: ID }) {
               <Row label="Deposit" value={formatIDR(deposit)} muted />
               {overbooked.length > 0 && (
                 <p className="mt-3 rounded-sm bg-danger-soft p-3 text-xs text-danger-soft-foreground">
-                  Unit tidak cukup di tanggal ini. Booking tetap bisa disimpan (mis. unit sedang diproduksi), tetapi serah unit akan ditolak bila stok belum ada.
+                  Not enough units on these dates. You can still save the booking (e.g. units are in production), but hand-over will be refused until the stock exists.
                 </p>
               )}
             </Card.Content>
             <Card.Footer>
               <Button onPress={save} isDisabled={!validDates || !project.trim() || input.lines.length === 0} fullWidth>
-                Simpan booking
+                Save booking
               </Button>
             </Card.Footer>
           </Card>

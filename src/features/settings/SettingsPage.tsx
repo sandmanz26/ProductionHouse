@@ -44,7 +44,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
             .map((x) => x.trim())
             .filter(Boolean),
         }),
-      "Pengaturan disimpan",
+      "Settings saved",
     );
 
   const exportBackup = () => {
@@ -52,19 +52,19 @@ function SettingsForm({ initial }: { initial: Settings }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `serat-cadangan-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `serat-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Cadangan diunduh");
+    toast.success("Backup downloaded");
   };
 
   const importBackup = async (file: File) => {
     try {
       const data = parseBackup(await file.text());
       replace(data);
-      toast.success("Data dipulihkan dari cadangan", { description: `${data.items.length} item, ${data.lots.length} lot.` });
+      toast.success("Data restored from backup", { description: `${data.items.length} items, ${data.lots.length} lots.` });
     } catch (e) {
-      toast.danger(e instanceof DomainError ? e.message : "Gagal membaca file cadangan");
+      toast.danger(e instanceof DomainError ? e.message : "Could not read the backup file");
     }
   };
 
@@ -72,63 +72,63 @@ function SettingsForm({ initial }: { initial: Settings }) {
 
   return (
     <>
-      <PageHeader title="Pengaturan" description="Profil perusahaan, tarif biaya standar, kurs, dan pengelolaan data." actions={<Button onPress={save}>Simpan pengaturan</Button>} />
+      <PageHeader title="Settings" description="Company profile, standard cost rates, exchange rates and data management." actions={<Button onPress={save}>Save settings</Button>} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Section title="Perusahaan" description="Tampil di proforma invoice dan packing list.">
+        <Section title="Company" description="Shown on the proforma invoice and packing list.">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextInput className="sm:col-span-2" label="Nama perusahaan" value={s.companyName} onChange={(v) => set("companyName", v)} isRequired />
-            <TextInput className="sm:col-span-2" label="Alamat" value={s.companyAddress} onChange={(v) => set("companyAddress", v)} />
-            <TextInput label="Telepon" value={s.companyPhone} onChange={(v) => set("companyPhone", v)} />
+            <TextInput className="sm:col-span-2" label="Company name" value={s.companyName} onChange={(v) => set("companyName", v)} isRequired />
+            <TextInput className="sm:col-span-2" label="Address" value={s.companyAddress} onChange={(v) => set("companyAddress", v)} />
+            <TextInput label="Phone" value={s.companyPhone} onChange={(v) => set("companyPhone", v)} />
             <TextInput label="Email" value={s.companyEmail} onChange={(v) => set("companyEmail", v)} />
-            <TextInput label="NPWP" value={s.npwp} onChange={(v) => set("npwp", v)} />
+            <TextInput label="Tax ID (NPWP)" value={s.npwp} onChange={(v) => set("npwp", v)} />
           </div>
         </Section>
-        <Section title="Biaya standar produksi" description="Dipakai sebagai default perintah kerja baru dan HPP standar.">
+        <Section title="Standard production costs" description="Used as the default for new work orders and for the standard cost.">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NumberInput label="Tarif tenaga kerja / jam" value={s.laborRatePerHour} onChange={(v) => set("laborRatePerHour", v)} money />
-            <NumberInput label="Overhead / jam kerja" value={s.overheadPerLaborHour} onChange={(v) => set("overheadPerLaborHour", v)} money description="Listrik, penyusutan mesin, sewa workshop dibagi jam kerja." />
+            <NumberInput label="Labour rate / hour" value={s.laborRatePerHour} onChange={(v) => set("laborRatePerHour", v)} money />
+            <NumberInput label="Overhead / labour hour" value={s.overheadPerLaborHour} onChange={(v) => set("overheadPerLaborHour", v)} money description="Electricity, machine depreciation and workshop rent divided by labour hours." />
           </div>
           <div className="mt-3">
-            <TextInput label="Rute tahapan default" value={stages} onChange={setStages} description="Dipakai perintah kerja baru bila produk tidak punya rute sendiri. Pisahkan dengan koma." />
+            <TextInput label="Default stage route" value={stages} onChange={setStages} description="Used by new work orders when the product has no route of its own. Separate with commas." />
           </div>
-          <p className="mt-3 text-xs text-muted">Contoh: 6 jam kerja → {formatIDR(6 * (s.laborRatePerHour + s.overheadPerLaborHour))} biaya konversi.</p>
+          <p className="mt-3 text-xs text-muted">Example: 6 labour hours → {formatIDR(6 * (s.laborRatePerHour + s.overheadPerLaborHour))} conversion cost.</p>
         </Section>
-        <Section title="Kurs default" description="Rupiah per 1 unit mata uang asing. Bisa diubah per order.">
+        <Section title="Default exchange rates" description="Rupiah per 1 unit of foreign currency. Can be changed per order.">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {currencies.map((c) => (
               <NumberInput key={c} label={c} value={s.exchangeRates[c]} onChange={(v) => set("exchangeRates", { ...s.exchangeRates, [c]: v })} money />
             ))}
           </div>
         </Section>
-        <Section title="Gudang & pengingat">
+        <Section title="Warehouse & reminders">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextInput className="sm:col-span-2" label="Lokasi gudang (pisahkan dengan koma)" value={locations} onChange={setLocations} description="Lokasi pertama menjadi default." />
-            <NumberInput label="Sisa dianggap lama setelah" value={s.remnantAgingDays} onChange={(v) => set("remnantAgingDays", v)} suffix="hari" maximumFractionDigits={0} />
-            <NumberInput label="Ingatkan sewa sebelum jatuh tempo" value={s.rentalReminderDays} onChange={(v) => set("rentalReminderDays", v)} suffix="hari" maximumFractionDigits={0} />
+            <TextInput className="sm:col-span-2" label="Warehouse locations (separate with commas)" value={locations} onChange={setLocations} description="The first location is the default." />
+            <NumberInput label="Offcuts count as old after" value={s.remnantAgingDays} onChange={(v) => set("remnantAgingDays", v)} suffix="days" maximumFractionDigits={0} />
+            <NumberInput label="Remind about rentals before the due date" value={s.rentalReminderDays} onChange={(v) => set("rentalReminderDays", v)} suffix="days" maximumFractionDigits={0} />
           </div>
         </Section>
         <Section
-          title="Metode biaya persediaan"
-          description="Menentukan harga bahan yang dibebankan ke perintah kerja dan HPP barang yang dikirim. Sisa material, barang yang dibeli khusus untuk satu pekerjaan, dan unit rusak selalu memakai harga lotnya sendiri."
+          title="Inventory costing method"
+          description="Sets the material price charged to work orders and the COGS of goods shipped. Offcuts, items bought for one specific job and damaged units always use their own lot price."
           className="xl:col-span-2"
         >
           <CostingMethodPicker name="costing-method" value={s.costingMethod} onChange={(m) => set("costingMethod", m)} />
           {s.costingMethod === "lifo" && (
             <p className="mt-3 border-l-2 border-danger pl-3 text-[13px] text-danger">
-              LIFO tidak diakui PSAK 14 (sejak 2009) maupun UU PPh Pasal 10 ayat 6. Pakai hanya untuk analisa internal; laporan keuangan dan
-              SPT perlu dihitung ulang dengan FIFO atau rata-rata.
+              LIFO is not accepted by PSAK 14 (since 2009) or by Income Tax Law Article 10(6). Use it for internal analysis only; financial
+              statements and tax returns (SPT) must be recalculated with FIFO or moving average.
             </p>
           )}
           {s.costingMethod !== initial.costingMethod && (
             <p className="mt-3 border-l-2 border-warning pl-3 text-[13px]">
-              Berlaku untuk barang yang keluar setelah disimpan; nilai yang sudah tercatat tidak diubah
-              {s.costingMethod === "rata_rata" ? ", kecuali stok yang ada langsung dirata-ratakan" : ""}. UU PPh mensyaratkan metode dipakai
-              konsisten — perubahan untuk keperluan pajak perlu persetujuan DJP.
+              Applies to goods that go out after you save; values already recorded do not change
+              {s.costingMethod === "rata_rata" ? ", except that existing stock is averaged right away" : ""}. Income tax law requires the method to be
+              used consistently — a change for tax purposes needs approval from the tax office (DJP).
             </p>
           )}
           {initial.costingHistory.length > 0 && (
             <div className="mt-4">
-              <p className="eyebrow">Riwayat perubahan</p>
+              <p className="eyebrow">Change history</p>
               <ul className="mt-1 divide-y divide-[var(--rule)] text-[13px]">
                 {[...initial.costingHistory].reverse().slice(0, 8).map((h, i) => (
                   <li key={i} className="flex flex-wrap justify-between gap-2 py-1.5">
@@ -143,21 +143,21 @@ function SettingsForm({ initial }: { initial: Settings }) {
             </div>
           )}
         </Section>
-        <Section title="Data" description="Semua data tersimpan di browser perangkat ini (tanpa server). Cadangkan secara rutin dan simpan file di tempat aman." className="xl:col-span-2">
+        <Section title="Data" description="All data is saved in this device's browser (no server). Back up regularly and keep the file somewhere safe." className="xl:col-span-2">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
-              <Row label="Item" value={db.items.length} />
-              <Row label="Lot stok" value={db.lots.length} />
-              <Row label="Mutasi" value={db.moves.length} />
-              <Row label="Transaksi" value={db.purchases.length + db.workOrders.length + db.sales.length + db.rentals.length} />
-              <Row label="Ukuran data" value={`±${storageKb.toLocaleString("id-ID")} KB dari ±5.000 KB`} muted />
+              <Row label="Items" value={db.items.length} />
+              <Row label="Stock lots" value={db.lots.length} />
+              <Row label="Stock movements" value={db.moves.length} />
+              <Row label="Transactions" value={db.purchases.length + db.workOrders.length + db.sales.length + db.rentals.length} />
+              <Row label="Data size" value={`±${storageKb.toLocaleString("en-US")} KB of ±5,000 KB`} muted />
             </div>
             <div className="flex flex-col gap-2">
               <Button variant="secondary" onPress={exportBackup}>
-                <Download className="size-4" /> Unduh cadangan (.json)
+                <Download className="size-4" /> Download backup (.json)
               </Button>
               <Button variant="secondary" onPress={() => fileRef.current?.click()}>
-                <Upload className="size-4" /> Pulihkan dari cadangan
+                <Upload className="size-4" /> Restore from backup
               </Button>
               <input
                 ref={fileRef}
@@ -172,29 +172,29 @@ function SettingsForm({ initial }: { initial: Settings }) {
               />
               <ConfirmButton
                 variant="secondary"
-                title="Muat ulang data demo?"
-                description="Semua data saat ini diganti dengan data contoh. Unduh cadangan dulu bila perlu."
-                confirmLabel="Muat data demo"
+                title="Reload the demo data?"
+                description="All current data is replaced with the sample data. Download a backup first if needed."
+                confirmLabel="Load demo data"
                 danger
                 onConfirm={() => {
                   resetDemo();
-                  toast.success("Data demo dimuat");
+                  toast.success("Demo data loaded");
                 }}
               >
-                <RotateCcw className="size-4" /> Muat data demo
+                <RotateCcw className="size-4" /> Load demo data
               </ConfirmButton>
               <ConfirmButton
                 variant="danger-soft"
-                title={isDemo ? "Mulai dengan data kosong?" : "Hapus semua data?"}
-                description="Seluruh item, stok, dan transaksi akan dihapus dari perangkat ini. Tindakan ini tidak bisa dibatalkan."
-                confirmLabel="Hapus semua"
+                title={isDemo ? "Start with empty data?" : "Delete all data?"}
+                description="All items, stock and transactions will be deleted from this device. This cannot be undone."
+                confirmLabel="Delete all"
                 danger
                 onConfirm={() => {
                   clearAll();
-                  toast.success("Data dikosongkan — mulai dengan menambah material dan produk");
+                  toast.success("Data cleared — start by adding materials and products");
                 }}
               >
-                Mulai dengan data kosong
+                Start with empty data
               </ConfirmButton>
             </div>
           </div>

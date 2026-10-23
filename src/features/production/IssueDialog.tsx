@@ -27,8 +27,8 @@ export function IssueDialog({
     <TaskModal
       isOpen={!!request}
       onOpenChange={(open) => !open && onClose()}
-      title="Ambil bahan dari gudang"
-      description="Lot dipilih otomatis: cadangan untuk pekerjaan ini → sisa material (terkecil dulu) → stok biasa menurut metode biaya. Ubah qty per lot bila perlu."
+      title="Issue materials from the warehouse"
+      description="Lots are picked automatically: reserved for this job → offcuts (smallest first) → regular stock by costing method. Change the qty per lot if needed."
     >
       {request && <IssueForm wo={wo} initial={request} onDone={onClose} />}
     </TaskModal>
@@ -78,37 +78,37 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
 
   const submit = () => {
     const picks = lots.map((l) => ({ lotId: l.id, qty: qtyFor(l.id) })).filter((p) => p.qty > EPS);
-    const ok = run((d) => issueMaterials(d, wo.id, picks), `${formatQty(picked, it?.uom)} ${it?.name ?? ""} diambil`);
+    const ok = run((d) => issueMaterials(d, wo.id, picks), `${formatQty(picked, it?.uom)} ${it?.name ?? ""} issued`);
     if (ok) onDone();
   };
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
-        <ItemPicker value={itemId} onChange={setItemId} label="Bahan / barang" />
-        <NumberInput label="Qty dibutuhkan" value={qty} onChange={setQty} suffix={it ? UOM_LABEL[it.uom] : undefined} />
+        <ItemPicker value={itemId} onChange={setItemId} label="Material / item" />
+        <NumberInput label="Qty needed" value={qty} onChange={setQty} suffix={it ? UOM_LABEL[it.uom] : undefined} />
       </div>
       <SwitchInput
         isSelected={useRemnants}
         onChange={setUseRemnants}
-        label="Pakai sisa material lebih dulu"
-        description="Matikan bila butuh potongan utuh (mis. papan panjang kualitas ekspor)."
+        label="Use offcuts first"
+        description="Turn this off when you need whole pieces (e.g. long export-grade boards)."
       />
 
       {itemId && (
         <p className="-mt-1 text-xs text-muted">
-          Metode biaya <b className="text-foreground">{COSTING_LABEL[method]}</b>
-          {method === "fifo" && " — stok biasa harus keluar dari lot terlama dulu."}
-          {method === "lifo" && " — stok biasa harus keluar dari lot terbaru dulu."}
-          {method === "rata_rata" && " — lot mana pun yang diambil, harganya rata-rata stok saat ini."}
-          {method === "identifikasi" && " — harga mengikuti lot yang dipilih."} Sisa material dan barang khusus pekerjaan ini selalu boleh dipakai lebih dulu.
+          Costing method <b className="text-foreground">{COSTING_LABEL[method]}</b>
+          {method === "fifo" && " — regular stock must come out of the oldest lot first."}
+          {method === "lifo" && " — regular stock must come out of the newest lot first."}
+          {method === "rata_rata" && " — whichever lot you issue, it costs the current stock average."}
+          {method === "identifikasi" && " — cost follows the chosen lot."} Offcuts and items bought for this job can always be used first.
         </p>
       )}
 
       {itemId && (
         <div className="rounded-md border border-[var(--rule)]">
           {lots.length === 0 ? (
-            <p className="p-4 text-sm text-muted">Tidak ada stok tersedia untuk item ini.</p>
+            <p className="p-4 text-sm text-muted">No stock available for this item.</p>
           ) : (
             <ul className="divide-y divide-[var(--rule)]">
               {lots.map((l) => (
@@ -119,20 +119,20 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
                       {l.isRemnant && (
                         <StatusChip tone="success">
                           <Recycle className="mr-1 inline size-3" />
-                          Sisa
+                          Offcut
                         </StatusChip>
                       )}
-                      {l.reservedForWo === wo.id && <StatusChip tone="accent">Dibeli untuk pekerjaan ini</StatusChip>}
-                      {next?.id === l.id && <StatusChip tone="default">Keluar berikutnya ({COSTING_LABEL[method]})</StatusChip>}
-                      {l.status === "rusak" && <StatusChip tone="danger">Rusak</StatusChip>}
+                      {l.reservedForWo === wo.id && <StatusChip tone="accent">Bought for this job</StatusChip>}
+                      {next?.id === l.id && <StatusChip tone="default">Next out ({COSTING_LABEL[method]})</StatusChip>}
+                      {l.status === "rusak" && <StatusChip tone="danger">Damaged</StatusChip>}
                     </div>
                     <p className="mt-0.5 text-xs text-muted">
-                      Ada {formatQty(l.qty, it?.uom)} · {formatIDR(l.unitCost)}/{it ? UOM_LABEL[it.uom] : ""} · {LOT_ORIGIN[l.origin]}
+                      On hand {formatQty(l.qty, it?.uom)} · {formatIDR(l.unitCost)}/{it ? UOM_LABEL[it.uom] : ""} · {LOT_ORIGIN[l.origin]}
                       {l.originRef ? ` ${l.originRef.code}` : ""} · {l.location}
                       {l.dimensions ? ` · ${formatDims(l.dimensions)}` : ""}
                     </p>
                   </div>
-                  <NumberInput aria-label={`Qty dari ${l.code}`} value={qtyFor(l.id)} onChange={(v) => setLotQty(l.id, v)} maxValue={l.qty} />
+                  <NumberInput aria-label={`Qty from ${l.code}`} value={qtyFor(l.id)} onChange={(v) => setLotQty(l.id, v)} maxValue={l.qty} />
                 </li>
               ))}
             </ul>
@@ -142,27 +142,27 @@ function IssueForm({ wo, initial, onDone }: { wo: WorkOrder; initial: IssueReque
 
       <div className="flex flex-col gap-1 rounded-md bg-default/60 p-3 text-sm">
         <div className="flex justify-between">
-          <span>Diambil</span>
+          <span>Issued</span>
           <b className="tabular-nums">
             {formatQty(picked, it?.uom)} · {formatIDR(value)}
           </b>
         </div>
         {remnantQty > 0 && (
           <div className="flex justify-between text-success">
-            <span>Dari sisa material</span>
+            <span>From offcuts</span>
             <span className="tabular-nums">{formatQty(remnantQty, it?.uom)}</span>
           </div>
         )}
-        {shortage > 0 && <p className="text-warning">Masih kurang {formatQty(shortage, it?.uom)} — sisanya bisa diambil setelah barang datang.</p>}
-        {over && <p className="text-danger">Qty dari {over.code} melebihi stok lot.</p>}
+        {shortage > 0 && <p className="text-warning">Still short {formatQty(shortage, it?.uom)} — issue the rest once the goods arrive.</p>}
+        {over && <p className="text-danger">Qty from {over.code} is more than the lot holds.</p>}
       </div>
 
       <div className="flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button onPress={submit} isDisabled={!itemId || picked <= EPS || !!over}>
-          Ambil {picked > 0 ? formatQty(picked, it?.uom) : ""}
+          Issue {picked > 0 ? formatQty(picked, it?.uom) : ""}
         </Button>
       </div>
     </div>

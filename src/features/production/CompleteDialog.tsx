@@ -50,8 +50,8 @@ export function CompleteDialog({ wo, isOpen, onOpenChange }: { wo: WorkOrder; is
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="full"
-      title={`Selesaikan ${wo.code}`}
-      description="Catat hasil dan sisa material. Sisa layak pakai kembali ke gudang sebagai lot sisa dan mengurangi HPP pekerjaan ini."
+      title={`Complete ${wo.code}`}
+      description="Record the output and offcuts. Usable offcuts go back to the warehouse as offcut lots and lower this job's cost."
     >
       {isOpen && <CompleteForm wo={wo} onDone={() => onOpenChange(false)} />}
     </TaskModal>
@@ -115,7 +115,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
   }
 
   const submit = () => {
-    const done = run((d) => completeWorkOrder(d, wo.id, input), `${wo.code} selesai — HPP terkunci`);
+    const done = run((d) => completeWorkOrder(d, wo.id, input), `${wo.code} done — cost locked`);
     if (done) onDone();
   };
 
@@ -127,42 +127,42 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="flex flex-col gap-6">
         <Section
-          title="Hasil pekerjaan"
+          title="Job output"
           description={
             wo.type === "dekonstruksi"
-              ? "Bahan yang berhasil dibongkar. Nilainya dibatasi maksimal harga bahan baru."
+              ? "Materials recovered from dismantling. Their value is capped at the price of new material."
               : wo.receipts.length
-                ? `Sisa hasil yang masuk sekarang. ${wo.receipts.reduce((a, r) => a + r.qty, 0)} unit sudah diterima sebagian dan ikut dihitung HPP-nya.`
-                : "Barang jadi yang masuk gudang. Unit yang gagal QC tambahkan sebagai baris Reject."
+                ? `The rest of the output, received now. ${wo.receipts.reduce((a, r) => a + r.qty, 0)} units were already received as partial output and are included in the cost.`
+                : "Finished goods going into the warehouse. Add units that failed QC as a Reject row."
           }
         >
           <div className="flex flex-col gap-2">
             {outputs.map((o) => (
               <div key={o.key} className={`grid items-end gap-2 ${manualShare ? "grid-cols-[1fr_6.5rem_8rem_6rem_auto]" : "grid-cols-[1fr_6.5rem_8rem_auto]"}`}>
-                <ItemPicker filter={outputFilter} value={o.itemId} onChange={(id) => updateOut(o.key, { itemId: id })} aria-label="Item hasil" />
-                <NumberInput aria-label="Qty hasil" value={o.qty} onChange={(qty) => updateOut(o.key, { qty })} suffix={o.itemId ? UOM_LABEL[item(o.itemId)?.uom ?? "pcs"] : undefined} />
+                <ItemPicker filter={outputFilter} value={o.itemId} onChange={(id) => updateOut(o.key, { itemId: id })} aria-label="Output item" />
+                <NumberInput aria-label="Output qty" value={o.qty} onChange={(qty) => updateOut(o.key, { qty })} suffix={o.itemId ? UOM_LABEL[item(o.itemId)?.uom ?? "pcs"] : undefined} />
                 <SelectInput
-                  aria-label="Hasil QC"
+                  aria-label="QC result"
                   value={o.grade}
                   onChange={(v) => updateOut(o.key, { grade: v as OutputGrade })}
                   options={(Object.keys(OUTPUT_GRADE) as OutputGrade[]).map((g) => ({ id: g, label: OUTPUT_GRADE[g] }))}
                 />
-                {manualShare && <NumberInput aria-label="Porsi biaya" value={o.sharePct} onChange={(sharePct) => updateOut(o.key, { sharePct })} maxValue={100} suffix="%" />}
-                <Button isIconOnly variant="ghost" aria-label="Hapus" isDisabled={outputs.length === 1} onPress={() => setOutputs(outputs.filter((x) => x.key !== o.key))}>
+                {manualShare && <NumberInput aria-label="Cost share" value={o.sharePct} onChange={(sharePct) => updateOut(o.key, { sharePct })} maxValue={100} suffix="%" />}
+                <Button isIconOnly variant="ghost" aria-label="Remove" isDisabled={outputs.length === 1} onPress={() => setOutputs(outputs.filter((x) => x.key !== o.key))}>
                   <Trash2 className="size-4" />
                 </Button>
               </div>
             ))}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Button size="sm" variant="tertiary" onPress={() => setOutputs([...outputs, { key: k(), itemId: outputs[0]?.itemId ?? null, qty: 1, sharePct: 0, grade: "reject" }])}>
-                <Plus className="size-4" /> Tambah baris (mis. reject QC)
+                <Plus className="size-4" /> Add row (e.g. QC reject)
               </Button>
               {outputs.length > 1 && (
                 <SwitchInput
                   isSelected={manualShare}
                   onChange={setManualShare}
-                  label="Atur porsi biaya manual"
-                  description="Default: dibagi menurut nilai jual relatif."
+                  label="Set cost shares manually"
+                  description="Default: split by relative sales value."
                 />
               )}
             </div>
@@ -170,8 +170,8 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
         </Section>
 
         <Section
-          title="Sisa & limbah"
-          description="Pilih: utuh (tidak terpakai), sisa layak pakai (jadi lot sisa dengan ukuran), atau limbah (isi nilai jika dijual)."
+          title="Offcuts & waste"
+          description="Choose: whole (unused), usable offcut (becomes an offcut lot with dimensions), or waste (enter a value if sold)."
         >
           <div className="flex flex-col gap-4">
             {[...issued].map(([itemId, info]) => {
@@ -183,8 +183,8 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="font-medium">{it?.name ?? "?"}</p>
                     <p className="text-xs text-muted">
-                      Diambil {formatQty(info.qty, it?.uom)} · {formatIDR(info.value)}
-                      {used > 0 && ` · terpakai ${formatQty(roundQty(info.qty - used), it?.uom)}`}
+                      Issued {formatQty(info.qty, it?.uom)} · {formatIDR(info.value)}
+                      {used > 0 && ` · used ${formatQty(roundQty(info.qty - used), it?.uom)}`}
                     </p>
                   </div>
                   <div className="mt-2 flex flex-col gap-2">
@@ -194,7 +194,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                         <div key={r.key} className="flex flex-col gap-2 rounded-sm bg-default/40 p-2">
                           <div className="grid grid-cols-[1fr_7rem_auto] items-end gap-2 sm:grid-cols-[12rem_8rem_1fr_auto]">
                             <SelectInput
-                              aria-label="Jenis"
+                              aria-label="Type"
                               value={r.kind}
                               onChange={(v) => updateRet(r.key, { kind: v as ReturnKind })}
                               options={(Object.keys(RETURN_KIND) as ReturnKind[]).map((kk) => ({
@@ -207,20 +207,20 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                             <div className="col-span-3 sm:col-span-1">
                               {r.kind === "sisa" && (
                                 <div className="grid grid-cols-3 gap-1.5">
-                                  <NumberInput aria-label="Panjang (mm)" value={r.length} onChange={(length) => updateRet(r.key, { length })} suffix="P" maximumFractionDigits={0} />
-                                  <NumberInput aria-label="Lebar (mm)" value={r.width} onChange={(width) => updateRet(r.key, { width })} suffix="L" maximumFractionDigits={0} />
-                                  <NumberInput aria-label="Tebal (mm)" value={r.thickness} onChange={(thickness) => updateRet(r.key, { thickness })} suffix="T" maximumFractionDigits={0} />
+                                  <NumberInput aria-label="Length (mm)" value={r.length} onChange={(length) => updateRet(r.key, { length })} suffix="L" maximumFractionDigits={0} />
+                                  <NumberInput aria-label="Width (mm)" value={r.width} onChange={(width) => updateRet(r.key, { width })} suffix="W" maximumFractionDigits={0} />
+                                  <NumberInput aria-label="Thickness (mm)" value={r.thickness} onChange={(thickness) => updateRet(r.key, { thickness })} suffix="T" maximumFractionDigits={0} />
                                 </div>
                               )}
                               {r.kind === "limbah" && (
-                                <NumberInput aria-label="Nilai jual limbah" value={r.salvageValue} onChange={(salvageValue) => updateRet(r.key, { salvageValue })} money />
+                                <NumberInput aria-label="Waste sale value" value={r.salvageValue} onChange={(salvageValue) => updateRet(r.key, { salvageValue })} money />
                               )}
-                              {r.kind === "utuh" && <p className="py-2 text-xs text-muted">Kembali ke lot asal dengan harga asal.</p>}
+                              {r.kind === "utuh" && <p className="py-2 text-xs text-muted">Goes back to the source lot at its original cost.</p>}
                             </div>
                             <Button
                               isIconOnly
                               variant="ghost"
-                              aria-label="Hapus"
+                              aria-label="Remove"
                               className="row-start-1 col-start-3 sm:col-start-auto sm:row-start-auto"
                               onPress={() => setReturns(returns.filter((x) => x.key !== r.key))}
                             >
@@ -229,7 +229,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                           </div>
                           {belowMin && (
                             <p className="flex items-center gap-1 text-xs text-warning">
-                              <AlertTriangle className="size-3" /> Di bawah ukuran minimum sisa ({formatQty(it!.minRemnantQty!, it!.uom)}) — pertimbangkan sebagai limbah.
+                              <AlertTriangle className="size-3" /> Below the minimum offcut size ({formatQty(it!.minRemnantQty!, it!.uom)}) — consider recording it as waste.
                             </p>
                           )}
                         </div>
@@ -246,7 +246,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
                           ])
                         }
                       >
-                        <Plus className="size-4" /> Sisa / limbah {it?.name.split(" ")[0]}
+                        <Plus className="size-4" /> Offcut / waste {it?.name.split(" ")[0]}
                       </Button>
                     </div>
                   </div>
@@ -256,10 +256,10 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
           </div>
         </Section>
 
-        <Section title="Biaya tenaga kerja & overhead">
+        <Section title="Labour & overhead">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <NumberInput label="Jam kerja aktual" value={laborHours} onChange={setLaborHours} suffix="jam" />
-            <NumberInput label="Tarif per jam" value={laborRate} onChange={setLaborRate} money />
+            <NumberInput label="Actual labour hours" value={laborHours} onChange={setLaborHours} suffix="h" />
+            <NumberInput label="Hourly rate" value={laborRate} onChange={setLaborRate} money />
             <NumberInput
               label="Overhead"
               value={overhead}
@@ -267,7 +267,7 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
               money
               description={
                 <button type="button" className="underline" onClick={() => setOverhead(Math.round(laborHours * db.settings.overheadPerLaborHour))}>
-                  Hitung dari jam × {formatIDR(db.settings.overheadPerLaborHour)}
+                  Calculate from hours × {formatIDR(db.settings.overheadPerLaborHour)}
                 </button>
               }
             />
@@ -276,14 +276,14 @@ function CompleteForm({ wo, onDone }: { wo: WorkOrder; onDone: () => void }) {
       </div>
 
       <div className="lg:sticky lg:top-0 lg:self-start">
-        <Section title="Pratinjau HPP" description={WO_TYPE[wo.type].label}>
+        <Section title="Cost preview" description={WO_TYPE[wo.type].label}>
           {preview ? <CostBreakdown cost={preview} /> : <p className="text-sm text-danger">{error}</p>}
           <div className="mt-4 flex flex-col gap-2">
             <Button onPress={submit} isDisabled={!preview} fullWidth>
-              Selesaikan & kunci HPP
+              Complete & lock cost
             </Button>
             <Button variant="tertiary" onPress={onDone} fullWidth>
-              Batal
+              Cancel
             </Button>
           </div>
         </Section>

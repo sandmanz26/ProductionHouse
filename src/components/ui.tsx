@@ -4,6 +4,8 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import type { Tone } from "@/lib/labels";
 import { useIsCompact } from "@/lib/use-media";
+import { nodeText, sortableValue, useTableQuery, type QueryColumn, type SortDirection, type SortValue, type TableFilter } from "@/lib/table-query";
+import { TableToolbar } from "./TableToolbar";
 
 export function PageHeader({
   title,
@@ -24,7 +26,7 @@ export function PageHeader({
     <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {back && (
-          <Button isIconOnly variant="ghost" size="sm" aria-label="Kembali" onPress={() => navigate(back)} className="mt-0.5">
+          <Button isIconOnly variant="ghost" size="sm" aria-label="Back" onPress={() => navigate(back)} className="mt-0.5">
             <ArrowLeft className="size-4" />
           </Button>
         )}
@@ -202,6 +204,12 @@ export interface Column<T> {
   align?: "start" | "end";
   isRowHeader?: boolean;
   className?: string;
+  /** Search/sort text; defaults to the cell's visible text. */
+  text?: (row: T) => string | undefined;
+  /** Sort value; defaults to the visible text read as money, number or date. */
+  sort?: (row: T) => SortValue;
+  /** Opt out of sorting (e.g. action buttons). */
+  noSort?: boolean;
 }
 
 export function DataTable<T extends { id: string }>({
@@ -211,6 +219,10 @@ export function DataTable<T extends { id: string }>({
   onRowAction,
   empty,
   dependencies = [],
+  filters,
+  searchText,
+  toolbar,
+  initialSort,
 }: {
   label: string;
   columns: Column<T>[];
@@ -218,83 +230,128 @@ export function DataTable<T extends { id: string }>({
   onRowAction?: (row: T) => void;
   empty?: ReactNode;
   dependencies?: unknown[];
+  filters?: TableFilter<T>[];
+  searchText?: (row: T) => string;
+  /** Search/filter/sort bar; shown by default once a list has more than five rows or has filters. */
+  toolbar?: boolean;
+  initialSort?: { column: string; direction: SortDirection };
 }) {
   const compact = useIsCompact();
-  const byId = new Map(rows.map((r) => [r.id, r]));
   const hasHeader = columns.some((c) => c.isRowHeader);
   const cols = columns.map((c, i) => ({ ...c, isRowHeader: c.isRowHeader || (!hasHeader && i === 0) }));
+  // Every column searches and sorts by what it shows, unless the page says better.
+  const queryCols: QueryColumn<T>[] = cols.map((c) => ({
+    key: c.key,
+    text: c.text ?? ((r: T) => nodeText(c.cell(r))),
+    sort: c.noSort || c.header === "" ? undefined : (c.sort ?? ((r: T) => sortableValue(c.text ? (c.text(r) ?? "") : nodeText(c.cell(r))))),
+  }));
+  const q = useTableQuery(rows, queryCols, { filters, searchText, initialSort });
+  const shown = q.visible;
+  const byId = new Map(shown.map((r) => [r.id, r]));
+  const showBar = toolbar ?? (rows.length > 5 || !!filters?.length);
+  const sortable = cols.filter((c) => !c.noSort && c.header !== "" && typeof c.header === "string").map((c) => ({ key: c.key, label: c.header as string }));
+  const noMatch = <EmptyBlock title="Nothing matches" description="Try other words, or clear the filters." action={<Button size="sm" variant="secondary" onPress={q.reset}>Clear search</Button>} />;
+  const emptyState = rows.length === 0 ? (empty ?? <EmptyBlock title="No data yet" />) : noMatch;
+
+  const bar = showBar && (
+    <TableToolbar
+      label={label}
+      query={q.query}
+      filters={filters}
+      sortable={sortable}
+      showSort={compact}
+      total={rows.length}
+      shown={shown.length}
+      onSearch={q.setSearch}
+      onFilter={q.setFilter}
+      onSort={q.setSort}
+      onReset={q.reset}
+    />
+  );
 
   if (compact) {
     // Phones: each row becomes a stacked card — no sideways scrolling on the shop floor.
-    if (rows.length === 0) return <div role="table" aria-label={label}>{empty ?? <EmptyBlock title="Belum ada data" />}</div>;
+    if (shown.length === 0) return <div role="table" aria-label={label}>{bar}{emptyState}</div>;
     const head = cols.find((c) => c.isRowHeader)!;
     const actions = cols.filter((c) => !c.isRowHeader && c.header === "");
     const fields = cols.filter((c) => !c.isRowHeader && c.header !== "");
     return (
-      <ul aria-label={label} className="divide-y divide-[var(--rule)]">
-        {rows.map((row) => {
-          const inner = (
-            <>
-              <div className="min-w-0 font-medium">{head.cell(row)}</div>
-              <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {fields.map((c) => (
-                  <div key={c.key} className="min-w-0">
-                    <dt className="eyebrow">{c.header}</dt>
-                    <dd className={`text-sm ${c.align === "end" ? "num" : ""}`}>{c.cell(row)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          );
-          return (
-            <li key={row.id} className="px-4 py-3">
-              {onRowAction ? (
-                <button type="button" className="w-full text-left" onClick={() => onRowAction(row)}>
-                  {inner}
-                </button>
-              ) : (
-                inner
-              )}
-              {actions.length > 0 && <div className="mt-2 flex justify-end gap-2">{actions.map((c) => <div key={c.key}>{c.cell(row)}</div>)}</div>}
-            </li>
-          );
-        })}
-      </ul>
+      <div>
+        {bar}
+        <ul aria-label={label} className="divide-y divide-[var(--rule)]">
+          {shown.map((row) => {
+            const inner = (
+              <>
+                <div className="min-w-0 font-medium">{head.cell(row)}</div>
+                <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {fields.map((c) => (
+                    <div key={c.key} className="min-w-0">
+                      <dt className="eyebrow">{c.header}</dt>
+                      <dd className={`text-sm ${c.align === "end" ? "num" : ""}`}>{c.cell(row)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            );
+            return (
+              <li key={row.id} className="px-4 py-3">
+                {onRowAction ? (
+                  <button type="button" className="w-full text-left" onClick={() => onRowAction(row)}>
+                    {inner}
+                  </button>
+                ) : (
+                  inner
+                )}
+                {actions.length > 0 && <div className="mt-2 flex justify-end gap-2">{actions.map((c) => <div key={c.key}>{c.cell(row)}</div>)}</div>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     );
   }
 
+  const sortDescriptor = q.query.sort ? { column: q.query.sort.column, direction: q.query.sort.direction } : undefined;
   return (
-    <Table variant="secondary">
-      <Table.ScrollContainer>
-        <Table.Content
-          aria-label={label}
-          onRowAction={onRowAction ? (key: Key) => byId.has(String(key)) && onRowAction(byId.get(String(key))!) : undefined}
-        >
-          <Table.Header columns={cols}>
-            {(c) => (
-              <Table.Column id={c.key} isRowHeader={c.isRowHeader} className={`${c.align === "end" ? "text-right" : ""} ${c.className ?? ""}`}>
-                {c.header}
-              </Table.Column>
-            )}
-          </Table.Header>
-          <Table.Body
-            items={rows}
-            dependencies={[cols, ...dependencies]}
-            renderEmptyState={() => empty ?? <EmptyBlock title="Belum ada data" />}
+    <div>
+      {bar}
+      <Table variant="secondary">
+        <Table.ScrollContainer>
+          <Table.Content
+            aria-label={label}
+            sortDescriptor={sortDescriptor}
+            onSortChange={(d: { column: Key; direction: SortDirection }) => q.setSort({ column: String(d.column), direction: d.direction })}
+            onRowAction={onRowAction ? (key: Key) => byId.has(String(key)) && onRowAction(byId.get(String(key))!) : undefined}
           >
-            {(row) => (
-              <Table.Row id={row.id} columns={cols} className={onRowAction ? "cursor-pointer" : undefined}>
-                {(c) => (
-                  <Table.Cell className={`${c.align === "end" ? `text-right whitespace-nowrap ${c.header === "" ? "" : "num"}` : ""} ${c.className ?? ""}`}>
-                    {c.cell(row)}
-                  </Table.Cell>
-                )}
-              </Table.Row>
-            )}
-          </Table.Body>
-        </Table.Content>
-      </Table.ScrollContainer>
-    </Table>
+            <Table.Header columns={cols}>
+              {(c) => {
+                const canSort = !!queryCols.find((x) => x.key === c.key)?.sort;
+                return (
+                  <Table.Column id={c.key} isRowHeader={c.isRowHeader} allowsSorting={canSort} className={`${c.align === "end" ? "text-right" : ""} ${c.className ?? ""}`}>
+                    {canSort ? (
+                      <Table.SortableColumnHeader sortDirection={q.query.sort?.column === c.key ? q.query.sort.direction : undefined}>{c.header}</Table.SortableColumnHeader>
+                    ) : (
+                      c.header
+                    )}
+                  </Table.Column>
+                );
+              }}
+            </Table.Header>
+            <Table.Body items={shown} dependencies={[cols, q.query, ...dependencies]} renderEmptyState={() => emptyState}>
+              {(row) => (
+                <Table.Row id={row.id} columns={cols} className={onRowAction ? "cursor-pointer" : undefined}>
+                  {(c) => (
+                    <Table.Cell className={`${c.align === "end" ? `text-right whitespace-nowrap ${c.header === "" ? "" : "num"}` : ""} ${c.className ?? ""}`}>
+                      {c.cell(row)}
+                    </Table.Cell>
+                  )}
+                </Table.Row>
+              )}
+            </Table.Body>
+          </Table.Content>
+        </Table.ScrollContainer>
+      </Table>
+    </div>
   );
 }
 
@@ -303,7 +360,7 @@ export function ConfirmButton({
   children,
   title,
   description,
-  confirmLabel = "Ya, lanjutkan",
+  confirmLabel = "Yes, continue",
   danger,
   onConfirm,
   variant = "secondary",
@@ -335,7 +392,7 @@ export function ConfirmButton({
               {description && <Modal.Body className="text-sm text-muted">{description}</Modal.Body>}
               <Modal.Footer>
                 <Button variant="tertiary" onPress={() => setOpen(false)}>
-                  Batal
+                  Cancel
                 </Button>
                 <Button
                   variant={danger ? "danger" : "primary"}

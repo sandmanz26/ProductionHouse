@@ -7,10 +7,10 @@ import { useDb } from "@/store/db-store";
 
 type Period = "30" | "90" | "year" | "all";
 const PERIODS: { id: Period; label: string }[] = [
-  { id: "30", label: "30 hari" },
-  { id: "90", label: "90 hari" },
-  { id: "year", label: "Tahun ini" },
-  { id: "all", label: "Semua" },
+  { id: "30", label: "30 days" },
+  { id: "90", label: "90 days" },
+  { id: "year", label: "This year" },
+  { id: "all", label: "All" },
 ];
 
 /** The whole workshop on one page: purchases → warehouse → production → products → customers. */
@@ -31,10 +31,10 @@ export default function PlantMapPage() {
   return (
     <>
       <PageHeader
-        title="Peta alur"
-        description="Seluruh bengkel dalam satu gambar: dari mana bahan datang, apa yang dibuat produksi, dan ke mana hasilnya pergi — dalam rupiah."
+        title="Flow map"
+        description="The whole workshop in one picture: where materials come from, what production makes, and where the output goes — in rupiah."
         actions={
-          <div role="radiogroup" aria-label="Periode" className="flex gap-1 text-[13px]">
+          <div role="radiogroup" aria-label="Period" className="flex gap-1 text-[13px]">
             {PERIODS.map((p) => (
               <button
                 key={p.id}
@@ -53,25 +53,25 @@ export default function PlantMapPage() {
       <MetricStrip
         className="mb-6"
         items={[
-          { label: "Masuk produksi", value: formatIDRCompact(intoProd), hint: "bahan, produk diolah, tenaga kerja" },
-          { label: "Jadi produk", value: formatIDRCompact(made), hint: intoProd ? `${formatPct(made / intoProd, 0)} dari yang masuk` : undefined },
-          { label: "Sisa & olahan kembali", value: formatIDRCompact(recycled), hint: intoStore ? `${formatPct(recycled / intoStore, 0)} pasokan gudang bahan` : undefined, tone: recycled > 0 ? "success" : "default" },
-          { label: "Produk terjual", value: formatIDRCompact(sold), hint: made ? `${formatPct(sold / made, 0)} dari yang dibuat` : undefined },
+          { label: "Into production", value: formatIDRCompact(intoProd), hint: "materials, reworked products, labour" },
+          { label: "Became product", value: formatIDRCompact(made), hint: intoProd ? `${formatPct(made / intoProd, 0)} of input` : undefined },
+          { label: "Offcuts & processed back", value: formatIDRCompact(recycled), hint: intoStore ? `${formatPct(recycled / intoStore, 0)} of material store supply` : undefined, tone: recycled > 0 ? "success" : "default" },
+          { label: "Products sold", value: formatIDRCompact(sold), hint: made ? `${formatPct(sold / made, 0)} of what was made` : undefined },
         ]}
       />
       <Section
-        title="Aliran nilai"
-        description="Klik simpul untuk membuka datanya. Hasil produksi ditelusuri lot demi lot sampai hari ini, jadi 'Terjual' dan 'Di gudang' adalah nasib barang yang dibuat pada periode ini."
+        title="Value flow"
+        description="Click a node to open its records. Production output is traced lot by lot up to today, so 'Sold' and 'In stock' show what happened to the goods made in this period."
         bodyClassName="p-0"
       >
-        <FlowDiagram graph={graph} label="Peta alur bengkel" empty="Belum ada pergerakan pada periode ini." />
+        <FlowDiagram graph={graph} label="Workshop flow map" empty="No movements in this period yet." />
       </Section>
       <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 text-xs text-muted sm:grid-cols-2">
         <p>
-          <b className="font-medium text-foreground">Dalam proses</b> adalah nilai yang sudah masuk pekerjaan tetapi belum keluar sebagai barang — biasanya pekerjaan yang masih berjalan.
+          <b className="font-medium text-foreground">Work in progress</b> is value that has gone into work orders but has not come out as goods yet — usually work orders still in progress.
         </p>
         <p>
-          <b className="font-medium text-foreground">Sisa & olahan</b> muncul dua kali: keluar dari produksi, lalu masuk lagi sebagai pasokan gudang bahan. Itulah lingkaran yang membuat setiap potongan punya harga.
+          <b className="font-medium text-foreground">Offcuts & processed</b> appear twice: out of production, then back in as material store supply. That loop is what gives every offcut a price.
         </p>
       </div>
     </>

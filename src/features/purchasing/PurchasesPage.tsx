@@ -1,4 +1,4 @@
-import { Button, SearchField, Tabs, type Key } from "@heroui/react";
+import { Button, Tabs, type Key } from "@heroui/react";
 import { Plus, ShoppingCart } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -15,31 +15,22 @@ export default function PurchasesPage() {
   const { item, partnerName } = useLookups();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("semua");
-  const [q, setQ] = useState("");
 
   const woCode = useMemo(() => new Map(db.workOrders.map((w) => [w.id, w.code])), [db.workOrders]);
 
   const rows = useMemo(() => {
-    const term = q.trim().toLowerCase();
     return [...db.purchases]
       .filter((p) => filter === "semua" || p.status === filter)
-      .filter(
-        (p) =>
-          !term ||
-          p.code.toLowerCase().includes(term) ||
-          partnerName(p.supplierId).toLowerCase().includes(term) ||
-          p.lines.some((l) => item(l.itemId)?.name.toLowerCase().includes(term)),
-      )
       .sort((a, b) => b.date.localeCompare(a.date) || b.code.localeCompare(a.code));
-  }, [db.purchases, filter, q, item, partnerName]);
+  }, [db.purchases, filter]);
 
   const columns: Column<Purchase>[] = [
-    { key: "code", header: "Kode", isRowHeader: true, className: "whitespace-nowrap", cell: (p) => <span className="font-medium">{p.code}</span> },
-    { key: "date", header: "Tanggal", className: "whitespace-nowrap", cell: (p) => formatDate(p.date) },
-    { key: "sup", header: "Pemasok", cell: (p) => partnerName(p.supplierId) },
+    { key: "code", header: "Code", isRowHeader: true, className: "whitespace-nowrap", cell: (p) => <span className="font-medium">{p.code}</span> },
+    { key: "date", header: "Date", className: "whitespace-nowrap", cell: (p) => formatDate(p.date) },
+    { key: "sup", header: "Supplier", cell: (p) => partnerName(p.supplierId) },
     {
       key: "items",
-      header: "Barang",
+      header: "Items",
       cell: (p) => (
         <span className="line-clamp-2 min-w-48 text-sm">
           {p.lines.map((l) => item(l.itemId)?.name ?? "?").join(", ")}
@@ -48,8 +39,8 @@ export default function PurchasesPage() {
     },
     {
       key: "wo",
-      header: "Untuk",
-      cell: (p) => (p.workOrderId ? <StatusChip tone="accent">{woCode.get(p.workOrderId) ?? "PK"}</StatusChip> : <span className="text-muted">Stok umum</span>),
+      header: "For",
+      cell: (p) => (p.workOrderId ? <StatusChip tone="accent">{woCode.get(p.workOrderId) ?? "WO"}</StatusChip> : <span className="text-muted">General stock</span>),
     },
     { key: "total", header: "Total", align: "end", cell: (p) => formatIDR(purchaseTotals(p).total) },
     { key: "status", header: "Status", cell: (p) => <StatusChip tone={PURCHASE_STATUS[p.status].tone}>{PURCHASE_STATUS[p.status].label}</StatusChip> },
@@ -58,11 +49,11 @@ export default function PurchasesPage() {
   return (
     <>
       <PageHeader
-        title="Pembelian"
-        description="Harga pokok = harga + ongkir (dibagi otomatis). Pembelian khusus proyek dicadangkan sampai proyek selesai."
+        title="Purchasing"
+        description="Unit cost = price + freight (split automatically). Purchases for a specific job stay reserved until the job is done."
         actions={
-          <Button onPress={() => navigate("/pembelian/baru")}>
-            <Plus className="size-4" /> Pembelian baru
+          <Button onPress={() => navigate("/purchases/new")}>
+            <Plus className="size-4" /> New purchase
           </Button>
         }
       />
@@ -71,38 +62,32 @@ export default function PurchasesPage() {
           <Tabs.ListContainer>
             <Tabs.List aria-label="Filter status">
               <Tabs.Tab id="semua">
-                Semua
+                All
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab id="draft">
-                Menunggu barang
+                Awaiting delivery
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab id="diterima">
-                Diterima
+                Received
                 <Tabs.Indicator />
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
         </Tabs>
-        <SearchField value={q} onChange={setQ} aria-label="Cari pembelian" className="sm:w-72">
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Cari kode, pemasok, barang…" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
       </div>
       <DataTable
-        label="Daftar pembelian"
+        toolbar searchText={(p) => `${p.code} ${partnerName(p.supplierId)} ${p.lines.map((l) => item(l.itemId)?.name ?? "").join(" ")}`}
+        label="Purchase list"
         columns={columns}
         rows={rows}
-        onRowAction={(p) => navigate(`/pembelian/${p.id}`)}
+        onRowAction={(p) => navigate(`/purchases/${p.id}`)}
         empty={
           <EmptyBlock
             icon={<ShoppingCart className="size-5" />}
-            title="Belum ada pembelian"
-            action={<Button onPress={() => navigate("/pembelian/baru")}>Catat pembelian</Button>}
+            title="No purchases yet"
+            action={<Button onPress={() => navigate("/purchases/new")}>Record a purchase</Button>}
           />
         }
       />

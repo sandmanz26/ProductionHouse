@@ -23,176 +23,176 @@ export type Tone = "default" | "accent" | "success" | "warning" | "danger";
 
 export const WO_TYPE: Record<WorkOrderType, { label: string; short: string; description: string; tone: Tone }> = {
   produksi: {
-    label: "Produksi Baru",
-    short: "Produksi",
-    description: "Bahan mentah → produk baru, sesuai BOM.",
+    label: "New production",
+    short: "Production",
+    description: "Raw materials → new product, per the BOM.",
     tone: "accent",
   },
   konversi: {
-    label: "Konversi",
-    short: "Konversi",
-    description: "Produk yang ada diubah menjadi produk lain (mis. meja makan → meja kerja).",
+    label: "Conversion",
+    short: "Conversion",
+    description: "An existing product is turned into another product (e.g. dining table → desk).",
     tone: "warning",
   },
   gabung: {
-    label: "Gabung",
-    short: "Gabung",
-    description: "Beberapa barang → satu barang: set meja + kursi, atau potongan sisa dilem jadi panel.",
+    label: "Merge",
+    short: "Merge",
+    description: "Several items → one item: a table + chairs set, or offcuts glued into a panel.",
     tone: "default",
   },
   dekonstruksi: {
-    label: "Dekonstruksi",
-    short: "Bongkar",
-    description: "Produk dibongkar menjadi bahan yang bisa dipakai lagi.",
+    label: "Dismantling",
+    short: "Dismantle",
+    description: "A product is taken apart into materials that can be used again.",
     tone: "danger",
   },
   perbaikan: {
-    label: "Perbaikan",
-    short: "Perbaikan",
-    description: "Unit rusak (mis. kembali dari sewa) diperbaiki agar layak lagi.",
+    label: "Repair",
+    short: "Repair",
+    description: "A damaged unit (e.g. back from rental) is repaired so it can be used again.",
     tone: "success",
   },
 };
 
 export const WO_STATUS: Record<WorkOrderStatus, { label: string; tone: Tone }> = {
-  rencana: { label: "Rencana", tone: "default" },
-  berjalan: { label: "Berjalan", tone: "accent" },
-  selesai: { label: "Selesai", tone: "success" },
-  batal: { label: "Batal", tone: "danger" },
+  rencana: { label: "Planned", tone: "default" },
+  berjalan: { label: "In progress", tone: "accent" },
+  selesai: { label: "Done", tone: "success" },
+  batal: { label: "Cancelled", tone: "danger" },
 };
 
 export const PURCHASE_STATUS: Record<PurchaseStatus, { label: string; tone: Tone }> = {
-  draft: { label: "Menunggu barang", tone: "warning" },
-  diterima: { label: "Diterima", tone: "success" },
-  batal: { label: "Batal", tone: "danger" },
+  draft: { label: "Awaiting goods", tone: "warning" },
+  diterima: { label: "Received", tone: "success" },
+  batal: { label: "Cancelled", tone: "danger" },
 };
 
 export const SALES_STATUS: Record<SalesStatus, { label: string; tone: Tone }> = {
   draft: { label: "Draft", tone: "default" },
-  dikonfirmasi: { label: "Dikonfirmasi", tone: "accent" },
-  dikirim_sebagian: { label: "Dikirim sebagian", tone: "warning" },
-  dikirim: { label: "Terkirim", tone: "success" },
-  selesai: { label: "Selesai", tone: "success" },
-  batal: { label: "Batal", tone: "danger" },
+  dikonfirmasi: { label: "Confirmed", tone: "accent" },
+  dikirim_sebagian: { label: "Partly shipped", tone: "warning" },
+  dikirim: { label: "Shipped", tone: "success" },
+  selesai: { label: "Done", tone: "success" },
+  batal: { label: "Cancelled", tone: "danger" },
 };
 
-export const SALES_CHANNEL: Record<SalesChannel, string> = { supply: "Supply", ekspor: "Ekspor" };
+export const SALES_CHANNEL: Record<SalesChannel, string> = { supply: "Supply", ekspor: "Export" };
 
 export const RENTAL_STATUS: Record<RentalStatus, { label: string; tone: Tone }> = {
-  dipesan: { label: "Dipesan", tone: "default" },
-  berjalan: { label: "Di klien", tone: "accent" },
-  selesai: { label: "Selesai", tone: "success" },
-  batal: { label: "Batal", tone: "danger" },
+  dipesan: { label: "Booked", tone: "default" },
+  berjalan: { label: "With client", tone: "accent" },
+  selesai: { label: "Done", tone: "success" },
+  batal: { label: "Cancelled", tone: "danger" },
 };
 
 export const LOT_STATUS: Record<LotStatus, { label: string; tone: Tone }> = {
-  tersedia: { label: "Tersedia", tone: "success" },
-  disewa: { label: "Disewa", tone: "accent" },
-  rusak: { label: "Rusak", tone: "danger" },
+  tersedia: { label: "Available", tone: "success" },
+  disewa: { label: "On rent", tone: "accent" },
+  rusak: { label: "Damaged", tone: "danger" },
 };
 
 export const LOT_ORIGIN: Record<LotOrigin, string> = {
-  saldo_awal: "Saldo awal",
-  pembelian: "Pembelian",
-  produksi: "Produksi",
-  sisa_produksi: "Sisa produksi",
-  dekonstruksi: "Hasil bongkar",
-  retur_sewa: "Retur sewa",
-  retur_penjualan: "Retur penjualan",
-  penyesuaian: "Penyesuaian",
-  gabung: "Gabungan lot",
+  saldo_awal: "Opening stock",
+  pembelian: "Purchase",
+  produksi: "Production",
+  sisa_produksi: "Production offcut",
+  dekonstruksi: "Dismantled",
+  retur_sewa: "Rental return",
+  retur_penjualan: "Sales return",
+  penyesuaian: "Adjustment",
+  gabung: "Merged lot",
 };
 
 export const RETURN_KIND: Record<ReturnKind, { label: string; description: string; tone: Tone }> = {
-  utuh: { label: "Utuh", description: "Tidak terpakai, kembali ke lot asal", tone: "default" },
-  sisa: { label: "Sisa layak pakai", description: "Potongan yang masih bisa dipakai — jadi lot sisa", tone: "success" },
-  limbah: { label: "Limbah", description: "Terbuang; isi nilai jika dijual (mis. serbuk)", tone: "warning" },
+  utuh: { label: "Whole", description: "Not used, goes back to its original lot", tone: "default" },
+  sisa: { label: "Offcut", description: "A piece that can still be used — becomes an offcut lot", tone: "success" },
+  limbah: { label: "Waste", description: "Thrown away; enter a value if it is sold (e.g. sawdust)", tone: "warning" },
 };
 
 export const RETURN_CONDITION: Record<ReturnCondition, { label: string; tone: Tone }> = {
-  baik: { label: "Baik", tone: "success" },
-  rusak: { label: "Rusak", tone: "warning" },
-  hilang: { label: "Hilang", tone: "danger" },
+  baik: { label: "Good", tone: "success" },
+  rusak: { label: "Damaged", tone: "warning" },
+  hilang: { label: "Lost", tone: "danger" },
 };
 
 export const MOVE_TYPE: Record<MoveType, string> = {
-  saldo_awal: "Saldo awal",
-  masuk_pembelian: "Masuk · pembelian",
-  keluar_produksi: "Keluar · produksi",
-  kembali_produksi: "Kembali · produksi",
-  masuk_produksi: "Masuk · hasil produksi",
-  masuk_sisa: "Masuk · sisa material",
-  keluar_penjualan: "Keluar · penjualan",
-  keluar_sewa: "Sewa · diserahkan",
-  kembali_sewa: "Sewa · kembali",
-  rusak_sewa: "Sewa · kembali rusak",
-  hilang: "Hilang",
-  penyesuaian: "Penyesuaian",
-  limbah: "Limbah",
-  transfer: "Pindah lokasi",
-  retur_penjualan: "Masuk · retur penjualan",
-  revaluasi: "Revaluasi HPP",
-  gabung: "Gabung lot",
+  saldo_awal: "Opening stock",
+  masuk_pembelian: "In · purchase",
+  keluar_produksi: "Out · production",
+  kembali_produksi: "Back · production",
+  masuk_produksi: "In · production output",
+  masuk_sisa: "In · offcut",
+  keluar_penjualan: "Out · sale",
+  keluar_sewa: "Rental · handed over",
+  kembali_sewa: "Rental · taken back",
+  rusak_sewa: "Rental · back damaged",
+  hilang: "Lost",
+  penyesuaian: "Adjustment",
+  limbah: "Waste",
+  transfer: "Transfer",
+  retur_penjualan: "In · sales return",
+  revaluasi: "Unit cost revaluation",
+  gabung: "Merge lots",
 };
 
 export const MATERIAL_CATEGORY: Record<MaterialCategory, string> = {
-  kayu_solid: "Kayu solid",
+  kayu_solid: "Solid wood",
   panel: "Panel (plywood/MDF)",
-  kain: "Kain",
-  busa: "Busa",
+  kain: "Fabric",
+  busa: "Foam",
   hardware: "Hardware",
   finishing: "Finishing",
-  logam: "Logam",
-  rotan: "Rotan",
-  kemasan: "Kemasan",
-  lainnya: "Lainnya",
+  logam: "Metal",
+  rotan: "Rattan",
+  kemasan: "Packaging",
+  lainnya: "Other",
 };
 
 export const PRODUCT_CATEGORY: Record<ProductCategory, string> = {
-  kursi: "Kursi",
-  meja: "Meja",
-  lemari: "Lemari",
+  kursi: "Chair",
+  meja: "Table",
+  lemari: "Cabinet",
   sofa: "Sofa",
-  tempat_tidur: "Tempat tidur",
-  dekorasi: "Dekorasi",
+  tempat_tidur: "Bed",
+  dekorasi: "Decor",
   set: "Set",
-  lainnya: "Lainnya",
+  lainnya: "Other",
 };
 
 export const categoryLabel = (c: string) =>
   (MATERIAL_CATEGORY as Record<string, string>)[c] ?? (PRODUCT_CATEGORY as Record<string, string>)[c] ?? c;
 
 export const STAGE_STATUS: Record<StageStatus, { label: string; tone: Tone }> = {
-  menunggu: { label: "Menunggu", tone: "default" },
-  proses: { label: "Dikerjakan", tone: "accent" },
-  selesai: { label: "Selesai", tone: "success" },
+  menunggu: { label: "Waiting", tone: "default" },
+  proses: { label: "Working", tone: "accent" },
+  selesai: { label: "Done", tone: "success" },
 };
 
-export const OUTPUT_GRADE: Record<OutputGrade, string> = { baik: "Lolos QC", reject: "Reject QC" };
+export const OUTPUT_GRADE: Record<OutputGrade, string> = { baik: "Good", reject: "Reject" };
 
 export const PAYMENT_METHOD: Record<PaymentMethod, string> = {
   transfer: "Transfer",
-  tunai: "Tunai",
-  giro: "Giro / cek",
+  tunai: "Cash",
+  giro: "Giro / cheque",
   lc: "L/C",
-  lainnya: "Lainnya",
+  lainnya: "Other",
 };
 
 /** What each formula means on the shop floor, in one line. */
 export const COSTING_HINT: Record<CostingMethod, string> = {
-  fifo: "Stok yang masuk paling dulu keluar paling dulu. Sisa stok bernilai harga terbaru.",
-  rata_rata: "Setiap barang keluar dengan harga rata-rata semua stok saat itu; dihitung ulang tiap barang masuk.",
-  identifikasi: "Harga lot yang benar-benar diambil. Cocok untuk barang unik atau pesanan proyek.",
-  lifo: "Stok yang masuk terakhir keluar lebih dulu. Hanya untuk analisa internal.",
+  fifo: "Stock that came in first goes out first. Remaining stock is valued at the latest prices.",
+  rata_rata: "Every item goes out at the average price of all stock at that moment; recalculated each time goods come in.",
+  identifikasi: "The price of the lot actually issued. Suits one-off items or project orders.",
+  lifo: "Stock that came in last goes out first. For internal analysis only.",
 };
 
 /** Legend wording for process-map node kinds. */
 export const FLOW_KIND: Record<FlowKind, string> = {
-  bahan: "Bahan",
-  produk: "Produk",
-  sisa: "Sisa material",
-  biaya: "Tenaga kerja & overhead",
-  proses: "Proses",
-  stok: "Stok / dalam proses",
-  rugi: "Limbah & rugi",
+  bahan: "Material",
+  produk: "Product",
+  sisa: "Offcut",
+  biaya: "Labour & overhead",
+  proses: "Process",
+  stok: "Stock / work in progress",
+  rugi: "Waste & loss",
 };

@@ -1,7 +1,7 @@
 import { costingMethodOf, isAveragedLot, isOrderedLot, layerOrder } from "./costing-rules";
 import type { CounterKey, Db, Dimensions, DocRef, ID, Item, Lot, MoveType, PartnerRole, StockMove } from "./types";
 
-/** Raised for rule violations; the message is user-facing (Bahasa Indonesia). */
+/** Raised for rule violations; the message is user-facing (English). */
 export class DomainError extends Error {
   constructor(message: string) {
     super(message);
@@ -12,6 +12,9 @@ export class DomainError extends Error {
 export function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new DomainError(message);
 }
+
+/** How a lot's status reads inside a sentence ("Lot LOT-0004 is on rent …"). */
+export const LOT_STATE: Record<Lot["status"], string> = { tersedia: "available", disewa: "on rent", rusak: "damaged" };
 
 /** Tolerance for floating point quantity comparisons. */
 export const EPS = 1e-6;
@@ -37,14 +40,14 @@ export const nowIso = () => new Date().toISOString();
 
 export const CODE_PREFIX: Record<CounterKey, string> = {
   lot: "LOT",
-  purchase: "PB",
-  workOrder: "PK",
+  purchase: "PO",
+  workOrder: "WO",
   sale: "SO",
-  rental: "SW",
+  rental: "RN",
   adjustment: "ADJ",
   item: "ITM",
-  partner: "REL",
-  recipe: "RSP",
+  partner: "CT",
+  recipe: "RCP",
 };
 
 export function nextCode(db: Db, key: CounterKey): string {
@@ -66,7 +69,7 @@ export function transact<R = void>(db: Db, fn: (draft: Db) => R): { db: Db; resu
 
 export function getItem(db: Db, id: ID): Item {
   const item = db.items.find((i) => i.id === id);
-  assert(item, "Item tidak ditemukan.");
+  assert(item, "Item not found — it may have been deleted.");
   return item;
 }
 
@@ -76,13 +79,13 @@ export function findItem(db: Db, id: ID | undefined): Item | undefined {
 
 export function getLot(db: Db, id: ID): Lot {
   const lot = db.lots.find((l) => l.id === id);
-  assert(lot, "Lot stok tidak ditemukan.");
+  assert(lot, "Stock lot not found — it may have been deleted.");
   return lot;
 }
 
 export function createLot(db: Db, data: Omit<Lot, "id" | "code" | "createdAt"> & { createdAt?: string }): Lot {
-  assert(Number.isFinite(data.qty) && data.qty > EPS, "Qty lot harus lebih dari 0.");
-  assertAmount(data.unitCost, "Harga pokok");
+  assert(Number.isFinite(data.qty) && data.qty > EPS, "Lot qty must be more than 0.");
+  assertAmount(data.unitCost, "Unit cost");
   assertDimensions(data.dimensions);
   const lot: Lot = {
     ...data,
@@ -126,14 +129,14 @@ export function takeFromLot(
 ): Lot {
   const lot = getLot(db, lotId);
   const item = getItem(db, lot.itemId);
-  assert(Number.isFinite(qty) && qty > EPS, "Qty harus lebih dari 0.");
+  assert(Number.isFinite(qty) && qty > EPS, "Qty must be more than 0.");
   // Moving average: whatever physical lot is taken, it leaves at the item's current average.
   if (isAveragedLot(lot) && costingMethodOf(db, item) === "rata_rata") averageItemCost(db, item.id, opts.at);
   const allowed = opts.allowStatus ?? ["tersedia"];
-  assert(allowed.includes(lot.status), `Lot ${lot.code} berstatus "${lot.status}" dan tidak dapat dipakai.`);
+  assert(allowed.includes(lot.status), `Lot ${lot.code} is ${LOT_STATE[lot.status]} and cannot be used.`);
   assert(
     qty <= lot.qty + EPS,
-    `Stok ${item.name} di ${lot.code} tidak cukup (tersedia ${roundQty(lot.qty)} ${item.uom}, diminta ${roundQty(qty)}).`,
+    `Not enough ${item.name} in ${lot.code} (available ${roundQty(lot.qty)} ${item.uom}, requested ${roundQty(qty)}).`,
   );
   lot.qty = roundQty(Math.max(0, lot.qty - qty));
   recordMove(db, { lot, qty: -qty, type, ref, at: opts.at, note: opts.note });
@@ -147,13 +150,13 @@ export function takeFromLot(
  */
 export function splitLot(db: Db, lotId: ID, qty: number, type: MoveType, ref: DocRef, at?: string): Lot {
   const lot = getLot(db, lotId);
-  assert(qty > EPS && qty <= lot.qty + EPS, `Qty pemecahan lot ${lot.code} tidak valid.`);
+  assert(qty > EPS && qty <= lot.qty + EPS, `Split qty for lot ${lot.code} is invalid — enter more than 0 and no more than the lot holds.`);
   if (Math.abs(qty - lot.qty) < EPS) return lot;
   lot.qty = roundQty(lot.qty - qty);
   const { id: _id, code: _code, createdAt: _c, ...rest } = lot;
   const part = createLot(db, { ...rest, qty, createdAt: lot.createdAt, splitFrom: lot.id });
-  recordMove(db, { lot, qty: -qty, type, ref, at, note: `Dipecah ke ${part.code}` });
-  recordMove(db, { lot: part, qty, type, ref, at, note: `Dipecah dari ${lot.code}` });
+  recordMove(db, { lot, qty: -qty, type, ref, at, note: `Split to ${part.code}` });
+  recordMove(db, { lot: part, qty, type, ref, at, note: `Split from ${lot.code}` });
   return part;
 }
 
@@ -227,7 +230,7 @@ export function suggestLots(
 
 export interface StockSummary {
   itemId: ID;
-  /** Available (status tersedia) — includes remnants and reserved. */
+  /** Available (status "tersedia") — includes remnants and reserved. */
   available: number;
   remnant: number;
   reserved: number;
@@ -317,40 +320,40 @@ export function freeQtyFor(db: Pick<Db, "lots">, itemId: ID, workOrderId?: ID): 
 export const isNonNegative = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0;
 
 export function assertAmount(n: unknown, label: string): asserts n is number {
-  assert(typeof n === "number" && Number.isFinite(n), `${label} harus berupa angka.`);
-  assert(n >= 0, `${label} tidak boleh negatif.`);
+  assert(typeof n === "number" && Number.isFinite(n), `${label} must be a number.`);
+  assert(n >= 0, `${label} cannot be negative.`);
 }
 
 /** Item that may be used in a new document line. Lines that already held it may keep it. */
 export function getUsableItem(db: Db, id: ID, keepIds?: ReadonlySet<ID>): Item {
   const item = getItem(db, id);
-  assert(!item.archived || keepIds?.has(id), `${item.name} sudah diarsipkan — pulihkan dulu di Master Barang.`);
+  assert(!item.archived || keepIds?.has(id), `${item.name} is archived — restore it in master data first.`);
   return item;
 }
 
 export function assertPartnerRole(db: Db, id: ID | undefined, role: PartnerRole) {
   if (!id) return;
   const p = db.partners.find((x) => x.id === id);
-  assert(p, "Relasi tidak ditemukan.");
-  assert(p.role === role, `${p.name} terdaftar sebagai ${role === "supplier" ? "pelanggan, bukan pemasok" : "pemasok, bukan pelanggan"}.`);
+  assert(p, "Contact not found — it may have been deleted.");
+  assert(p.role === role, `${p.name} is registered as a ${role === "supplier" ? "customer, not a supplier" : "supplier, not a customer"}.`);
 }
 
 export function assertDimensions(d: Dimensions | undefined | null) {
   if (!d) return;
   const ok = [d.length, d.width, d.thickness ?? 0].every((n) => isNonNegative(n));
-  assert(ok, "Ukuran (panjang/lebar/tebal) harus angka dan tidak boleh negatif.");
+  assert(ok, "Size (length/width/thickness) must be numbers of 0 or more.");
 }
 
-export function assertDate(date: string | undefined, label = "Tanggal"): asserts date is string {
-  assert(typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date), `${label} wajib diisi.`);
+export function assertDate(date: string | undefined, label = "Date"): asserts date is string {
+  assert(typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date), `${label} is required.`);
 }
 
 export function assertLocation(db: Db, location: string) {
-  assert(db.settings.locations.includes(location), `Lokasi "${location}" tidak dikenal — tambahkan dulu di Pengaturan.`);
+  assert(db.settings.locations.includes(location), `Location "${location}" is unknown — add it in settings first.`);
 }
 
 /** Revaluation entries made by the cost formula itself carry this reference. */
-export const AVERAGE_REF: DocRef = { type: "adjustment", id: "rata-rata", code: "Rata-rata" };
+export const AVERAGE_REF: DocRef = { type: "adjustment", id: "rata-rata", code: "Average" };
 
 /**
  * Perpetual moving average: gives every interchangeable lot of an item the same unit cost
@@ -364,7 +367,7 @@ export function averageItemCost(db: Db, itemId: ID, at?: string): number | undef
   for (const lot of pool) {
     if (Math.abs(lot.unitCost - avg) < 0.005) continue;
     lot.unitCost = avg;
-    recordMove(db, { lot, qty: 0, type: "revaluasi", ref: AVERAGE_REF, at, unitCost: avg, note: "Rata-rata bergerak" });
+    recordMove(db, { lot, qty: 0, type: "revaluasi", ref: AVERAGE_REF, at, unitCost: avg, note: "Moving average" });
   }
   return avg;
 }

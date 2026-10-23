@@ -45,7 +45,7 @@ export default function SalesDetailPage() {
   const [editingExport, setEditingExport] = useState(false);
   const [returning, setReturning] = useState(false);
   const so = db.sales.find((s) => s.id === id);
-  if (!so) return <RecordNotFound what="Order" back="/penjualan" />;
+  if (!so) return <RecordNotFound what="Order" back="/sales" />;
 
   const totals = salesTotals(db, so);
   const shortages = productionShortages(db, so);
@@ -58,20 +58,20 @@ export default function SalesDetailPage() {
   const columns: Column<SalesLine>[] = [
     {
       key: "item",
-      header: "Barang",
+      header: "Item",
       isRowHeader: true,
       cell: (l) => (
         <div className="min-w-40">
           <p className="font-medium">{item(l.itemId)?.name ?? "?"}</p>
-          {l.spec && <p className="text-xs text-muted">Spesifikasi: {l.spec}</p>}
+          {l.spec && <p className="text-xs text-muted">Spec: {l.spec}</p>}
         </div>
       ),
     },
-    { key: "qty", header: "Order", align: "end", cell: (l) => formatQty(l.qty, item(l.itemId)?.uom) },
-    { key: "sent", header: "Terkirim", align: "end", cell: (l) => formatQty(deliveredQty(so, l.itemId), item(l.itemId)?.uom) },
+    { key: "qty", header: "Ordered", align: "end", cell: (l) => formatQty(l.qty, item(l.itemId)?.uom) },
+    { key: "sent", header: "Shipped", align: "end", cell: (l) => formatQty(deliveredQty(so, l.itemId), item(l.itemId)?.uom) },
     {
       key: "stock",
-      header: "Stok siap",
+      header: "Ready stock",
       align: "end",
       cell: (l) => {
         const free = freeQtyFor(db, l.itemId);
@@ -79,14 +79,14 @@ export default function SalesDetailPage() {
         return <span className={open && outstanding > 0 && free < outstanding ? "text-warning" : ""}>{formatQty(free, item(l.itemId)?.uom)}</span>;
       },
     },
-    { key: "price", header: "Harga", align: "end", cell: (l) => formatMoney(l.unitPrice, so.currency) },
+    { key: "price", header: "Price", align: "end", cell: (l) => formatMoney(l.unitPrice, so.currency) },
     { key: "sub", header: "Subtotal", align: "end", cell: (l) => formatMoney(l.qty * l.unitPrice, so.currency) },
   ];
 
   return (
     <>
       <PageHeader
-        back="/penjualan"
+        back="/sales"
         title={`${so.code} · ${partnerName(so.customerId)}`}
         badge={
           <>
@@ -94,51 +94,51 @@ export default function SalesDetailPage() {
             <StatusChip tone={SALES_STATUS[so.status].tone}>{SALES_STATUS[so.status].label}</StatusChip>
           </>
         }
-        description={`Order ${formatDate(so.date)}${so.dueDate ? ` · target kirim ${formatDate(so.dueDate)}` : ""}`}
+        description={`Order ${formatDate(so.date)}${so.dueDate ? ` · ship by ${formatDate(so.dueDate)}` : ""}`}
         actions={
           <>
             {so.status === "draft" && (
               <ConfirmButton
                 variant="danger-soft"
                 danger
-                title={`Batalkan ${so.code}?`}
-                confirmLabel="Batalkan order"
-                onConfirm={() => run((d) => cancelSalesOrder(d, so.id), `${so.code} dibatalkan`)}
+                title={`Cancel ${so.code}?`}
+                confirmLabel="Cancel order"
+                onConfirm={() => run((d) => cancelSalesOrder(d, so.id), `${so.code} cancelled`)}
               >
-                Batalkan
+                Cancel
               </ConfirmButton>
             )}
             {so.channel === "ekspor" && (
-              <Button variant="secondary" onPress={() => navigate(`/penjualan/${so.id}/dokumen`)}>
-                <FileText className="size-4" /> Dokumen ekspor
+              <Button variant="secondary" onPress={() => navigate(`/sales/${so.id}/documents`)}>
+                <FileText className="size-4" /> Export documents
               </Button>
             )}
             {(so.status === "draft" || so.status === "dikonfirmasi") && so.deliveries.length === 0 && (
-              <Button variant="secondary" onPress={() => navigate(`/penjualan/${so.id}/ubah`)}>
-                <Pencil className="size-4" /> Ubah
+              <Button variant="secondary" onPress={() => navigate(`/sales/${so.id}/edit`)}>
+                <Pencil className="size-4" /> Edit
               </Button>
             )}
             {so.status === "draft" &&
               (so.customerId ? (
-                <Button onPress={() => run((d) => confirmSalesOrder(d, so.id), `${so.code} dikonfirmasi`)}>Konfirmasi order</Button>
+                <Button onPress={() => run((d) => confirmSalesOrder(d, so.id), `${so.code} confirmed`)}>Confirm order</Button>
               ) : (
-                <Button variant="secondary" onPress={() => navigate(`/penjualan/${so.id}/ubah`)}>
-                  Pilih pelanggan untuk konfirmasi
+                <Button variant="secondary" onPress={() => navigate(`/sales/${so.id}/edit`)}>
+                  Choose a customer to confirm
                 </Button>
               ))}
             {canDeliver && (
               <Button onPress={() => setDelivering(true)}>
-                <Truck className="size-4" /> Kirim barang
+                <Truck className="size-4" /> Ship
               </Button>
             )}
             {so.deliveries.length > 0 && so.status !== "batal" && (
               <Button variant="secondary" onPress={() => setReturning(true)}>
-                <Undo2 className="size-4" /> Retur
+                <Undo2 className="size-4" /> Return
               </Button>
             )}
             {so.status === "dikirim" && (
-              <Button onPress={() => run((d) => completeSalesOrder(d, so.id), `${so.code} selesai`)}>
-                <PackageCheck className="size-4" /> Tandai selesai
+              <Button onPress={() => run((d) => completeSalesOrder(d, so.id), `${so.code} done`)}>
+                <PackageCheck className="size-4" /> Mark as done
               </Button>
             )}
           </>
@@ -149,37 +149,37 @@ export default function SalesDetailPage() {
         <Alert status="warning" className="mb-6">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Stok belum cukup untuk order ini</Alert.Title>
+            <Alert.Title>Not enough stock for this order</Alert.Title>
             <Alert.Description>
-              {shortages.map((s) => `${item(s.itemId)?.name} kurang ${formatQty(s.shortage)}`).join(", ")}. Buat perintah produksi otomatis untuk kekurangannya.
+              {shortages.map((s) => `${item(s.itemId)?.name} short by ${formatQty(s.shortage)}`).join(", ")}. Create work orders for the shortfall automatically.
             </Alert.Description>
           </Alert.Content>
           <Button
             size="sm"
             onPress={() => {
-              const created = run((d) => createWorkOrdersForShortage(d, so.id), (w) => `${w.length} perintah produksi dibuat`);
-              if (created?.[0]) navigate(`/produksi/${created[0].id}`);
+              const created = run((d) => createWorkOrdersForShortage(d, so.id), (w) => `${w.length} work orders created`);
+              if (created?.[0]) navigate(`/work-orders/${created[0].id}`);
             }}
           >
-            <Hammer className="size-4" /> Buat produksi
+            <Hammer className="size-4" /> Create work orders
           </Button>
         </Alert>
       )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
-          <Section title="Produk" bodyClassName="p-0">
-            <DataTable label="Produk dipesan" columns={columns} rows={so.lines} dependencies={[db.lots, so.deliveries]} />
+          <Section title="Products" bodyClassName="p-0">
+            <DataTable label="Ordered products" columns={columns} rows={so.lines} dependencies={[db.lots, so.deliveries]} />
           </Section>
 
           {so.channel === "ekspor" && so.export && pl && (
             <Section
-              title="Pengapalan"
+              title="Shipment"
               description={`${so.export.incoterm} ${so.export.portOfLoading} → ${so.export.portOfDischarge || "?"}, ${so.export.destinationCountry || "?"}`}
               actions={
                 open && (
                   <Button size="sm" variant="secondary" onPress={() => setEditingExport(true)}>
-                    <Pencil className="size-4" /> Ubah data ekspor
+                    <Pencil className="size-4" /> Edit export details
                   </Button>
                 )
               }
@@ -189,7 +189,7 @@ export default function SalesDetailPage() {
                   <Alert status="warning">
                     <Alert.Indicator />
                     <Alert.Content>
-                      <Alert.Title>Kelengkapan dokumen</Alert.Title>
+                      <Alert.Title>Missing document details</Alert.Title>
                       <Alert.Description>
                         <ul className="list-disc pl-4">
                           {warnings.map((w) => (
@@ -201,13 +201,13 @@ export default function SalesDetailPage() {
                   </Alert>
                 )}
                 <Meter
-                  aria-label="Isi kontainer"
+                  aria-label="Container fill"
                   value={Math.min(100, pl.fill * 100)}
                   color={pl.fill > 1 ? "danger" : pl.fill > 0.85 ? "success" : "warning"}
                 >
                   <div className="mb-1 flex justify-between text-sm">
                     <span>
-                      Isi {CONTAINER_LABEL[so.export.containerType]} (±{pl.capacity} CBM)
+                      Fill of {CONTAINER_LABEL[so.export.containerType]} (±{pl.capacity} CBM)
                     </span>
                     <span className="tabular-nums">
                       {formatNumber(pl.totals.cbm, 2)} CBM · {formatPct(pl.fill, 0)}
@@ -219,19 +219,19 @@ export default function SalesDetailPage() {
                 </Meter>
                 <p className="text-xs text-muted">
                   {pl.remainingCbm > 0
-                    ? `Masih muat ±${formatNumber(pl.remainingCbm, 1)} CBM — tawarkan produk tambahan ke buyer agar ongkos per unit turun.`
-                    : "Volume melebihi kapasitas — pertimbangkan kontainer lebih besar atau pisah pengiriman."}{" "}
-                  {pl.totals.cartons} karton · {formatNumber(pl.totals.grossKg, 1)} kg kotor.
+                    ? `Room for ±${formatNumber(pl.remainingCbm, 1)} CBM more — offer the buyer extra products to bring the freight cost per unit down.`
+                    : "Volume exceeds capacity — use a bigger container or split the shipment."}{" "}
+                  {pl.totals.cartons} cartons · {formatNumber(pl.totals.grossKg, 1)} kg gross.
                 </p>
                 <KeyValue
                   columns={3}
                   items={[
-                    ["No. V-Legal", so.export.vLegalNo],
-                    ["Ref. DDS EUDR", so.export.eudrDdsRef],
+                    ["V-Legal no.", so.export.vLegalNo],
+                    ["EUDR DDS reference", so.export.eudrDdsRef],
                     ["ETD", formatDate(so.export.etd)],
-                    ["No. kontainer", so.export.containerNo],
-                    ["No. segel", so.export.sealNo],
-                    ["No. B/L", so.export.blNo],
+                    ["Container no.", so.export.containerNo],
+                    ["Seal no.", so.export.sealNo],
+                    ["B/L no.", so.export.blNo],
                   ]}
                 />
               </div>
@@ -239,32 +239,32 @@ export default function SalesDetailPage() {
           )}
 
           {so.deliveries.length > 0 && (
-          <Section title="Riwayat pengiriman" bodyClassName="p-0">
+          <Section title="Delivery history" bodyClassName="p-0">
             <DataTable
-              label="Pengiriman"
+              label="Deliveries"
               rows={so.deliveries.flatMap((d) => d.lines.map((l, i) => ({ ...l, id: `${d.id}-${i}`, at: d.at })))}
               columns={[
-                { key: "at", header: "Waktu", isRowHeader: true, className: "whitespace-nowrap", cell: (l) => formatDateTime(l.at) },
-                { key: "item", header: "Produk", cell: (l) => item(l.itemId)?.name ?? "?" },
+                { key: "at", header: "Time", isRowHeader: true, className: "whitespace-nowrap", cell: (l) => formatDateTime(l.at) },
+                { key: "item", header: "Product", cell: (l) => item(l.itemId)?.name ?? "?" },
                 { key: "lot", header: "Lot", className: "whitespace-nowrap", cell: (l) => db.lots.find((x) => x.id === l.lotId)?.code ?? "?" },
                 { key: "qty", header: "Qty", align: "end", cell: (l) => formatQty(l.qty, item(l.itemId)?.uom) },
-                { key: "cost", header: "HPP/unit", align: "end", cell: (l) => formatIDR(l.unitCost) },
+                { key: "cost", header: "Unit cost", align: "end", cell: (l) => formatIDR(l.unitCost) },
               ]}
             />
           </Section>
           )}
           {so.returns.length > 0 && (
-            <Section title="Retur" bodyClassName="p-0">
+            <Section title="Returns" bodyClassName="p-0">
               <DataTable
-                label="Retur"
+                label="Returns"
                 rows={so.returns}
                 columns={[
-                  { key: "at", header: "Waktu", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => formatDateTime(r.at) },
-                  { key: "item", header: "Barang", cell: (r) => item(r.itemId)?.name ?? "?" },
-                  { key: "cond", header: "Kondisi", cell: (r) => <StatusChip tone={r.condition === "rusak" ? "danger" : "success"}>{r.condition === "rusak" ? "Cacat" : "Baik"}</StatusChip> },
+                  { key: "at", header: "Time", isRowHeader: true, className: "whitespace-nowrap", cell: (r) => formatDateTime(r.at) },
+                  { key: "item", header: "Item", cell: (r) => item(r.itemId)?.name ?? "?" },
+                  { key: "cond", header: "Condition", cell: (r) => <StatusChip tone={r.condition === "rusak" ? "danger" : "success"}>{r.condition === "rusak" ? "Defective" : "Good"}</StatusChip> },
                   { key: "qty", header: "Qty", align: "end", cell: (r) => formatQty(r.qty, item(r.itemId)?.uom) },
-                  { key: "credit", header: "Kredit", align: "end", cell: (r) => formatMoney(r.credit, so.currency) },
-                  { key: "note", header: "Alasan", cell: (r) => <span className="text-muted">{r.note ?? "—"}</span> },
+                  { key: "credit", header: "Credit", align: "end", cell: (r) => formatMoney(r.credit, so.currency) },
+                  { key: "note", header: "Reason", cell: (r) => <span className="text-muted">{r.note ?? "—"}</span> },
                 ]}
               />
             </Section>
@@ -272,17 +272,17 @@ export default function SalesDetailPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <Section title="Nilai & margin">
+          <Section title="Value & margin">
             <Row label="Subtotal" value={formatMoney(totals.subtotal, so.currency)} />
-            {so.discount > 0 && <Row label="Diskon" value={`− ${formatMoney(so.discount, so.currency)}`} />}
-            {so.shippingCharge > 0 && <Row label="Ongkir" value={formatMoney(so.shippingCharge, so.currency)} />}
-            {totals.returnCredit > 0 && <Row label="Retur" value={`− ${formatMoney(totals.returnCredit, so.currency)}`} />}
+            {so.discount > 0 && <Row label="Discount" value={`− ${formatMoney(so.discount, so.currency)}`} />}
+            {so.shippingCharge > 0 && <Row label="Shipping" value={formatMoney(so.shippingCharge, so.currency)} />}
+            {totals.returnCredit > 0 && <Row label="Returns" value={`− ${formatMoney(totals.returnCredit, so.currency)}`} />}
             <Row label="Total" value={formatMoney(totals.total, so.currency)} strong />
-            {so.currency !== "IDR" && <Row label={`Kurs ${formatIDR(so.exchangeRate)}`} value={formatIDR(totals.totalIdr)} muted />}
+            {so.currency !== "IDR" && <Row label={`Exchange rate ${formatIDR(so.exchangeRate)}`} value={formatIDR(totals.totalIdr)} muted />}
             <div className="my-2 border-t border-[var(--rule)]" />
-            <Row label="HPP barang terkirim" value={formatIDR(totals.cogs)} />
-            {totals.estimatedCogsOutstanding > 0 && <Row label="Estimasi HPP belum kirim" value={formatIDR(totals.estimatedCogsOutstanding)} muted />}
-            <Row label="Margin kotor" value={`${formatIDR(totals.margin)} · ${formatPct(totals.marginPct)}`} strong tone={totals.margin < 0 ? "danger" : "success"} />
+            <Row label="COGS of shipped items" value={formatIDR(totals.cogs)} />
+            {totals.estimatedCogsOutstanding > 0 && <Row label="Estimated COGS not yet shipped" value={formatIDR(totals.estimatedCogsOutstanding)} muted />}
+            <Row label="Gross margin" value={`${formatIDR(totals.margin)} · ${formatPct(totals.marginPct)}`} strong tone={totals.margin < 0 ? "danger" : "success"} />
           </Section>
           {so.status !== "batal" && (
             <PaymentsSection
@@ -293,23 +293,23 @@ export default function SalesDetailPage() {
                 so.dpPercent
                   ? (() => {
                       const dp = dpStatus(db, so);
-                      return `DP ${so.dpPercent}%: ${formatMoney(dp.required, so.currency)} — ${dp.met ? "sudah terpenuhi" : `kurang ${formatMoney(dp.required - dp.received, so.currency)}`}. Jatuh tempo pelunasan ${formatDate(so.paymentDueDate ?? so.dueDate)}.`;
+                      return `Down payment ${so.dpPercent}%: ${formatMoney(dp.required, so.currency)} — ${dp.met ? "received" : `${formatMoney(dp.required - dp.received, so.currency)} still due`}. Final payment due ${formatDate(so.paymentDueDate ?? so.dueDate)}.`;
                     })()
                   : so.paymentDueDate
-                    ? `Jatuh tempo pelunasan ${formatDate(so.paymentDueDate)}.`
+                    ? `Final payment due ${formatDate(so.paymentDueDate)}.`
                     : undefined
               }
             />
           )}
           {wos.length > 0 && (
-            <Section title="Produksi untuk order ini">
+            <Section title="Work orders for this order">
               {wos.map((w) => (
-                <Row key={w.id} label={<Link href={`/produksi/${w.id}`}>{`${w.code} · ${w.title}`}</Link>} value={<StatusChip tone={WO_STATUS[w.status].tone}>{WO_STATUS[w.status].label}</StatusChip>} />
+                <Row key={w.id} label={<Link href={`/work-orders/${w.id}`}>{`${w.code} · ${w.title}`}</Link>} value={<StatusChip tone={WO_STATUS[w.status].tone}>{WO_STATUS[w.status].label}</StatusChip>} />
               ))}
             </Section>
           )}
           <Section title="Info">
-            <KeyValue columns={1} items={[["Pelanggan", partnerName(so.customerId)], ["Catatan", so.note]]} />
+            <KeyValue columns={1} items={[["Customer", partnerName(so.customerId)], ["Note", so.note]]} />
           </Section>
         </div>
       </div>
@@ -323,7 +323,7 @@ export default function SalesDetailPage() {
 
 function DeliverDialog({ so, isOpen, onOpenChange }: { so: SalesOrder; isOpen: boolean; onOpenChange: (o: boolean) => void }) {
   return (
-    <TaskModal isOpen={isOpen} onOpenChange={onOpenChange} title={`Kirim barang ${so.code}`} description="Lot produk dipilih otomatis (stok terlama dulu). HPP penjualan tercatat dari lot yang terkirim.">
+    <TaskModal isOpen={isOpen} onOpenChange={onOpenChange} title={`Ship ${so.code}`} description="Product lots are picked automatically (oldest stock first). COGS is recorded from the lots shipped.">
       {isOpen && <DeliverForm so={so} onDone={() => onOpenChange(false)} />}
     </TaskModal>
   );
@@ -338,7 +338,7 @@ function DeliverForm({ so, onDone }: { so: SalesOrder; onDone: () => void }) {
   const submit = () => {
     const ok = run(
       (d) => deliverSalesOrder(d, so.id, lines.map((l) => ({ itemId: l.itemId, qty: roundQty(qty[l.itemId] ?? 0) }))),
-      "Pengiriman tercatat — stok berkurang",
+      "Delivery recorded — stock reduced",
     );
     if (ok) onDone();
   };
@@ -352,19 +352,19 @@ function DeliverForm({ so, onDone }: { so: SalesOrder; onDone: () => void }) {
             <div>
               <p className="font-medium">{it?.name}</p>
               <p className="text-xs text-muted">
-                Sisa order {formatQty(l.qty, it?.uom)} · stok siap {formatQty(free, it?.uom)}
+                Left to ship {formatQty(l.qty, it?.uom)} · ready stock {formatQty(free, it?.uom)}
               </p>
             </div>
-            <NumberInput aria-label={`Qty kirim ${it?.name}`} value={qty[l.itemId] ?? 0} onChange={(v) => setQty({ ...qty, [l.itemId]: v })} maxValue={Math.min(l.qty, free)} maximumFractionDigits={0} />
+            <NumberInput aria-label={`Quantity to ship ${it?.name}`} value={qty[l.itemId] ?? 0} onChange={(v) => setQty({ ...qty, [l.itemId]: v })} maxValue={Math.min(l.qty, free)} maximumFractionDigits={0} />
           </div>
         );
       })}
       <div className="mt-2 flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button onPress={submit} isDisabled={Object.values(qty).every((v) => !v)}>
-          Kirim
+          Ship
         </Button>
       </div>
     </div>
@@ -388,18 +388,18 @@ function ExportEditDialog({
     <TaskModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
-      title="Data ekspor"
+      title="Export details"
       footer={
         <>
           <Button variant="tertiary" onPress={() => onOpenChange(false)}>
-            Batal
+            Cancel
           </Button>
           <Button
             onPress={() => {
-              if (run((d) => updateExportInfo(d, soId, value), "Data ekspor disimpan")) onOpenChange(false);
+              if (run((d) => updateExportInfo(d, soId, value), "Export details saved")) onOpenChange(false);
             }}
           >
-            Simpan
+            Save
           </Button>
         </>
       }
@@ -415,8 +415,8 @@ function ReturnDialog({ so, isOpen, onOpenChange }: { so: SalesOrder; isOpen: bo
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      title={`Retur ${so.code}`}
-      description="Barang kembali ke gudang dengan HPP saat dikirim. Barang cacat masuk status rusak dan bisa dibuatkan perintah perbaikan. Pelanggan dikredit sesuai harga order."
+      title={`Return ${so.code}`}
+      description="Items go back to the warehouse at their unit cost when shipped. Defective items are marked Damaged and can get a repair work order. The customer is credited at the order price."
     >
       {isOpen && <ReturnForm so={so} onDone={() => onOpenChange(false)} />}
     </TaskModal>
@@ -436,36 +436,36 @@ function ReturnForm({ so, onDone }: { so: SalesOrder; onDone: () => void }) {
         return (
           <div key={r.itemId} className="rounded-sm border border-[var(--rule)] p-3">
             <p className="text-sm font-medium">
-              {item(r.itemId)?.name} <span className="font-normal text-muted">· bisa diretur {formatQty(max)}</span>
+              {item(r.itemId)?.name} <span className="font-normal text-muted">· returnable {formatQty(max)}</span>
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-[7rem_9rem_1fr]">
-              <NumberInput aria-label="Qty retur" value={r.qty} onChange={(qty) => set({ qty })} maxValue={max} />
+              <NumberInput aria-label="Return quantity" value={r.qty} onChange={(qty) => set({ qty })} maxValue={max} />
               <SelectInput
-                aria-label="Kondisi"
+                aria-label="Condition"
                 value={r.condition}
                 onChange={(v) => set({ condition: v as "baik" | "rusak" })}
                 options={[
-                  { id: "baik", label: "Baik — bisa dijual lagi" },
-                  { id: "rusak", label: "Cacat — perlu perbaikan" },
+                  { id: "baik", label: "Good — can be sold again" },
+                  { id: "rusak", label: "Defective — needs repair" },
                 ]}
               />
-              <TextInput aria-label="Alasan" value={r.note} onChange={(note) => set({ note })} placeholder="Alasan retur" className="col-span-2 sm:col-span-1" />
+              <TextInput aria-label="Reason" value={r.note} onChange={(note) => set({ note })} placeholder="Return reason" className="col-span-2 sm:col-span-1" />
             </div>
           </div>
         );
       })}
       <div className="flex justify-end gap-2">
         <Button variant="tertiary" onPress={onDone}>
-          Batal
+          Cancel
         </Button>
         <Button
           isDisabled={rows.every((r) => !r.qty)}
           onPress={() => {
-            const ok = run((d) => returnSale(d, so.id, rows.filter((r) => r.qty > 0).map((r) => ({ ...r, note: r.note || undefined }))), "Retur tercatat");
+            const ok = run((d) => returnSale(d, so.id, rows.filter((r) => r.qty > 0).map((r) => ({ ...r, note: r.note || undefined }))), "Return recorded");
             if (ok) onDone();
           }}
         >
-          Simpan retur
+          Save return
         </Button>
       </div>
     </div>

@@ -12,7 +12,7 @@ export function BrandedState({ code, title, body }: { code: string; title: strin
       <h1 className="title-display mt-2 text-[28px] leading-tight">{title}</h1>
       <p className="mt-3 text-sm break-words text-muted">{body}</p>
       <Button className="mt-6" onPress={() => navigate("/")}>
-        Kembali ke beranda
+        Back to home
       </Button>
     </div>
   );

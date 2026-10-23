@@ -101,7 +101,7 @@ export function NumberInput({
   minValue?: number;
   maxValue?: number;
   step?: number;
-  /** Unit shown after the input, e.g. "lembar". */
+  /** Unit shown after the input, e.g. "sheet". */
   suffix?: string;
   /** Formats as Rupiah without decimals. */
   money?: boolean;
@@ -147,7 +147,7 @@ export function SelectInput({
   value,
   onChange,
   options,
-  placeholder = "Pilih…",
+  placeholder = "Select…",
   ...base
 }: BaseProps & { value: string | null; onChange: (v: string) => void; options: Option[]; placeholder?: string }) {
   return (
@@ -192,8 +192,8 @@ export function SearchPicker({
   value,
   onChange,
   options,
-  placeholder = "Cari…",
-  emptyText = "Tidak ditemukan",
+  placeholder = "Search…",
+  emptyText = "Nothing found",
   ...base
 }: BaseProps & {
   value: string | null;

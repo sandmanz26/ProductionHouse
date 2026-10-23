@@ -11,7 +11,7 @@ function Compliance({ method }: { method: CostingMethod }) {
   return (
     <span className="flex flex-wrap gap-1">
       {tag(c.psak, "PSAK 14")}
-      {tag(c.tax, "UU PPh")}
+      {tag(c.tax, "Income tax")}
     </span>
   );
 }
@@ -19,7 +19,7 @@ function Compliance({ method }: { method: CostingMethod }) {
 /** Radio cards for the company-wide cost formula. */
 export function CostingMethodPicker({ value, onChange, name }: { value: CostingMethod; onChange: (m: CostingMethod) => void; name: string }) {
   return (
-    <div role="radiogroup" aria-label="Metode biaya persediaan" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div role="radiogroup" aria-label="Inventory costing method" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {COSTING_METHODS.map((m) => {
         const active = value === m;
         return (
