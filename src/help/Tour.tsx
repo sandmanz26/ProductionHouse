@@ -8,7 +8,7 @@ import type { FlowStep } from "./content";
 import { useHelp } from "./help-store";
 
 interface TourStep {
-  eyebrow: string;
+  kicker: string;
   title: string;
   body: string;
   flow?: FlowStep[];
@@ -17,7 +17,7 @@ interface TourStep {
 
 const STEPS: TourStep[] = [
   {
-    eyebrow: "Welcome",
+    kicker: "Welcome",
     title: `${BRAND.name} follows every piece of timber from purchase to payment`,
     body: "It is one workbook for the whole workshop: what you buy, what is in stock, what is on the floor, what you sell or rent out, and who still owes whom. This tour takes a minute; you can reopen it any time from Help.",
     flow: [
@@ -29,7 +29,7 @@ const STEPS: TourStep[] = [
     ],
   },
   {
-    eyebrow: "1 · Stock in lots",
+    kicker: "1 · Stock in lots",
     title: "Everything in stock is a lot with its own price",
     body: "Receiving a purchase creates a lot — e.g. 1.2 m³ of teak at Rp 14,500,000/m³ including freight. When material leaves, Serat knows exactly which lot it came from and what it cost.",
     flow: [
@@ -40,7 +40,7 @@ const STEPS: TourStep[] = [
     note: "Stock → Materials and Products show every lot. Open one to trace where it came from and where it went.",
   },
   {
-    eyebrow: "2 · Work orders",
+    kicker: "2 · Work orders",
     title: "A work order turns materials into products — and locks the cost",
     body: "Issue materials to the job, log labour, move it through its stages on the board, then complete it. The job cost is materials + labour + overhead, minus the offcuts you put back.",
     flow: [
@@ -52,7 +52,7 @@ const STEPS: TourStep[] = [
     ],
   },
   {
-    eyebrow: "3 · Offcuts",
+    kicker: "3 · Offcuts",
     title: "Every offcut has a price",
     body: "Usable leftovers go back to stock with their size and their share of the cost, so the job is not charged for them and the next job uses them first. Waste you sell (sawdust, scrap) lowers the job cost.",
     flow: [
@@ -62,7 +62,7 @@ const STEPS: TourStep[] = [
     ],
   },
   {
-    eyebrow: "4 · Selling, renting, getting paid",
+    kicker: "4 · Selling, renting, getting paid",
     title: "Shipping takes the real cost out of stock",
     body: "A sales order ships specific lots, so the margin is real. Rentals keep units on your books while they are out; damaged returns go to a repair work order. Unpaid balances show up in Receivables & payables.",
     flow: [
@@ -73,7 +73,7 @@ const STEPS: TourStep[] = [
     ],
   },
   {
-    eyebrow: "Finding your way",
+    kicker: "Finding your way",
     title: "Help is always one click away",
     body: "Every page has a How this works button at the top: what the page is for, a picture of its flow, step-by-step tasks and what it changes elsewhere. The Help page has the full map of the workshop and a glossary. Press Ctrl K (⌘K) to jump to any code or item.",
   },
@@ -99,8 +99,8 @@ function TourBody({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex flex-col gap-4 p-1">
       <div>
-        <p className="eyebrow">
-          {step.eyebrow} <span className="num ml-1 text-muted">{i + 1}/{STEPS.length}</span>
+        <p className="caption-label">
+          {step.kicker} <span className="num ml-1 text-muted">{i + 1}/{STEPS.length}</span>
         </p>
         <h2 className="mt-1 text-lg leading-snug font-semibold">{step.title}</h2>
       </div>

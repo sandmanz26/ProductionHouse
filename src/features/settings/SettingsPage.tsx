@@ -128,7 +128,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
           )}
           {initial.costingHistory.length > 0 && (
             <div className="mt-4">
-              <p className="eyebrow">Change history</p>
+              <p className="caption-label">Change history</p>
               <ul className="mt-1 divide-y divide-[var(--rule)] text-[13px]">
                 {[...initial.costingHistory].reverse().slice(0, 8).map((h, i) => (
                   <li key={i} className="flex flex-wrap justify-between gap-2 py-1.5">

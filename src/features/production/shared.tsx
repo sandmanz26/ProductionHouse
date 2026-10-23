@@ -23,7 +23,7 @@ export function RequirementsTable({
       header: "Material",
       isRowHeader: true,
       cell: (r) => (
-        <div className="min-w-36">
+        <div className="sm:min-w-36">
           <p className="font-medium">{item(r.itemId)?.name ?? "?"}</p>
           <p className="text-xs text-muted">{item(r.itemId)?.sku}</p>
         </div>

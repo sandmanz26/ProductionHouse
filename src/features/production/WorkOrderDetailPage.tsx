@@ -167,7 +167,7 @@ export default function WorkOrderDetailPage() {
         <FlowDiagram graph={flow} label={`Process map ${wo.code}`} />
       </Section>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 items-start xl:grid-cols-3">
         <div className="flex flex-col gap-6 xl:col-span-2">
           {open && (
             <Section
@@ -323,7 +323,7 @@ export default function WorkOrderDetailPage() {
             )}
             {wo.plannedInputs.length > 0 && (
               <>
-                <p className="eyebrow mt-3 mb-1">Source / extra items</p>
+                <p className="caption-label mt-3 mb-1">Source / extra items</p>
                 {wo.plannedInputs.map((i) => (
                   <Row
                     key={i.id}

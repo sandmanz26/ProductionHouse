@@ -77,14 +77,13 @@ export default function HelpPage() {
         <ProcessOverview onOpen={goTopic} />
       </Section>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+      <div className="mb-6 grid gap-6 items-start lg:grid-cols-2">
         <Section title="Your first day" description="Starting from empty data, in this order.">
           <ol className="flex flex-col divide-y divide-[var(--rule)]">
-            {FIRST_DAY.map((s, i) => (
+            {FIRST_DAY.map((s) => (
               <li key={s.title}>
                 <button type="button" onClick={() => navigate(s.to)} className="flex w-full items-start gap-3 py-2.5 text-left hover:bg-default/40">
-                  <span className="num mt-0.5 text-[12px] text-muted">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="flex-1">
+                  <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-medium">{s.title}</span>
                     <span className="block text-[12px] text-muted">{s.body}</span>
                   </span>
@@ -117,7 +116,7 @@ export default function HelpPage() {
         <div className="flex flex-col gap-5">
           {GROUPS.map((g) => (
             <div key={g}>
-              <p className="eyebrow mb-1.5">{g}</p>
+              <p className="caption-label mb-1.5">{g}</p>
               <ul className="divide-y divide-[var(--rule)] rounded-md border border-[var(--rule)] bg-surface">
                 {HELP_TOPICS.filter((t) => t.group === g).map((t) => {
                   const isOpen = open === t.id;
@@ -125,9 +124,9 @@ export default function HelpPage() {
                     <li key={t.id} id={`topic-${t.id}`} className="scroll-mt-20">
                       <button type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-default/40">
                         <ChevronRight className={`size-4 shrink-0 text-muted transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                        <span className="flex-1">
+                        <span className="min-w-0 flex-1">
                           <span className="block text-[14px] font-medium">{t.title}</span>
-                          {!isOpen && <span className="block truncate text-[12px] text-muted">{t.summary}</span>}
+                          {!isOpen && <span className="line-clamp-2 block text-[12px] text-muted">{t.summary}</span>}
                         </span>
                       </button>
                       {isOpen && (
@@ -149,7 +148,7 @@ export default function HelpPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 items-start">
         <Section title="Glossary" description={`${GLOSSARY.length} words used across ${BRAND.name}.`}>
           <label className="mb-3 flex h-8 items-center gap-2 rounded-sm border border-[var(--rule)] px-2.5 text-[13px]">
             <Search className="size-3.5 text-muted" />

@@ -30,7 +30,7 @@ export function PageHelpPanel() {
         <Drawer.Dialog aria-label="How this page works">
           <Drawer.Header className="flex items-start justify-between gap-2">
             <div>
-              <p className="eyebrow">How this works</p>
+              <p className="caption-label">How this works</p>
               <h2 className="text-base font-semibold">{topic?.title ?? "This page"}</h2>
             </div>
             <Button isIconOnly variant="ghost" size="sm" aria-label="Close" onPress={() => setPanel(false)}>
@@ -65,7 +65,7 @@ export function FirstVisitTip() {
   const { seenTips, tipsOff, tourDone, dismissTip, setPanel, setTipsOff } = useHelp();
   if (!topic || tipsOff || !tourDone || seenTips.includes(topic.id) || pathname === "/help") return null;
   return (
-    <aside aria-label="Tip for this page" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-[var(--rule)] border-l-[3px] border-l-accent bg-surface px-3 py-2 text-[13px]">
+    <aside aria-label="Tip for this page" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-[var(--rule)] bg-surface px-3 py-2 text-[13px]">
       <span className="font-medium">New here?</span>
       <span className="min-w-0 flex-1 text-foreground/80">{topic.summary}</span>
       <span className="flex gap-1">

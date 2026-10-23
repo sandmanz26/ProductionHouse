@@ -7,17 +7,14 @@ import { useDbStore } from "@/store/db-store";
 
 const PROOF = [
   {
-    n: "01",
     title: "Offcuts are counted, not binned",
     body: "Usable offcuts go into stock at their own price and are suggested first on the next work order.",
   },
   {
-    n: "02",
     title: "One ledger for export, supply and rental",
     body: "Proforma & packing list, down payment and final payment, rental hand-over and take-back down to the late fee.",
   },
   {
-    n: "03",
     title: "Data stays on this device",
     body: "No server, no account. Back up to a single file at any time.",
   },
@@ -51,19 +48,18 @@ export function WelcomePage() {
         <GrainRings className="pointer-events-none absolute -right-40 -bottom-48 w-[760px] text-serbuk opacity-[0.13] lg:-right-24" />
         <div className="relative flex items-center gap-2">
           <LogoMark className="size-7 text-serbuk" />
-          <span className="font-display text-[22px] leading-none font-semibold tracking-[-0.02em]">{BRAND.name.toLowerCase()}</span>
+          <span className="font-sans text-[22px] leading-none font-semibold tracking-[-0.02em]">{BRAND.name.toLowerCase()}</span>
         </div>
 
         <div className="relative mt-14 max-w-xl lg:mt-auto">
           <p className="text-xs font-semibold tracking-[0.08em] text-serbuk uppercase">{BRAND.descriptor}</p>
-          <h1 className="mt-3 font-display text-[40px] leading-[1.05] font-semibold tracking-[-0.025em] sm:text-[52px]">{BRAND.line}</h1>
+          <h1 className="mt-3 font-sans text-[40px] leading-[1.05] font-semibold tracking-[-0.025em] sm:text-[52px]">{BRAND.line}</h1>
           <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-kertas/75">{BRAND.pitch}</p>
         </div>
 
         <ol className="relative mt-10 grid max-w-xl gap-5 sm:grid-cols-3 sm:gap-6 lg:mt-14">
           {PROOF.map((p) => (
-            <li key={p.n} className="border-t border-kertas/20 pt-3">
-              <span className="num text-xs text-serbuk">{p.n}</span>
+            <li key={p.title} className="border-t border-kertas/20 pt-3">
               <p className="mt-1 text-sm font-medium">{p.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-kertas/60">{p.body}</p>
             </li>
@@ -73,8 +69,8 @@ export function WelcomePage() {
 
       <section className="flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-16">
         <div className="mx-auto w-full max-w-md">
-          <p className="eyebrow">Start</p>
-          <h2 className="mt-1 font-display text-[26px] leading-tight font-semibold tracking-[-0.015em]">Open a workbook</h2>
+          <p className="caption-label">Start</p>
+          <h2 className="mt-1 font-sans text-[26px] leading-tight font-semibold tracking-[-0.015em]">Open a workbook</h2>
           <p className="mt-1.5 text-[13px] text-muted">Pick one. You can switch at any time from Settings.</p>
 
           <div role="radiogroup" aria-label="Choose a workbook" className="mt-6 flex flex-col gap-2">

@@ -32,7 +32,7 @@ export default function PartnersPage() {
       header: "Name",
       isRowHeader: true,
       cell: (p) => (
-        <div className="min-w-44">
+        <div className="sm:min-w-44">
           <p className="font-medium">{p.name}</p>
           {p.contact && <p className="text-xs text-muted">{p.contact}</p>}
         </div>

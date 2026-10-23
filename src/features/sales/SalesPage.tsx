@@ -31,7 +31,7 @@ export default function SalesPage() {
       key: "cust",
       header: "Customer",
       cell: (s) => (
-        <div className="min-w-40">
+        <div className="sm:min-w-40">
           <p className="font-medium">{partnerName(s.customerId)}</p>
           {s.export && <p className="text-xs text-muted">{s.export.destinationCountry} · {s.export.incoterm} {s.export.portOfDischarge}</p>}
         </div>

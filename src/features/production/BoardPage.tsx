@@ -50,7 +50,7 @@ export default function BoardPage() {
                     const wo = db.workOrders.find((x) => x.id === w.id)!;
                     const done = wo.stages.filter((s) => s.status === "selesai").length;
                     return (
-                      <li key={w.id} className="rounded-sm bg-surface p-2.5 shadow-[var(--surface-shadow)]">
+                      <li key={w.id} className="rounded-sm bg-surface p-2.5 border border-[var(--rule)]">
                         <div className="flex items-baseline justify-between gap-2">
                           <Link href={`/work-orders/${w.id}`}>
                             <Code>{w.code}</Code>

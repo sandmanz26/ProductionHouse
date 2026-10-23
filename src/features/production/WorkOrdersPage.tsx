@@ -34,9 +34,9 @@ export default function WorkOrdersPage() {
       key: "title",
       header: "Job",
       cell: (w) => (
-        <div className="min-w-48">
-          <p className="truncate font-medium">{w.title}</p>
-          <p className="truncate text-xs text-muted">
+        <div className="sm:min-w-48">
+          <p className="line-clamp-2 font-medium">{w.title}</p>
+          <p className="line-clamp-2 text-xs text-muted">
             {(w.status === "selesai" ? w.outputs : w.plannedOutputs)
               .map((o) => `${formatQty(o.qty, item(o.itemId)?.uom)} ${item(o.itemId)?.name ?? ""}`)
               .join(", ") || "—"}

@@ -28,7 +28,7 @@ export default function ItemsPage() {
     header: kind === "product" ? "Product" : "Material",
     isRowHeader: true,
     cell: (i) => (
-      <div className="min-w-44">
+      <div className="sm:min-w-44">
         <p className="font-medium">
           {i.name} {i.archived && <StatusChip tone="default">Archived</StatusChip>}
         </p>

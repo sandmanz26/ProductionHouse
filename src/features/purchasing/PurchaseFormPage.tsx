@@ -321,7 +321,7 @@ function QtyHelper({
     const vol = cubicMeters(pcs, t, w, len);
     return (
       <div className="mt-2 rounded-sm border border-dashed border-[var(--rule)] p-3">
-        <p className="eyebrow mb-2">Timber volume: pieces × thickness × width × length</p>
+        <p className="caption-label mb-2">Timber volume: pieces × thickness × width × length</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <NumberInput label="Pieces" value={pcs} onChange={setPcs} maximumFractionDigits={0} />
           <NumberInput label="Thickness" value={t} onChange={setT} suffix="cm" />
@@ -340,7 +340,7 @@ function QtyHelper({
   if (purchaseUnit) {
     return (
       <div className="mt-2 rounded-sm border border-dashed border-[var(--rule)] p-3">
-        <p className="eyebrow mb-2">
+        <p className="caption-label mb-2">
           Purchase unit: 1 {purchaseUnit.label} = {purchaseUnit.factor} {uom}
         </p>
         <div className="grid grid-cols-2 gap-2">

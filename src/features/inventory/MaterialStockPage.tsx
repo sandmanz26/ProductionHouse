@@ -50,7 +50,7 @@ export default function MaterialStockPage() {
       header: "Material",
       isRowHeader: true,
       cell: (r) => (
-        <div className="min-w-44">
+        <div className="sm:min-w-44">
           <p className="font-medium">{r.name}</p>
           <p className="text-xs text-muted">
             {r.sku} · {MATERIAL_CATEGORY[r.category as MaterialCategory] ?? r.category}

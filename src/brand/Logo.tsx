@@ -20,7 +20,7 @@ export function Wordmark({ className = "", size = "md" }: { className?: string; 
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <LogoMark className={`${lg ? "size-8" : "size-[22px]"} shrink-0 text-accent`} />
-      <span className={`font-display font-semibold tracking-[-0.02em] ${lg ? "text-[28px] leading-none" : "text-[19px] leading-none"}`}>
+      <span className={`font-sans font-semibold tracking-[-0.02em] ${lg ? "text-[28px] leading-none" : "text-[19px] leading-none"}`}>
         {BRAND.name.toLowerCase()}
       </span>
     </span>

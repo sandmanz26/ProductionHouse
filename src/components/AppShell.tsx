@@ -138,7 +138,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label="Main navigation" className="flex flex-col gap-4">
       {NAV.map((group, gi) => (
         <div key={gi}>
-          {group.title && <p className="eyebrow mb-1 px-3">{group.title}</p>}
+          {group.title && <p className="caption-label mb-1 px-3">{group.title}</p>}
           <ul className="flex flex-col gap-0.5">
             {group.items.map((item) => {
               const badge = item.badge?.(counts);
@@ -151,7 +151,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                     className={({ isActive }) =>
                       `relative flex items-center gap-2.5 rounded-sm px-3 py-1.5 text-[13px] transition-colors ${
                         isActive
-                          ? "bg-default font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-accent"
+                          ? "bg-default font-medium text-foreground"
                           : "text-foreground/75 hover:bg-default/60 hover:text-foreground"
                       }`
                     }
@@ -182,7 +182,7 @@ function QuickCreate({ compact }: { compact?: boolean }) {
     <Dropdown>
       <Button variant="primary" size="sm" isIconOnly={compact} aria-label="Create new">
         <Plus className="size-4" />
-        {!compact && "New"}
+        {!compact && <span className="hidden sm:inline">New</span>}
       </Button>
       <Dropdown.Popover placement="bottom end">
         <Dropdown.Menu aria-label="Create new" onAction={(key: Key) => navigate(String(key))}>
@@ -286,11 +286,11 @@ export function AppShell({ children }: { children?: ReactNode }) {
         <div className="print:hidden">
           <DemoBanner />
         </div>
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-[var(--rule)] bg-background/90 px-4 backdrop-blur lg:px-8 print:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-[var(--rule)] bg-background px-4 lg:px-8 print:hidden">
           <Button isIconOnly variant="ghost" size="sm" aria-label="Open menu" className="lg:hidden" onPress={() => setDrawerOpen(true)}>
             <Menu className="size-5" />
           </Button>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <SearchButton onPress={() => setPaletteOpen(true)} />
           </div>
           <PageHelpButton />

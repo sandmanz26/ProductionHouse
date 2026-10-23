@@ -149,7 +149,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           const header = i === 0 || results[i - 1]!.group !== e.group ? e.group : null;
           return (
             <li key={`${e.group}-${e.id}`} role="presentation">
-              {header && <p className="eyebrow px-2 pt-2 pb-1">{header}</p>}
+              {header && <p className="caption-label px-2 pt-2 pb-1">{header}</p>}
               <div
                 id={`palette-${e.id}`}
                 role="option"

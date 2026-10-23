@@ -104,12 +104,12 @@ export function MetricStrip({ items, className }: { items: Metric[]; className?:
   ];
   return (
     <div
-      className={`grid grid-cols-2 overflow-hidden rounded-md bg-surface shadow-[var(--surface-shadow)] ${cols} ${className ?? ""}`}
+      className={`grid grid-cols-2 overflow-hidden rounded-md bg-surface border border-[var(--rule)] ${cols} ${className ?? ""}`}
     >
       {items.map((m, i) => {
         const body = (
           <>
-            <p className="eyebrow">{m.label}</p>
+            <p className="caption-label">{m.label}</p>
             <p className={`num mt-1 text-lg font-medium sm:text-xl ${toneText[m.tone ?? "default"]}`}>{m.value}</p>
             {m.hint && <p className="mt-0.5 text-xs text-muted">{m.hint}</p>}
           </>
@@ -147,7 +147,7 @@ export function Section({
   bodyClassName?: string;
 }) {
   return (
-    <section className={`rounded-md bg-surface shadow-[var(--surface-shadow)] ${className ?? ""}`}>
+    <section className={`rounded-md bg-surface border border-[var(--rule)] ${className ?? ""}`}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--rule)] px-4 py-3">
           <div className="min-w-0">
@@ -179,7 +179,7 @@ export function KeyValue({ items, columns = 2 }: { items: [ReactNode, ReactNode]
     <dl className={`grid grid-cols-1 gap-x-6 gap-y-3 ${cols}`}>
       {items.map(([k, v], i) => (
         <div key={i} className="min-w-0">
-          <dt className="eyebrow">{k}</dt>
+          <dt className="caption-label">{k}</dt>
           <dd className="mt-0.5 text-sm break-words">{v || "—"}</dd>
         </div>
       ))}
@@ -283,11 +283,11 @@ export function DataTable<T extends { id: string }>({
             const inner = (
               <>
                 <div className="min-w-0 font-medium">{head.cell(row)}</div>
-                <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
                   {fields.map((c) => (
                     <div key={c.key} className="min-w-0">
-                      <dt className="eyebrow">{c.header}</dt>
-                      <dd className={`text-sm ${c.align === "end" ? "num" : ""}`}>{c.cell(row)}</dd>
+                      <dt className="caption-label">{c.header}</dt>
+                      <dd className={`min-w-0 text-sm break-words ${c.align === "end" ? "num" : ""}`}>{c.cell(row)}</dd>
                     </div>
                   ))}
                 </dl>

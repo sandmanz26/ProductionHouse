@@ -2,14 +2,13 @@
 @import "@heroui/styles";
 
 /*
- * Serat — visual direction (see docs/BRAND.md).
- * A workshop ledger, not a marketing dashboard: small radii, hairline rules instead of shadows,
- * a serif voice for titles (the "book"), sans for work, monospace for anything you compare.
- * Palette: jati (accent), arang (ink), kertas (paper), serbuk (sawdust highlight).
+ * Serat — visual direction (see docs/BRAND.md), restyled with tasteskill's "achromatic ledger":
+ * the chrome is ink on a stone ground, the primary action is near-black, and colour is kept for
+ * data (process maps, status). One sans for words; every figure in mono, as a ledger's columns.
+ * Teak (jati) is the brand hue and appears on the mark and on the main data element only.
  */
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "IBM Plex Serif", ui-serif, Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
   --color-jati: oklch(0.5 0.115 50);
   --color-arang: oklch(0.2 0.008 60);
@@ -20,17 +19,33 @@
 :root,
 .light,
 [data-theme="light"] {
-  --radius: 0.25rem;
-  --accent: oklch(0.5 0.115 50);
-  --accent-foreground: oklch(0.99 0.01 80);
-  --focus: oklch(0.5 0.115 50);
-  --background: oklch(0.972 0.005 85);
-  --surface-shadow: 0 0 0 1px oklch(0.89 0.008 85);
-  --overlay-shadow: 0 0 0 1px oklch(0.86 0.008 85), 0 12px 32px -12px oklch(0.2 0.02 60 / 0.25);
-  --field-border: oklch(0.88 0.008 85);
+  --radius: 0.375rem;
+  /* Chrome: ink on stone. The accent drives HeroUI's primary button, so it is near-black. */
+  --accent: #141414;
+  --accent-foreground: #ffffff;
+  --focus: #1d5fbf;
+  --background: #f4f3f1;
+  --surface: #ffffff;
+  --foreground: #0a0a0a;
+  --muted: #5f5f5f;
+  --default: #ececea;
+  --border: #e6e6e6;
+  --surface-shadow: none;
+  --overlay-shadow: 0 0 0 1px #e0e0e0, 0 12px 32px -12px rgb(0 0 0 / 0.18);
+  --field-border: #d4d4d4;
   --field-border-width: 1px;
-  --ink-soft: oklch(0.45 0.01 70);
-  --rule: oklch(0.89 0.008 85);
+  --ink-soft: #5f5f5f;
+  /* Status text that reads at 4.5:1 on white. */
+  --success: #247b50;
+  --warning: #a15c07;
+  --danger: #c4242a;
+  --rule: #e6e6e6;
+  --pill-positive-bg: #dcfae5;
+  --pill-positive-ink: #04250e;
+  --pill-negative-bg: #ffedea;
+  --pill-negative-ink: #831c1e;
+  /* The one data hue: teak, on the screen's main data element only. */
+  --data: #964c1c;
   /* Process-map palette — validated with the dataviz checker (CVD-safe, ≥3:1 on white). */
   --flow-bahan: #a0612d;
   --flow-produk: #2a78d6;
@@ -43,21 +58,43 @@
 /* Unlayered rules beat HeroUI's layered theme, so every token set above must be re-set here. */
 .dark,
 [data-theme="dark"] {
-  --background: oklch(0.17 0.004 70);
-  --accent: oklch(0.74 0.11 62);
-  --accent-foreground: oklch(0.2 0.02 60);
-  --focus: oklch(0.74 0.11 62);
-  --surface-shadow: 0 0 0 1px oklch(0.32 0.005 70);
-  --overlay-shadow: 0 0 0 1px oklch(0.36 0.005 70), 0 16px 40px -12px oklch(0 0 0 / 0.6);
-  --field-border: oklch(0.34 0.005 70);
-  --ink-soft: oklch(0.72 0.01 70);
-  --rule: oklch(0.32 0.005 70);
+  --background: #0b0b0b;
+  --surface: #151515;
+  --foreground: #ffffff;
+  --muted: #b4b4b4;
+  --default: #242424;
+  --border: #2a2a2a;
+  --accent: #ffffff;
+  --accent-foreground: #0a0a0a;
+  --focus: #6c9ce8;
+  --surface-shadow: none;
+  --overlay-shadow: 0 0 0 1px #333333, 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --field-border: #444444;
+  --ink-soft: #b4b4b4;
+  --success: #3fc07a;
+  --warning: #e0a03a;
+  --danger: #e5566f;
+  --rule: #2a2a2a;
+  --data: #d08a52;
+  --pill-positive-bg: #172a1d;
+  --pill-positive-ink: #3fc07a;
+  --pill-negative-bg: #2c1a20;
+  --pill-negative-ink: #e5566f;
   --flow-bahan: #c27a40;
   --flow-produk: #3987e5;
   --flow-sisa: #199e70;
   --flow-biaya: #9085e9;
   --flow-netral: #77726b;
   --flow-rugi: #9a948b;
+}
+
+/* Controls follow the cards' tight corners; tables are rules and alignment, no header band. */
+.button {
+  border-radius: 6px;
+}
+.table__header,
+.table__column {
+  background-color: transparent;
 }
 
 html {
@@ -70,11 +107,11 @@ body {
   font-size: 14px;
 }
 
-/* Page titles speak in the brand's serif; everything you work with stays sans. */
+/* Page titles: a noun at 24/600 in the text face. */
 .title-display {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
 }
 
 /* Digits that get compared column-wise. */
@@ -87,13 +124,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Small uppercase labels used for metric and section captions. */
-.eyebrow {
-  font-size: 11px;
+/* Small labels over values and lists: sentence case, grey, readable. */
+.caption-label {
+  font-size: 12px;
   line-height: 16px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 500;
   color: var(--ink-soft);
 }
 

@@ -24,7 +24,7 @@ export function CostBreakdown({ cost, compact }: { cost: CostSummary; compact?: 
         />
       )}
       <div className="mt-3 border-t border-[var(--rule)] pt-2">
-        <p className="eyebrow mb-1">Unit cost per output</p>
+        <p className="caption-label mb-1">Unit cost per output</p>
         {cost.outputs.map((o) => {
           const it = item(o.itemId);
           return (
@@ -42,7 +42,7 @@ export function CostBreakdown({ cost, compact }: { cost: CostSummary; compact?: 
       </div>
       {((cost.revalued ?? 0) !== 0 || (cost.variance ?? 0) !== 0) && (
         <div className="mt-3 border-t border-[var(--rule)] pt-2">
-          <p className="eyebrow mb-1">Partial output</p>
+          <p className="caption-label mb-1">Partial output</p>
           <Row label="Stock revaluation (provisional → actual cost)" value={formatIDR(cost.revalued)} />
           <Row label="Cost variance on units already out of stock" value={formatIDR(cost.variance)} tone={cost.variance > 0 ? "warning" : "success"} />
         </div>

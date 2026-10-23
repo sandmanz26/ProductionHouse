@@ -4,7 +4,7 @@
  */
 export const BRAND = {
   name: "Serat",
-  version: "4.0",
+  version: "4.1",
   /** The promise, used on the welcome screen and in metadata. */
   line: "Every offcut has a price.",
   descriptor: "The production ledger for furniture workshops",

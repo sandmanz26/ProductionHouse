@@ -14,7 +14,6 @@ export function FlowSteps({ steps, note, compact }: { steps: FlowStep[]; note?: 
               className={`flex min-w-0 flex-1 flex-col justify-center rounded-sm border border-[var(--rule)] bg-surface ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} sm:min-w-28`}
               style={{ borderLeft: `3px solid ${STEP_COLOR[s.kind]}` }}
             >
-              <span className="num text-[10px] text-muted">{String(i + 1).padStart(2, "0")}</span>
               <span className={`${compact ? "text-[12px]" : "text-[13px]"} leading-snug font-medium`}>{s.label}</span>
               {s.sub && <span className="text-[11px] leading-snug text-muted">{s.sub}</span>}
             </div>

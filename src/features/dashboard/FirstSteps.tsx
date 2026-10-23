@@ -51,7 +51,7 @@ export function FirstSteps() {
                 s.done ? "border-success text-success" : i === next ? "border-accent text-accent" : "border-[var(--rule)] text-muted"
               }`}
             >
-              {s.done ? <Check className="size-3.5" aria-label="done" /> : String(i + 1).padStart(2, "0")}
+              {s.done ? <Check className="size-3.5" aria-label="done" /> : null}
             </span>
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-medium ${s.done ? "text-muted line-through decoration-[var(--rule)]" : ""}`}>{s.title}</p>

@@ -41,7 +41,7 @@ export default function RentalsPage() {
       key: "proj",
       header: "Event / project",
       cell: (r) => (
-        <div className="min-w-48">
+        <div className="sm:min-w-48">
           <p className="font-medium">{r.project}</p>
           <p className="text-xs text-muted">
             {partnerName(r.customerId)} · {r.lines.map((l) => `${l.qty}× ${item(l.itemId)?.name ?? "?"}`).join(", ")}

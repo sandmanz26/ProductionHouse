@@ -22,7 +22,7 @@ measured. The top board is full teak, the bottom board 38% — so the joint stil
 16 px. Straight lines only: it survives as a favicon, in black-and-white print, and as a stamp.
 
 - Code: `src/brand/Logo.tsx` (`LogoMark`, `Wordmark`), favicon `public/favicon.svg`.
-- The wordmark is always lowercase: **serat**, IBM Plex Serif 600, tracking −2%.
+- The wordmark is always lowercase: **serat**, IBM Plex Sans 600, tracking −2%.
 - Clear space = the width of one tail (¼ of the mark height). No shadows, gradients, or outlines.
 
 ## Decorative device
@@ -33,22 +33,28 @@ behind data.
 
 ## Colour
 
+v4.1 restyle, following tasteskill's app-screen rules ("achromatic ledger"): the chrome holds no
+colour, so colour always means something.
+
 | Name | Role | Value |
 |---|---|---|
-| **Teak** (*Jati*) | accent, primary action, mark | `oklch(0.5 0.115 50)` (dark: `oklch(0.74 0.11 62)`) |
-| **Charcoal** (*Arang*) | ink, welcome panel, favicon | `oklch(0.2 0.008 60)` |
-| **Paper** (*Kertas*) | background | `oklch(0.972 0.005 85)` |
-| **Sawdust** (*Serbuk*) | highlight on charcoal | `oklch(0.83 0.06 78)` |
+| **Stone** | page ground (one tone off white, low chroma, not cream) | `#f4f3f1` (dark: `#0b0b0b`) |
+| **Ink** | text, and the primary action as a near-black button | `#0a0a0a` / `#141414` (dark: white) |
+| **Grey** | secondary text, readable at 4.5:1 | `#5f5f5f` (dark: `#b4b4b4`) |
+| **Teak** (*Jati*) | the mark, and the main data element on a screen (job progress, material flows) | `#964c1c` (dark: `#d08a52`) |
+| **Charcoal** (*Arang*) | welcome panel, favicon | `oklch(0.2 0.008 60)` |
 
-Red/yellow/green are for status only (late, needs attention, complete) — never decoration.
+Surfaces are white cards with a 1px `#e6e6e6` border, no shadow; 8 px card corners, 6 px controls.
+Red/amber/green are for status only (late, needs attention, complete), as text that reads at
+4.5:1 or as pale pill pairs — never decoration.
 
 ## Typography
 
-- **IBM Plex Serif** — page titles and the wordmark. The "book" voice.
-- **IBM Plex Sans** — everything you work in: forms, tables, buttons.
-- **IBM Plex Mono** — numbers that get compared: document codes, qty, money. Tabular figures.
+- **IBM Plex Sans** — everything: titles (24/600), forms, tables, buttons, the wordmark.
+- **IBM Plex Mono** — every figure that gets compared: document codes, qty, money, in tabular
+  figures, so money reads as a ledger's columns. This is the one deliberate second face.
 
-One family, three voices: tidy like a shop drawing, not like a marketing dashboard.
+Labels are sentence case at 12px, never small uppercase. No index numbers (01 / 02) as decoration.
 
 ## Voice
 
@@ -64,5 +70,5 @@ One family, three voices: tidy like a shop drawing, not like a marketing dashboa
 ## Deliberately left out
 
 Purple-blue gradients, frosted-glass cards (*glassmorphism*), icons inside coloured circles, large
-rounded corners, soft shadows everywhere, 3D illustrations. Hairlines replace shadows;
-radius 4 px.
+rounded corners, soft shadows everywhere, 3D illustrations, cream grounds, coloured chrome. Borders
+replace shadows; radius 8 px for cards, 6 px for controls.

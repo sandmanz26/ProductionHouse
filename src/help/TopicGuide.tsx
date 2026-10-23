@@ -7,12 +7,12 @@ export function TopicGuide({ topic }: { topic: HelpTopic }) {
     <div className="flex flex-col gap-5 text-[13px] leading-relaxed">
       <p className="text-[14px]">{topic.summary}</p>
       <div>
-        <p className="eyebrow mb-2">How it flows</p>
+        <p className="caption-label mb-2">How it flows</p>
         <FlowSteps steps={topic.flow} note={topic.flowNote} compact />
       </div>
       {topic.tasks.map((t) => (
         <div key={t.title}>
-          <p className="eyebrow mb-1.5">{t.title}</p>
+          <p className="caption-label mb-1.5">{t.title}</p>
           <ol className="ml-5 list-decimal space-y-1 marker:text-muted">
             {t.steps.map((s, k) => (
               <li key={k}>{s}</li>
@@ -22,7 +22,7 @@ export function TopicGuide({ topic }: { topic: HelpTopic }) {
       ))}
       {topic.effects?.length ? (
         <div>
-          <p className="eyebrow mb-1.5">What it changes elsewhere</p>
+          <p className="caption-label mb-1.5">What it changes elsewhere</p>
           <ul className="ml-5 list-disc space-y-1 marker:text-muted">
             {topic.effects.map((e, k) => (
               <li key={k}>{e}</li>
@@ -32,7 +32,7 @@ export function TopicGuide({ topic }: { topic: HelpTopic }) {
       ) : null}
       {topic.terms?.length ? (
         <div>
-          <p className="eyebrow mb-1.5">Words on this page</p>
+          <p className="caption-label mb-1.5">Words on this page</p>
           <dl className="space-y-1.5">
             {topic.terms.map((name) => {
               const term = termByName(name);

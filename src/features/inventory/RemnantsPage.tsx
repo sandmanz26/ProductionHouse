@@ -40,7 +40,7 @@ export default function RemnantsPage() {
       header: "Material",
       isRowHeader: true,
       cell: (r) => (
-        <div className="min-w-40">
+        <div className="sm:min-w-40">
           <p className="font-medium">{r.item.name}</p>
           <p className="text-xs text-muted">
             {r.lot.code} · {r.lot.location}

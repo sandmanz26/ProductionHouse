@@ -61,7 +61,7 @@ export default function SalesDetailPage() {
       header: "Item",
       isRowHeader: true,
       cell: (l) => (
-        <div className="min-w-40">
+        <div className="sm:min-w-40">
           <p className="font-medium">{item(l.itemId)?.name ?? "?"}</p>
           {l.spec && <p className="text-xs text-muted">Spec: {l.spec}</p>}
         </div>

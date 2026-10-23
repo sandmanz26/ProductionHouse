@@ -33,7 +33,7 @@ export default function ProductStockPage() {
       header: "Product",
       isRowHeader: true,
       cell: (r) => (
-        <div className="min-w-44">
+        <div className="sm:min-w-44">
           <p className="font-medium">{r.name}</p>
           <p className="text-xs text-muted">
             {r.sku} · {PRODUCT_CATEGORY[r.category as keyof typeof PRODUCT_CATEGORY] ?? r.category}

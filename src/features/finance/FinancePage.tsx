@@ -85,7 +85,7 @@ export default function FinancePage() {
           </Tabs.List>
         </Tabs.ListContainer>
       </Tabs>
-      <div className="rounded-md bg-surface shadow-[var(--surface-shadow)]">
+      <div className="rounded-md bg-surface border border-[var(--rule)]">
         <DataTable label="Open bills" columns={columns} rows={rows} dependencies={[view]} empty={<EmptyBlock title="All clear" description="No open bills in this list." />} />
       </div>
       {paying && <PaymentDialog doc={paying.doc} id={paying.id} isOpen onOpenChange={(o) => !o && setPaying(null)} />}

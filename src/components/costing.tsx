@@ -4,8 +4,8 @@ import { COSTING_HINT } from "@/lib/labels";
 function Compliance({ method }: { method: CostingMethod }) {
   const c = COSTING_COMPLIANCE[method];
   const tag = (ok: boolean, label: string) => (
-    <span className={`num rounded-sm border px-1.5 py-px text-[10px] ${ok ? "border-success/40 text-success" : "border-danger/40 text-danger"}`}>
-      {ok ? "✓" : "✗"} {label}
+    <span className={`rounded-sm px-1.5 py-px text-[11px] font-medium ${ok ? "bg-[var(--pill-positive-bg)] text-[var(--pill-positive-ink)]" : "bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)]"}`}>
+      {label} {ok ? "allowed" : "not allowed"}
     </span>
   );
   return (

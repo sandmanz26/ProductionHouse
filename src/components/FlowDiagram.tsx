@@ -320,5 +320,6 @@ export function FlowDiagram({ graph, label, empty = "No flows to draw yet." }: {
 }
 
 const HALO = { paintOrder: "stroke", stroke: "var(--surface)", strokeWidth: 4, strokeLinejoin: "round" } as const;
-const HATCH_CSS = "repeating-linear-gradient(45deg, transparent 0 2px, rgba(255,255,255,.55) 2px 3px)";
+// A hatch marks provisional (estimated) flows: data encoding, not decoration.
+const HATCH_CSS = "repeating-linear-gradient(45deg, transparent 0 2px, rgba(255,255,255,.55) 2px 3px)"; // taste-skill-ignore
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
